@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -624,16 +624,20 @@ export default function CoursePage() {
   const params = useParams();
   const courseId = params.id as string;
   const [activeTab, setActiveTab] = useState('modules');
-  const { currentCourse, fetchCourse } = useCoursesStore();
+  const { courses, fetchCourses } = useCoursesStore();
 
-  // Fetch course details
-  useState(() => {
-    if (courseId) {
-      fetchCourse(courseId);
+  // Fetch courses if not loaded (safeguard for direct navigation)
+  useEffect(() => {
+    if (courses.length === 0) {
+      fetchCourses();
     }
-  });
+  }, [courses.length, fetchCourses]);
 
-  const course = currentCourse;
+  // Find course metadata from the courses list
+  const courseInfo = courses.find((c) => c.course_section_id === courseId);
+  const courseCode = courseInfo?.course_code || 'COURSE';
+  const courseTitle = courseInfo?.course_title || 'Course Title';
+  const sectionName = courseInfo?.section_name || 'SECTION';
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -673,11 +677,11 @@ export default function CoursePage() {
         <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <div className="flex items-center gap-2 text-sm font-medium text-white/80 mb-2">
-              <span className="text-gold-400">{course?.course?.code || 'COURSE'}</span>
+              <span className="text-gold-400">{courseCode}</span>
               <span>@</span>
-              <span>{course?.section?.name || 'SECTION'}</span>
+              <span>{sectionName}</span>
             </div>
-            <h1 className="font-display text-4xl font-bold">{course?.course?.title || 'Course Title'}</h1>
+            <h1 className="font-display text-4xl font-bold">{courseTitle}</h1>
           </motion.div>
         </div>
       </div>
