@@ -140,6 +140,56 @@ function ModulesTab({
     });
   };
 
+  // Get activity icon config based on status
+  const getActivityConfig = (activity: Activity) => {
+    const submission = activity.my_submission;
+    const isLate = activity.deadline && new Date(activity.deadline) < new Date() && !submission;
+
+    if (!submission) {
+      return {
+        iconColor: isLate ? 'text-red-500' : 'text-amber-500',
+        iconBg: isLate ? 'bg-red-50' : 'bg-amber-50',
+        status: isLate ? 'late' : 'not-started',
+      };
+    }
+
+    switch (submission.status) {
+      case 'graded':
+        return { iconColor: 'text-emerald-500', iconBg: 'bg-emerald-50', status: 'graded' };
+      case 'submitted':
+        return { iconColor: 'text-blue-500', iconBg: 'bg-blue-50', status: 'submitted' };
+      case 'late':
+        return { iconColor: 'text-red-500', iconBg: 'bg-red-50', status: 'late-submitted' };
+      default:
+        return { iconColor: 'text-amber-500', iconBg: 'bg-amber-50', status: 'not-started' };
+    }
+  };
+
+  // Get quiz icon config based on status
+  const getQuizConfig = (quiz: Quiz) => {
+    const now = new Date();
+    const openAt = quiz.open_at ? new Date(quiz.open_at) : null;
+    const closeAt = quiz.close_at ? new Date(quiz.close_at) : null;
+
+    if (closeAt && now > closeAt) {
+      return { iconColor: 'text-gray-500', iconBg: 'bg-gray-100', status: 'closed' };
+    }
+
+    if (openAt && now < openAt) {
+      return { iconColor: 'text-amber-500', iconBg: 'bg-amber-50', status: 'not-open' };
+    }
+
+    if (quiz.my_attempt?.is_submitted) {
+      return { iconColor: 'text-emerald-500', iconBg: 'bg-emerald-50', status: 'completed' };
+    }
+
+    if (quiz.my_in_progress_attempt) {
+      return { iconColor: 'text-blue-500', iconBg: 'bg-blue-50', status: 'in-progress' };
+    }
+
+    return { iconColor: 'text-navy-600', iconBg: 'bg-navy-50', status: 'available' };
+  };
+
   if (!modules?.length) return <EmptyState message="No modules available" />;
 
   return (
@@ -150,28 +200,45 @@ function ModulesTab({
         const modQuizzes = quizzes.filter((q) => q.weekly_module_id === module.id);
         const modFiles = files.filter((f) => f.weekly_module_id === module.id);
 
-        // Combine all items with their type for display
+        // Combine all items with their type and status config for display
         const moduleItems = [
-          ...modActivities.map((a) => ({
-            id: a.id,
-            type: 'activity' as const,
-            title: a.title,
-            meta: a.deadline ? `Due ${formatDate(a.deadline)}` : 'No due date',
-            published: a.is_published,
-          })),
-          ...modQuizzes.map((q) => ({
-            id: q.id,
-            type: 'quiz' as const,
-            title: q.title,
-            meta: q.time_limit_minutes ? `${q.time_limit_minutes} min` : `${q.question_count || 0} questions`,
-            published: q.is_published,
-          })),
+          ...modActivities.map((a) => {
+            const config = getActivityConfig(a);
+            return {
+              id: a.id,
+              type: 'activity' as const,
+              title: a.title,
+              meta: a.deadline ? `Due ${formatDate(a.deadline)}` : 'No due date',
+              published: a.is_published,
+              iconColor: config.iconColor,
+              iconBg: config.iconBg,
+              status: config.status,
+            };
+          }),
+          ...modQuizzes.map((q) => {
+            const config = getQuizConfig(q);
+            return {
+              id: q.id,
+              type: 'quiz' as const,
+              title: q.title,
+              meta: q.time_limit_minutes ? `${q.time_limit_minutes} min` : `${q.question_count || 0} questions`,
+              published: q.is_published,
+              iconColor: config.iconColor,
+              iconBg: config.iconBg,
+              status: config.status,
+              openAt: q.open_at,
+              closeAt: q.close_at,
+            };
+          }),
           ...modFiles.map((f) => ({
             id: f.id,
             type: 'file' as const,
             title: f.file_name,
             meta: formatFileSize(f.file_size_bytes),
             published: f.is_visible,
+            iconColor: 'text-blue-500',
+            iconBg: 'bg-blue-50',
+            status: 'file',
           })),
         ];
 
@@ -230,21 +297,52 @@ function ModulesTab({
                             if (item.type === 'activity') {
                               router.push(`/activities/${item.id}`);
                             } else if (item.type === 'quiz') {
-                              router.push(`/quizzes/${item.id}`);
+                              // Check if quiz can be clicked
+                              if (item.status !== 'not-open') {
+                                router.push(`/quizzes/${item.id}`);
+                              }
                             }
                           }}
                           className={cn(
                             "flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors",
-                            (item.type === 'activity' || item.type === 'quiz') && "cursor-pointer"
+                            (item.type === 'activity' || (item.type === 'quiz' && item.status !== 'not-open')) && "cursor-pointer",
+                            item.type === 'quiz' && item.status === 'not-open' && "opacity-75 cursor-not-allowed"
                           )}
                         >
-                          {item.type === 'file' && <FolderOpen className="w-5 h-5 text-blue-500" />}
-                          {item.type === 'activity' && <FileText className="w-5 h-5 text-green-500" />}
-                          {item.type === 'quiz' && <ClipboardCheck className="w-5 h-5 text-orange-500" />}
+                          <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', item.iconBg)}>
+                            {item.type === 'file' && <FolderOpen className={cn('w-4 h-4', item.iconColor)} />}
+                            {item.type === 'activity' && <FileText className={cn('w-4 h-4', item.iconColor)} />}
+                            {item.type === 'quiz' && <ClipboardCheck className={cn('w-4 h-4', item.iconColor)} />}
+                          </div>
                           <div className="flex-1">
                             <span className="text-navy-700">{item.title}</span>
                             {item.meta && <span className="text-sm text-gray-400 ml-2">{item.meta}</span>}
                           </div>
+                          {/* Status indicators */}
+                          {item.type === 'activity' && item.status === 'graded' && (
+                            <span className="text-xs font-medium text-emerald-600">Graded</span>
+                          )}
+                          {item.type === 'activity' && item.status === 'submitted' && (
+                            <span className="text-xs font-medium text-blue-600">Submitted</span>
+                          )}
+                          {item.type === 'activity' && item.status === 'not-started' && (
+                            <span className="text-xs font-medium text-amber-600">Not Started</span>
+                          )}
+                          {item.type === 'activity' && item.status === 'late' && (
+                            <span className="text-xs font-medium text-red-600">Overdue</span>
+                          )}
+                          {item.type === 'quiz' && item.status === 'completed' && (
+                            <span className="text-xs font-medium text-emerald-600">Completed</span>
+                          )}
+                          {item.type === 'quiz' && item.status === 'in-progress' && (
+                            <span className="text-xs font-medium text-blue-600">In Progress</span>
+                          )}
+                          {item.type === 'quiz' && item.status === 'not-open' && (
+                            <span className="text-xs font-medium text-amber-600">Locked</span>
+                          )}
+                          {item.type === 'quiz' && item.status === 'closed' && (
+                            <span className="text-xs font-medium text-gray-500">Closed</span>
+                          )}
                           {!item.published && (
                             <span className="text-xs text-gray-400">Draft</span>
                           )}
