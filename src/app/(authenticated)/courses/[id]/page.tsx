@@ -46,6 +46,8 @@ import {
   RotateCcw,
   Eye,
   Layers,
+  CheckSquare,
+  HelpCircle,
 } from 'lucide-react';
 
 const tabs = [
@@ -398,22 +400,22 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
       return {
         status: isLate ? 'late' : 'not-started',
         badge: isLate ? (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-600 border border-amber-100">
             <Clock className="w-3.5 h-3.5" />
             Overdue
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
             Not Started
           </span>
         ),
-        iconBg: isLate ? 'bg-red-50' : 'bg-amber-50',
-        iconColor: isLate ? 'text-red-600' : 'text-amber-600',
-        barColor: isLate ? 'bg-red-500' : 'bg-amber-500',
+        iconBg: isLate ? 'bg-amber-100' : 'bg-gray-100',
+        iconColor: isLate ? 'text-amber-600' : 'text-gray-500',
+        barColor: isLate ? 'bg-amber-500' : 'bg-gray-300',
         buttonText: isLate ? 'Submit Now' : 'Start Assignment',
         buttonVariant: 'btn-primary' as const,
         buttonDisabled: false,
-        pointsColor: 'text-navy-800',
+        pointsColor: isLate ? 'text-amber-600' : 'text-navy-800',
       };
     }
 
@@ -422,12 +424,12 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
         return {
           status: 'graded',
           badge: (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-600 border border-emerald-100">
               <CheckCircle className="w-3.5 h-3.5" />
               Graded
             </span>
           ),
-          iconBg: 'bg-emerald-50',
+          iconBg: 'bg-emerald-100',
           iconColor: 'text-emerald-600',
           barColor: 'bg-emerald-500',
           buttonText: 'View Feedback',
@@ -439,12 +441,12 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
         return {
           status: 'submitted',
           badge: (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-600">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600 border border-blue-100">
               <CheckCircle className="w-3.5 h-3.5" />
               Submitted
             </span>
           ),
-          iconBg: 'bg-blue-50',
+          iconBg: 'bg-blue-100',
           iconColor: 'text-blue-600',
           barColor: 'bg-blue-500',
           buttonText: 'View Submission',
@@ -456,14 +458,14 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
         return {
           status: 'late-submitted',
           badge: (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-600">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600 border border-blue-100">
               <Clock className="w-3.5 h-3.5" />
               Submitted Late
             </span>
           ),
-          iconBg: 'bg-orange-50',
-          iconColor: 'text-orange-600',
-          barColor: 'bg-orange-500',
+          iconBg: 'bg-blue-100',
+          iconColor: 'text-blue-600',
+          barColor: 'bg-blue-500',
           buttonText: 'View Submission',
           buttonVariant: 'btn-secondary' as const,
           buttonDisabled: false,
@@ -473,13 +475,13 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
         return {
           status: 'not-started',
           badge: (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
               Not Started
             </span>
           ),
-          iconBg: 'bg-amber-50',
-          iconColor: 'text-amber-600',
-          barColor: 'bg-amber-500',
+          iconBg: 'bg-gray-100',
+          iconColor: 'text-gray-500',
+          barColor: 'bg-gray-300',
           buttonText: 'Start Assignment',
           buttonVariant: 'btn-primary' as const,
           buttonDisabled: false,
@@ -522,7 +524,7 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
   return (
     <div className="space-y-6">
       {/* Filter Tabs */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         {[
           { id: 'all', label: 'All' },
           { id: 'pending', label: 'Pending' },
@@ -533,16 +535,16 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
             key={tab.id}
             onClick={() => setFilter(tab.id as typeof filter)}
             className={cn(
-              'px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+              'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200',
               filter === tab.id
-                ? 'bg-navy-600 text-white shadow-md'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-navy-600 text-white'
+                : 'text-gray-500 hover:bg-gray-100'
             )}
           >
             {tab.label}
             <span
               className={cn(
-                'ml-2 px-1.5 py-0.5 rounded-full text-xs',
+                'px-2 py-0.5 rounded-full text-xs',
                 filter === tab.id ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-600'
               )}
             >
@@ -553,7 +555,7 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
       </div>
 
       {/* Assignment Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         {filteredAssignments.map((activity: Activity) => {
           const config = getAssignmentConfig(activity);
           const submission = activity.my_submission;
@@ -562,71 +564,73 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
           return (
             <div
               key={activity.id}
-              className="bg-white rounded-2xl shadow-card hover:shadow-card-hover transition-all duration-200 overflow-hidden group"
+              className="bg-white rounded-2xl shadow-card hover:shadow-card-hover transition-all duration-200 overflow-hidden group cursor-pointer"
+              onClick={() => router.push(`/activities/${activity.id}`)}
             >
               {/* Status Bar */}
               <div className={cn('h-1.5 w-full', config.barColor)} />
 
-              <div className="p-5">
-                {/* Header */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', config.iconBg)}>
-                    <FileText className={cn('w-6 h-6', config.iconColor)} />
+              <div className="p-6">
+                {/* Header - Icon + Badge */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className={cn('w-11 h-11 rounded-full flex items-center justify-center', config.iconBg)}>
+                    <FileText className={cn('w-5 h-5', config.iconColor)} />
                   </div>
                   {config.badge}
                 </div>
 
-                {/* Title & Description */}
-                <h3 className="font-display font-semibold text-lg text-navy-800 mb-2 line-clamp-1">
+                {/* Title */}
+                <h3 className="font-display font-semibold text-xl text-navy-800 mb-2" style={{ fontFamily: "'Crimson Pro', serif" }}>
                   {activity.title}
                 </h3>
+
+                {/* Description */}
                 {activity.instructions && (
                   <p className="text-sm text-gray-500 line-clamp-2 mb-4 leading-relaxed">
                     {activity.instructions}
                   </p>
                 )}
 
-                {/* Meta Grid */}
-                <div className="grid grid-cols-2 gap-3 mb-5">
-                  <div className={cn('flex items-center gap-2 text-sm', isOverdue ? 'text-red-600' : 'text-gray-500')}>
-                    <Calendar className={cn('w-4 h-4', isOverdue ? 'text-red-500' : 'text-gray-400')} />
-                    {activity.deadline ? (
-                      <span>
-                        {submission?.status === 'graded' ? `Graded ${formatDate(submission.graded_at || '')}` :
-                         submission?.status === 'submitted' || submission?.status === 'late' ? `Submitted ${formatDate(submission.submitted_at || '')}` :
-                         isOverdue ? `Due ${formatDate(activity.deadline)}` :
-                         `Due ${formatDate(activity.deadline)}`}
-                        {submission?.status === 'late' && ' (Late)'}
-                      </span>
-                    ) : (
-                      <span>No due date</span>
-                    )}
+                {/* Meta Row */}
+                <div className="flex items-center gap-6 mb-5">
+                  <div className={cn('flex items-center gap-2 text-sm', isOverdue ? 'text-amber-600' : 'text-gray-500')}>
+                    <Calendar className={cn('w-4 h-4', isOverdue ? 'text-amber-500' : 'text-gray-400')} />
+                    <span>
+                      {activity.deadline ? (
+                        isOverdue ? `Due ${formatDate(activity.deadline)}` : `Due ${formatDate(activity.deadline)}`
+                      ) : (
+                        'No due date'
+                      )}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <ClipboardCheck className="w-4 h-4 text-gray-400" />
+                    <Layers className="w-4 h-4 text-gray-400" />
                     <span>{activity.points} points</span>
                   </div>
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-between">
                   <span className={cn('text-sm font-semibold', config.pointsColor)}>
                     {submission?.status === 'graded'
-                      ? `${submission.score}/${activity.points} (${Math.round((submission.score / activity.points) * 100)}%)`
+                      ? `${submission.score}/${activity.points} points`
                       : submission?.status === 'submitted' || submission?.status === 'late'
                       ? 'Pending Grade'
                       : `${activity.points} points`}
                   </span>
                   <button
-                    onClick={() => router.push(`/activities/${activity.id}`)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/activities/${activity.id}`);
+                    }}
                     className={cn(
-                      'btn text-sm px-4 py-2 rounded-xl transition-all duration-200',
+                      'text-sm font-medium transition-colors duration-200',
                       config.buttonVariant === 'btn-primary'
-                        ? 'btn-primary'
-                        : 'btn-secondary bg-gray-100 text-gray-700 hover:bg-gray-200 border-0'
+                        ? 'text-navy-600 hover:text-navy-700'
+                        : 'text-gray-500 hover:text-gray-700'
                     )}
                   >
-                    {config.buttonText}
+                    {config.buttonText} →
                   </button>
                 </div>
               </div>
@@ -666,76 +670,74 @@ function QuizzesTab({ quizzes }: { quizzes: Quiz[] }) {
 
     // Check quiz status
     if (closeAt && now > closeAt) {
-      // Closed
       return {
         status: 'closed',
-        badge: <span className="badge bg-gray-100 text-gray-600">Closed</span>,
         iconBg: 'bg-gray-100',
-        iconColor: 'text-gray-500',
-        buttonText: 'View',
-        buttonVariant: 'btn-outline' as const,
-        buttonDisabled: false,
-        canClick: true,
-      };
-    }
-
-    if (openAt && now < openAt) {
-      // Not open yet
-      return {
-        status: 'not-open',
-        badge: <span className="badge badge-warning">Opens {formatDate(quiz.open_at!)}</span>,
-        iconBg: 'bg-amber-100',
-        iconColor: 'text-amber-600',
+        icon: Lock,
+        iconColor: 'text-gray-400',
+        badge: null,
+        badgeColor: '',
         buttonText: 'Locked',
-        buttonVariant: 'btn-outline' as const,
-        buttonDisabled: true,
         canClick: false,
       };
     }
 
+    if (openAt && now < openAt) {
+      return {
+        status: 'not-open',
+        iconBg: 'bg-gray-100',
+        icon: Lock,
+        iconColor: 'text-gray-400',
+        badge: null,
+        badgeColor: '',
+        buttonText: 'Locked',
+        canClick: false,
+        openDate: quiz.open_at,
+      };
+    }
+
     if (quiz.my_attempt?.is_submitted) {
-      // Completed - check if can retry
-      const canRetry = (quiz.my_attempt.attempts_used || 0) < quiz.attempt_limit;
+      const percentage = Math.round((quiz.my_attempt.score / quiz.my_attempt.max_score) * 100);
       return {
         status: 'completed',
-        badge: (
-          <span className="badge badge-success">
-            Score: {quiz.my_attempt.score}/{quiz.my_attempt.max_score}
-          </span>
-        ),
-        iconBg: 'bg-emerald-100',
-        iconColor: 'text-emerald-600',
-        buttonText: canRetry ? 'Try Again' : 'Review',
-        buttonVariant: canRetry ? 'btn-primary' : 'btn-outline' as const,
-        buttonDisabled: false,
+        iconBg: 'bg-emerald-500',
+        icon: CheckCircle,
+        iconColor: 'text-white',
+        badge: 'Completed',
+        badgeColor: 'bg-emerald-50 text-emerald-600',
+        score: percentage,
+        scoreLabel: `${quiz.my_attempt.score}/${quiz.my_attempt.max_score}`,
+        buttonText: 'Review',
         canClick: true,
+        submittedDate: quiz.my_attempt.submitted_at,
+        bestOf: quiz.attempt_limit > 1 ? `Best of ${quiz.attempt_limit}` : null,
       };
     }
 
     if (quiz.my_in_progress_attempt) {
-      // In progress
       return {
         status: 'in-progress',
-        badge: <span className="badge badge-info">In Progress</span>,
-        iconBg: 'bg-blue-100',
-        iconColor: 'text-blue-600',
+        iconBg: 'bg-navy-600',
+        icon: Play,
+        iconColor: 'text-white',
+        badge: 'In Progress',
+        badgeColor: 'bg-blue-50 text-blue-600',
         buttonText: 'Resume',
-        buttonVariant: 'btn-primary' as const,
-        buttonDisabled: false,
         canClick: true,
       };
     }
 
-    // Available
+    const attemptsRemaining = quiz.attempt_limit - (quiz.my_attempt?.attempts_used || 0);
     return {
       status: 'available',
-      badge: <span className="badge badge-navy">Available</span>,
-      iconBg: 'bg-navy-100',
-      iconColor: 'text-navy-600',
+      iconBg: 'bg-navy-600',
+      icon: HelpCircle,
+      iconColor: 'text-white',
+      badge: null,
+      badgeColor: '',
       buttonText: 'Start Quiz',
-      buttonVariant: 'btn-primary' as const,
-      buttonDisabled: false,
       canClick: true,
+      attemptsRemaining,
     };
   };
 
@@ -743,34 +745,107 @@ function QuizzesTab({ quizzes }: { quizzes: Quiz[] }) {
   if (!publishedQuizzes.length) return <EmptyState message="No quizzes available" />;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {publishedQuizzes.map((quiz) => {
         const config = getQuizConfig(quiz);
+        const Icon = config.icon;
+        const attemptsRemaining = quiz.attempt_limit - (quiz.my_attempt?.attempts_used || 0);
+        const isCompleted = config.status === 'completed';
+
         return (
           <div
             key={quiz.id}
-            onClick={() => config.canClick && router.push(`/quizzes/${quiz.id}`)}
             className={cn(
-              "bg-white rounded-xl shadow-card p-5 hover:shadow-card-hover transition-shadow",
-              config.canClick ? "cursor-pointer" : "opacity-75 cursor-not-allowed"
+              "flex items-center gap-5 p-6 bg-white rounded-2xl shadow-card transition-all duration-200",
+              config.canClick ? "hover:shadow-card-hover" : "opacity-75"
             )}
           >
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-4">
-                <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', config.iconBg)}>
-                  <ClipboardCheck className={cn('w-6 h-6', config.iconColor)} />
-                </div>
-                <div>
-                  <h3 className="font-display font-semibold text-navy-800">{quiz.title}</h3>
-                  <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                    <span>{quiz.question_count || 0} questions</span>
-                    {quiz.time_limit_minutes && <span>{quiz.time_limit_minutes} min</span>}
-                    <span>{quiz.attempt_limit} attempts allowed</span>
+            {/* Quiz Icon */}
+            <div className={cn(
+              'w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0',
+              config.iconBg
+            )}>
+              <Icon className={cn('w-6 h-6', config.iconColor)} />
+            </div>
+
+            {/* Quiz Content */}
+            <div className="flex-1 min-w-0">
+              <h3 className={cn(
+                "font-display font-semibold text-lg",
+                config.status === 'not-open' || config.status === 'closed' ? 'text-gray-500' : 'text-navy-800'
+              )}>
+                {quiz.title}
+              </h3>
+              {quiz.instructions && (
+                <p className={cn(
+                  "text-sm mt-1 line-clamp-1",
+                  config.status === 'not-open' || config.status === 'closed' ? 'text-gray-400' : 'text-gray-500'
+                )}>
+                  {quiz.instructions}
+                </p>
+              )}
+              <div className="flex items-center gap-5 mt-2.5 text-xs text-gray-400">
+                <span className="flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5" />
+                  {quiz.time_limit_minutes || 0} minutes
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <CheckSquare className="w-3.5 h-3.5" />
+                  {quiz.question_count || 0} questions
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  {isCompleted
+                    ? `${attemptsRemaining} attempt${attemptsRemaining !== 1 ? 's' : ''} remaining`
+                    : `${quiz.attempt_limit} attempt${quiz.attempt_limit !== 1 ? 's' : ''} allowed`}
+                </span>
+                {isCompleted && quiz.my_attempt?.submitted_at && (
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5" />
+                    Completed {formatDate(quiz.my_attempt.submitted_at)}
+                  </span>
+                )}
+                {config.status === 'not-open' && quiz.open_at && (
+                  <span className="flex items-center gap-1.5 text-amber-600">
+                    <Lock className="w-3.5 h-3.5" />
+                    Opens {formatDate(quiz.open_at)}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Right Section: Status Badge + Score + Button */}
+            <div className="flex items-center gap-4 flex-shrink-0">
+              {/* Status Badge - only show if exists */}
+              {config.badge && (
+                <span className={cn('px-3 py-1 rounded-full text-xs font-medium', config.badgeColor)}>
+                  {config.badge}
+                </span>
+              )}
+
+              {/* Score Display for Completed */}
+              {isCompleted && (
+                <div className="flex items-center gap-4">
+                  <div className="text-right pr-4 border-r border-gray-200">
+                    <div className={cn(
+                      'text-3xl font-bold leading-none',
+                      config.score! >= 90 ? 'text-emerald-500' :
+                      config.score! >= 80 ? 'text-blue-500' :
+                      config.score! >= 70 ? 'text-amber-500' : 'text-red-500'
+                    )}>
+                      {config.score}%
+                    </div>
+                    <div className="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5">Score</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{config.scoreLabel} correct</div>
+                    {config.bestOf && (
+                      <div className="text-xs text-gray-400 mt-0.5">{config.bestOf}</div>
+                    )}
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-                {config.badge}
+              )}
+
+              {/* Action Button */}
+              {config.status !== 'not-open' && config.status !== 'closed' && (
                 <button
                   onClick={() => {
                     if (config.status === 'in-progress' && quiz.my_in_progress_attempt) {
@@ -779,12 +854,21 @@ function QuizzesTab({ quizzes }: { quizzes: Quiz[] }) {
                       router.push(`/quizzes/${quiz.id}`);
                     }
                   }}
-                  disabled={config.buttonDisabled}
-                  className={cn('btn', config.buttonVariant, config.buttonDisabled && 'opacity-50 cursor-not-allowed')}
+                  className={cn(
+                    'px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors',
+                    isCompleted
+                      ? 'bg-slate-100 text-navy-700 hover:bg-slate-200'
+                      : 'bg-navy-600 text-white hover:bg-navy-700'
+                  )}
                 >
                   {config.buttonText}
                 </button>
-              </div>
+              )}
+
+              {/* Locked indicator */}
+              {(config.status === 'not-open' || config.status === 'closed') && (
+                <span className="text-sm text-gray-400 font-medium">{config.buttonText}</span>
+              )}
             </div>
           </div>
         );
