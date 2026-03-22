@@ -102,76 +102,149 @@ function EmptyState({ message }: { message: string }) {
 }
 
 // Modules Tab
-function ModulesTab({ modules }: { modules: WeeklyModule[] }) {
-  const [expandedModule, setExpandedModule] = useState<string | null>(null);
+function ModulesTab({
+  modules,
+  activities,
+  quizzes,
+  files
+}: {
+  modules: WeeklyModule[];
+  activities: Activity[];
+  quizzes: Quiz[];
+  files: CourseFile[];
+}) {
+  // Track which modules are expanded - all expanded by default when modules load
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
 
-  // Module items are included in the modules data
-  const moduleItems = expandedModule
-    ? modules?.find((m) => m.id === expandedModule)?.items || []
-    : [];
+  // Expand all modules when data loads
+  useEffect(() => {
+    if (modules?.length) {
+      setExpandedModules(new Set(modules.map(m => m.id)));
+    }
+  }, [modules]);
+
+  const toggleModule = (moduleId: string) => {
+    setExpandedModules(prev => {
+      const next = new Set(prev);
+      if (next.has(moduleId)) {
+        next.delete(moduleId);
+      } else {
+        next.add(moduleId);
+      }
+      return next;
+    });
+  };
 
   if (!modules?.length) return <EmptyState message="No modules available" />;
 
   return (
     <div className="space-y-4">
-      {modules.map((module) => (
-        <div key={module.id} className="bg-white rounded-xl shadow-card overflow-hidden">
-          <button
-            onClick={() => setExpandedModule(expandedModule === module.id ? null : module.id)}
-            className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-lg bg-navy-100 flex items-center justify-center">
-                <span className="font-display font-bold text-navy-600">W{module.week_number}</span>
-              </div>
-              <div className="text-left">
-                <h3 className="font-display font-semibold text-navy-800">{module.title}</h3>
-                <p className="text-sm text-gray-500">{module.description || 'No description'}</p>
-              </div>
-            </div>
-            <ChevronDown
-              className={cn(
-                'w-5 h-5 text-gray-400 transition-transform',
-                expandedModule === module.id && 'rotate-180'
-              )}
-            />
-          </button>
+      {modules.map((module) => {
+        // Derive module items from activities, quizzes, and files that belong to this module
+        const modActivities = activities.filter((a) => a.weekly_module_id === module.id);
+        const modQuizzes = quizzes.filter((q) => q.weekly_module_id === module.id);
+        const modFiles = files.filter((f) => f.weekly_module_id === module.id);
 
-          <AnimatePresence>
-            {expandedModule === module.id && (
-              <motion.div
-                initial={{ height: 0 }}
-                animate={{ height: 'auto' }}
-                exit={{ height: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="px-5 pb-5 space-y-2">
-                  {moduleItems?.length ? (
-                    moduleItems.map((item: ModuleItem, index: number) => (
-                      <motion.div
-                        key={item.id}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-                      >
-                        {item.item_type === 'file' && <FolderOpen className="w-5 h-5 text-blue-500" />}
-                        {item.item_type === 'link' && <ExternalLink className="w-5 h-5 text-purple-500" />}
-                        {item.item_type === 'activity' && <FileText className="w-5 h-5 text-green-500" />}
-                        {item.item_type === 'quiz' && <ClipboardCheck className="w-5 h-5 text-orange-500" />}
-                        {item.item_type === 'label' && <span className="w-5 h-5 flex items-center justify-center text-gray-400">#</span>}
-                        <span className="text-navy-700">{item.title}</span>
-                      </motion.div>
-                    ))
-                  ) : (
-                    <p className="text-gray-500 py-4">No items in this module</p>
-                  )}
+        // Combine all items with their type for display
+        const moduleItems = [
+          ...modActivities.map((a) => ({
+            id: a.id,
+            type: 'activity' as const,
+            title: a.title,
+            meta: a.deadline ? `Due ${formatDate(a.deadline)}` : 'No due date',
+            published: a.is_published,
+          })),
+          ...modQuizzes.map((q) => ({
+            id: q.id,
+            type: 'quiz' as const,
+            title: q.title,
+            meta: q.time_limit_minutes ? `${q.time_limit_minutes} min` : `${q.question_count || 0} questions`,
+            published: q.is_published,
+          })),
+          ...modFiles.map((f) => ({
+            id: f.id,
+            type: 'file' as const,
+            title: f.file_name,
+            meta: formatFileSize(f.file_size_bytes),
+            published: f.is_visible,
+          })),
+        ];
+
+        return (
+          <div key={module.id} className="bg-white rounded-xl shadow-card overflow-hidden">
+            <button
+              onClick={() => toggleModule(module.id)}
+              className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-lg bg-navy-100 flex items-center justify-center">
+                  <span className="font-display font-bold text-navy-600">
+                    {module.is_exam_week ? 'EX' : `W${module.week_number}`}
+                  </span>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      ))}
+                <div className="text-left">
+                  <h3 className="font-display font-semibold text-navy-800">{module.title}</h3>
+                  <p className="text-sm text-gray-500">{module.description || 'No description'}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={cn(
+                  'px-2 py-0.5 rounded-full text-xs font-medium',
+                  module.is_published
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-gray-100 text-gray-600'
+                )}>
+                  {module.is_published ? 'Published' : 'Draft'}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    'w-5 h-5 text-gray-400 transition-transform',
+                    expandedModules.has(module.id) && 'rotate-180'
+                  )}
+                />
+              </div>
+            </button>
+
+            <AnimatePresence initial={false}>
+              {expandedModules.has(module.id) && (
+                <motion.div
+                  initial={{ height: 0 }}
+                  animate={{ height: 'auto' }}
+                  exit={{ height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="px-5 pb-5 space-y-2">
+                    {moduleItems.length > 0 ? (
+                      moduleItems.map((item, index) => (
+                        <motion.div
+                          key={`${item.type}-${item.id}`}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                        >
+                          {item.type === 'file' && <FolderOpen className="w-5 h-5 text-blue-500" />}
+                          {item.type === 'activity' && <FileText className="w-5 h-5 text-green-500" />}
+                          {item.type === 'quiz' && <ClipboardCheck className="w-5 h-5 text-orange-500" />}
+                          <div className="flex-1">
+                            <span className="text-navy-700">{item.title}</span>
+                            {item.meta && <span className="text-sm text-gray-400 ml-2">{item.meta}</span>}
+                          </div>
+                          {!item.published && (
+                            <span className="text-xs text-gray-400">Draft</span>
+                          )}
+                        </motion.div>
+                      ))
+                    ) : (
+                      <p className="text-gray-500 py-4">No items in this module</p>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -611,7 +684,7 @@ export default function CoursePage() {
 
     switch (activeTab) {
       case 'modules':
-        return <ModulesTab modules={modules} />;
+        return <ModulesTab modules={modules} activities={activities} quizzes={quizzes} files={files} />;
       case 'assignments':
         return <AssignmentsTab activities={activities} />;
       case 'quizzes':
@@ -625,7 +698,7 @@ export default function CoursePage() {
       case 'grades':
         return <GradesTab courseId={courseId} />;
       default:
-        return <ModulesTab modules={modules} />;
+        return <ModulesTab modules={modules} activities={activities} quizzes={quizzes} files={files} />;
     }
   };
 
