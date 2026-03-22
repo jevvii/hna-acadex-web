@@ -41,6 +41,10 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
+  Lock,
+  Play,
+  RotateCcw,
+  Eye,
 } from 'lucide-react';
 
 const tabs = [
@@ -264,20 +268,67 @@ function ModulesTab({
 function AssignmentsTab({ activities }: { activities: Activity[] }) {
   const router = useRouter();
 
-  const getStatusBadge = (activity: Activity) => {
+  const getAssignmentConfig = (activity: Activity) => {
     const submission = activity.my_submission;
+    const isLate = activity.deadline && new Date(activity.deadline) < new Date() && !submission;
+
     if (!submission) {
-      return <span className="badge badge-warning">Not Started</span>;
+      return {
+        status: isLate ? 'late' : 'not-started',
+        badge: isLate ? (
+          <span className="badge badge-error">Overdue</span>
+        ) : (
+          <span className="badge badge-warning">Not Started</span>
+        ),
+        iconBg: isLate ? 'bg-red-50' : 'bg-amber-50',
+        iconColor: isLate ? 'text-red-600' : 'text-amber-600',
+        buttonText: 'Start',
+        buttonVariant: 'btn-primary' as const,
+        buttonDisabled: false,
+      };
     }
+
     switch (submission.status) {
       case 'graded':
-        return <span className="badge badge-success">Graded: {submission.score}</span>;
+        return {
+          status: 'graded',
+          badge: <span className="badge badge-success">Graded: {submission.score}</span>,
+          iconBg: 'bg-emerald-50',
+          iconColor: 'text-emerald-600',
+          buttonText: 'View',
+          buttonVariant: 'btn-outline' as const,
+          buttonDisabled: false,
+        };
       case 'submitted':
-        return <span className="badge badge-info">Submitted</span>;
+        return {
+          status: 'submitted',
+          badge: <span className="badge badge-info">Submitted</span>,
+          iconBg: 'bg-blue-50',
+          iconColor: 'text-blue-600',
+          buttonText: 'View',
+          buttonVariant: 'btn-outline' as const,
+          buttonDisabled: false,
+        };
       case 'late':
-        return <span className="badge badge-error">Late</span>;
+        return {
+          status: 'late-submitted',
+          badge: <span className="badge badge-error">Late</span>,
+          iconBg: 'bg-red-50',
+          iconColor: 'text-red-600',
+          buttonText: 'View',
+          buttonVariant: 'btn-outline' as const,
+          buttonDisabled: false,
+        };
       default:
-        return <span className="badge badge-warning">Not Started</span>;
+        return {
+          status: 'not-started',
+          badge: <span className="badge badge-warning">Not Started</span>,
+          iconBg: 'bg-amber-50',
+          iconColor: 'text-amber-600',
+          buttonText: 'Start',
+          buttonVariant: 'btn-primary' as const,
+          buttonDisabled: false,
+        };
     }
   };
 
@@ -286,42 +337,46 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
 
   return (
     <div className="space-y-4">
-      {assignments.map((activity: Activity) => (
-        <div
-          key={activity.id}
-          onClick={() => router.push(`/activities/${activity.id}`)}
-          className="bg-white rounded-xl shadow-card p-5 hover:shadow-card-hover transition-shadow cursor-pointer"
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
-                <FileText className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <h3 className="font-display font-semibold text-navy-800">{activity.title}</h3>
-                <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                  {activity.deadline && (
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      Due {formatDate(activity.deadline)}
-                    </span>
-                  )}
-                  <span>{activity.points} pts</span>
+      {assignments.map((activity: Activity) => {
+        const config = getAssignmentConfig(activity);
+        return (
+          <div
+            key={activity.id}
+            onClick={() => router.push(`/activities/${activity.id}`)}
+            className="bg-white rounded-xl shadow-card p-5 hover:shadow-card-hover transition-shadow cursor-pointer"
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-4">
+                <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', config.iconBg)}>
+                  <FileText className={cn('w-6 h-6', config.iconColor)} />
+                </div>
+                <div>
+                  <h3 className="font-display font-semibold text-navy-800">{activity.title}</h3>
+                  <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                    {activity.deadline && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        Due {formatDate(activity.deadline)}
+                      </span>
+                    )}
+                    <span>{activity.points} pts</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-              {getStatusBadge(activity)}
-              <button
-                onClick={() => router.push(`/activities/${activity.id}`)}
-                className="btn btn-outline"
-              >
-                {activity.my_submission ? 'View' : 'Start'}
-              </button>
+              <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                {config.badge}
+                <button
+                  onClick={() => router.push(`/activities/${activity.id}`)}
+                  className={cn('btn', config.buttonVariant)}
+                  disabled={config.buttonDisabled}
+                >
+                  {config.buttonText}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -329,66 +384,141 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
 // Quizzes Tab
 function QuizzesTab({ quizzes }: { quizzes: Quiz[] }) {
   const router = useRouter();
+
+  const getQuizConfig = (quiz: Quiz) => {
+    const now = new Date();
+    const openAt = quiz.open_at ? new Date(quiz.open_at) : null;
+    const closeAt = quiz.close_at ? new Date(quiz.close_at) : null;
+
+    // Check quiz status
+    if (closeAt && now > closeAt) {
+      // Closed
+      return {
+        status: 'closed',
+        badge: <span className="badge bg-gray-100 text-gray-600">Closed</span>,
+        iconBg: 'bg-gray-100',
+        iconColor: 'text-gray-500',
+        buttonText: 'View',
+        buttonVariant: 'btn-outline' as const,
+        buttonDisabled: false,
+        canClick: true,
+      };
+    }
+
+    if (openAt && now < openAt) {
+      // Not open yet
+      return {
+        status: 'not-open',
+        badge: <span className="badge badge-warning">Opens {formatDate(quiz.open_at!)}</span>,
+        iconBg: 'bg-amber-100',
+        iconColor: 'text-amber-600',
+        buttonText: 'Locked',
+        buttonVariant: 'btn-outline' as const,
+        buttonDisabled: true,
+        canClick: false,
+      };
+    }
+
+    if (quiz.my_attempt?.is_submitted) {
+      // Completed - check if can retry
+      const canRetry = (quiz.my_attempt.attempts_used || 0) < quiz.attempt_limit;
+      return {
+        status: 'completed',
+        badge: (
+          <span className="badge badge-success">
+            Score: {quiz.my_attempt.score}/{quiz.my_attempt.max_score}
+          </span>
+        ),
+        iconBg: 'bg-emerald-100',
+        iconColor: 'text-emerald-600',
+        buttonText: canRetry ? 'Try Again' : 'Review',
+        buttonVariant: canRetry ? 'btn-primary' : 'btn-outline' as const,
+        buttonDisabled: false,
+        canClick: true,
+      };
+    }
+
+    if (quiz.my_in_progress_attempt) {
+      // In progress
+      return {
+        status: 'in-progress',
+        badge: <span className="badge badge-info">In Progress</span>,
+        iconBg: 'bg-blue-100',
+        iconColor: 'text-blue-600',
+        buttonText: 'Resume',
+        buttonVariant: 'btn-primary' as const,
+        buttonDisabled: false,
+        canClick: true,
+      };
+    }
+
+    // Available
+    return {
+      status: 'available',
+      badge: <span className="badge badge-navy">Available</span>,
+      iconBg: 'bg-navy-100',
+      iconColor: 'text-navy-600',
+      buttonText: 'Start Quiz',
+      buttonVariant: 'btn-primary' as const,
+      buttonDisabled: false,
+      canClick: true,
+    };
+  };
+
   const publishedQuizzes = quizzes?.filter((q) => q.is_published) || [];
   if (!publishedQuizzes.length) return <EmptyState message="No quizzes available" />;
 
   return (
     <div className="space-y-4">
-      {publishedQuizzes.map((quiz) => (
-        <div
-          key={quiz.id}
-          onClick={() => router.push(`/quizzes/${quiz.id}`)}
-          className="bg-white rounded-xl shadow-card p-5 hover:shadow-card-hover transition-shadow cursor-pointer"
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center">
-                <ClipboardCheck className="w-6 h-6 text-orange-600" />
-              </div>
-              <div>
-                <h3 className="font-display font-semibold text-navy-800">{quiz.title}</h3>
-                <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                  <span>{quiz.question_count || 0} questions</span>
-                  {quiz.time_limit_minutes && <span>{quiz.time_limit_minutes} min</span>}
-                  <span>{quiz.attempt_limit} attempts allowed</span>
+      {publishedQuizzes.map((quiz) => {
+        const config = getQuizConfig(quiz);
+        return (
+          <div
+            key={quiz.id}
+            onClick={() => config.canClick && router.push(`/quizzes/${quiz.id}`)}
+            className={cn(
+              "bg-white rounded-xl shadow-card p-5 hover:shadow-card-hover transition-shadow",
+              config.canClick ? "cursor-pointer" : "opacity-75 cursor-not-allowed"
+            )}
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-4">
+                <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', config.iconBg)}>
+                  <ClipboardCheck className={cn('w-6 h-6', config.iconColor)} />
+                </div>
+                <div>
+                  <h3 className="font-display font-semibold text-navy-800">{quiz.title}</h3>
+                  <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+                    <span>{quiz.question_count || 0} questions</span>
+                    {quiz.time_limit_minutes && <span>{quiz.time_limit_minutes} min</span>}
+                    <span>{quiz.attempt_limit} attempts allowed</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-              {quiz.my_attempt?.is_submitted ? (
-                <>
-                  <span className="badge badge-success">
-                    Score: {quiz.my_attempt.score}/{quiz.my_attempt.max_score}
-                  </span>
-                  <button
-                    onClick={() => router.push(`/quizzes/${quiz.id}`)}
-                    className="btn btn-outline"
-                  >
-                    Review
-                  </button>
-                </>
-              ) : quiz.my_in_progress_attempt ? (
+              <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                {config.badge}
                 <button
-                  onClick={() => router.push(`/quizzes/${quiz.id}/take?attempt=${quiz.my_in_progress_attempt?.attempt_id}`)}
-                  className="btn btn-primary"
+                  onClick={() => {
+                    if (config.status === 'in-progress' && quiz.my_in_progress_attempt) {
+                      router.push(`/quizzes/${quiz.id}/take?attempt=${quiz.my_in_progress_attempt.attempt_id}`);
+                    } else {
+                      router.push(`/quizzes/${quiz.id}`);
+                    }
+                  }}
+                  disabled={config.buttonDisabled}
+                  className={cn('btn', config.buttonVariant, config.buttonDisabled && 'opacity-50 cursor-not-allowed')}
                 >
-                  Continue
+                  {config.buttonText}
                 </button>
-              ) : (
-                <button
-                  onClick={() => router.push(`/quizzes/${quiz.id}`)}
-                  className="btn btn-primary"
-                >
-                  Start Quiz
-                </button>
-              )}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
+
 
 // Files Tab
 function FilesTab({ files }: { files: CourseFile[] }) {
