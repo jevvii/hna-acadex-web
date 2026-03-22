@@ -6,7 +6,6 @@ import { useAuthStore, useUserRole } from '@/store/auth';
 import { cn, getInitials } from '@/lib/utils';
 import {
   LayoutDashboard,
-  BookOpen,
   Calendar,
   CheckSquare,
   Bell,
@@ -16,15 +15,15 @@ import {
 
 const studentNavItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/courses', label: 'My Courses', icon: BookOpen },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/todos', label: 'To-Do List', icon: CheckSquare },
+  { href: '/notifications', label: 'Notifications', icon: Bell },
 ];
 
 const teacherNavItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/courses', label: 'My Courses', icon: BookOpen },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
+  { href: '/notifications', label: 'Notifications', icon: Bell },
 ];
 
 export function Sidebar() {

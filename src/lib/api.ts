@@ -291,6 +291,22 @@ export const calendarApi = {
   },
 };
 
+// Notifications API
+export const notificationsApi = {
+  getNotifications: async (): Promise<Notification[]> => {
+    return api.get('/notifications/');
+  },
+  markAsRead: async (notificationId: string) => {
+    return api.patch(`/notifications/${notificationId}/`, { is_read: true });
+  },
+  markAllAsRead: async () => {
+    return api.post('/notifications/mark-all-read/');
+  },
+  deleteNotification: async (notificationId: string) => {
+    return api.delete(`/notifications/${notificationId}/`);
+  },
+};
+
 // Todo API
 export const todoApi = {
   getTodos: async (): Promise<TodoItem[]> => {
