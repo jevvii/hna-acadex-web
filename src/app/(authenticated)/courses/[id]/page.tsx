@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCoursesStore } from '@/store/courses';
@@ -113,6 +113,7 @@ function ModulesTab({
   quizzes: Quiz[];
   files: CourseFile[];
 }) {
+  const router = useRouter();
   // Track which modules are expanded - all expanded by default when modules load
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
 
@@ -221,7 +222,17 @@ function ModulesTab({
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: index * 0.05 }}
-                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                          onClick={() => {
+                            if (item.type === 'activity') {
+                              router.push(`/activities/${item.id}`);
+                            } else if (item.type === 'quiz') {
+                              router.push(`/quizzes/${item.id}`);
+                            }
+                          }}
+                          className={cn(
+                            "flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors",
+                            (item.type === 'activity' || item.type === 'quiz') && "cursor-pointer"
+                          )}
                         >
                           {item.type === 'file' && <FolderOpen className="w-5 h-5 text-blue-500" />}
                           {item.type === 'activity' && <FileText className="w-5 h-5 text-green-500" />}
@@ -251,6 +262,8 @@ function ModulesTab({
 
 // Assignments Tab
 function AssignmentsTab({ activities }: { activities: Activity[] }) {
+  const router = useRouter();
+
   const getStatusBadge = (activity: Activity) => {
     const submission = activity.my_submission;
     if (!submission) {
@@ -274,7 +287,11 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
   return (
     <div className="space-y-4">
       {assignments.map((activity: Activity) => (
-        <div key={activity.id} className="bg-white rounded-xl shadow-card p-5 hover:shadow-card-hover transition-shadow">
+        <div
+          key={activity.id}
+          onClick={() => router.push(`/activities/${activity.id}`)}
+          className="bg-white rounded-xl shadow-card p-5 hover:shadow-card-hover transition-shadow cursor-pointer"
+        >
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-4">
               <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
@@ -293,9 +310,12 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
               {getStatusBadge(activity)}
-              <button className="btn btn-outline">
+              <button
+                onClick={() => router.push(`/activities/${activity.id}`)}
+                className="btn btn-outline"
+              >
                 {activity.my_submission ? 'View' : 'Start'}
               </button>
             </div>
@@ -308,13 +328,18 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
 
 // Quizzes Tab
 function QuizzesTab({ quizzes }: { quizzes: Quiz[] }) {
+  const router = useRouter();
   const publishedQuizzes = quizzes?.filter((q) => q.is_published) || [];
   if (!publishedQuizzes.length) return <EmptyState message="No quizzes available" />;
 
   return (
     <div className="space-y-4">
       {publishedQuizzes.map((quiz) => (
-        <div key={quiz.id} className="bg-white rounded-xl shadow-card p-5 hover:shadow-card-hover transition-shadow">
+        <div
+          key={quiz.id}
+          onClick={() => router.push(`/quizzes/${quiz.id}`)}
+          className="bg-white rounded-xl shadow-card p-5 hover:shadow-card-hover transition-shadow cursor-pointer"
+        >
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-4">
               <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center">
@@ -329,18 +354,33 @@ function QuizzesTab({ quizzes }: { quizzes: Quiz[] }) {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
               {quiz.my_attempt?.is_submitted ? (
                 <>
                   <span className="badge badge-success">
                     Score: {quiz.my_attempt.score}/{quiz.my_attempt.max_score}
                   </span>
-                  <button className="btn btn-outline">Review</button>
+                  <button
+                    onClick={() => router.push(`/quizzes/${quiz.id}`)}
+                    className="btn btn-outline"
+                  >
+                    Review
+                  </button>
                 </>
               ) : quiz.my_in_progress_attempt ? (
-                <button className="btn btn-primary">Continue</button>
+                <button
+                  onClick={() => router.push(`/quizzes/${quiz.id}/take?attempt=${quiz.my_in_progress_attempt?.attempt_id}`)}
+                  className="btn btn-primary"
+                >
+                  Continue
+                </button>
               ) : (
-                <button className="btn btn-primary">Start Quiz</button>
+                <button
+                  onClick={() => router.push(`/quizzes/${quiz.id}`)}
+                  className="btn btn-primary"
+                >
+                  Start Quiz
+                </button>
               )}
             </div>
           </div>

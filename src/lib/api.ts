@@ -8,6 +8,8 @@ import type {
   ModuleItem,
   Activity,
   Quiz,
+  QuizQuestion,
+  QuizAttempt,
   CourseFile,
   Announcement,
   MeetingSession,
@@ -17,6 +19,8 @@ import type {
   TodoItem,
   GradebookData,
   UserNotification,
+  ActivityComment,
+  Submission,
 } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
@@ -201,8 +205,27 @@ export const activitiesApi = {
   getActivity: async (activityId: string): Promise<Activity> => {
     return api.get(`/activities/${activityId}/`);
   },
-  submitActivity: async (activityId: string, submission: { text_content?: string; file_urls?: string[] }) => {
-    return api.post(`/activities/${activityId}/submit/`, submission);
+  submitActivity: async (activityId: string, formData: FormData) => {
+    return api.postForm(`/activities/${activityId}/submit/`, formData);
+  },
+  getMySubmission: async (activityId: string): Promise<Submission | null> => {
+    return api.get(`/activities/${activityId}/my-submission/`);
+  },
+  getAllSubmissions: async (activityId: string) => {
+    return api.get(`/activities/${activityId}/submissions/`);
+  },
+  gradeSubmission: async (submissionId: string, data: { score: number; feedback?: string; status?: string }) => {
+    return api.post(`/activity-submissions/${submissionId}/grade/`, data);
+  },
+  createActivity: async (courseSectionId: string, formData: FormData) => {
+    formData.append('course_section', courseSectionId);
+    return api.postForm('/activities/', formData);
+  },
+  updateActivity: async (activityId: string, formData: FormData) => {
+    return api.patchForm(`/activities/${activityId}/`, formData);
+  },
+  deleteActivity: async (activityId: string) => {
+    return api.delete(`/activities/${activityId}/`);
   },
 };
 
@@ -214,11 +237,38 @@ export const quizzesApi = {
   getQuiz: async (quizId: string): Promise<Quiz> => {
     return api.get(`/quizzes/${quizId}/`);
   },
-  takeQuiz: async (quizId: string) => {
+  takeQuiz: async (quizId: string): Promise<{ attempt_id: string; attempt_number: number; questions: QuizQuestion[]; time_remaining_seconds?: number }> => {
     return api.get(`/quizzes/${quizId}/take/`);
+  },
+  getLatestAttempt: async (quizId: string): Promise<QuizAttempt | null> => {
+    return api.get(`/quizzes/${quizId}/my-latest-attempt/`);
+  },
+  saveProgress: async (quizId: string, answers: Record<string, any>) => {
+    return api.post(`/quizzes/${quizId}/save-progress/`, { answers });
   },
   submitAttempt: async (quizId: string, answers: Record<string, any>) => {
     return api.post(`/quizzes/${quizId}/submit-attempt/`, { answers });
+  },
+  getGradingList: async (quizId: string) => {
+    return api.get(`/quizzes/${quizId}/grading/`);
+  },
+  quickCreate: async (courseSectionId: string, data: {
+    title: string;
+    instructions?: string;
+    time_limit_minutes?: number;
+    attempt_limit: number;
+    questions: QuizQuestion[];
+  }) => {
+    return api.post('/quizzes/quick-create/', { course_section: courseSectionId, ...data });
+  },
+  createQuiz: async (courseSectionId: string, data: Partial<Quiz>) => {
+    return api.post('/quizzes/', { course_section: courseSectionId, ...data });
+  },
+  updateQuiz: async (quizId: string, data: Partial<Quiz>) => {
+    return api.patch(`/quizzes/${quizId}/`, data);
+  },
+  deleteQuiz: async (quizId: string) => {
+    return api.delete(`/quizzes/${quizId}/`);
   },
 };
 
@@ -345,5 +395,77 @@ export const gradesApi = {
   },
   exportCSV: async (courseSectionId: string) => {
     return api.get(`/course-sections/${courseSectionId}/grades/export/`);
+  },
+};
+
+// Reminders API
+export interface Reminder {
+  id: string;
+  user_id: string;
+  reminder_type: 'activity' | 'quiz';
+  activity_id?: string;
+  quiz_id?: string;
+  course_section_id?: string;
+  activity_title?: string;
+  activity_deadline?: string;
+  reminder_datetime: string;
+  offset_minutes: number;
+  notification_sent: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export const reminderApi = {
+  list: async (): Promise<Reminder[]> => {
+    return api.get('/reminders/');
+  },
+  getByActivity: async (activityId: string): Promise<Reminder[]> => {
+    return api.get(`/reminders/?activity_id=${activityId}`);
+  },
+  getByQuiz: async (quizId: string): Promise<Reminder[]> => {
+    return api.get(`/reminders/?quiz_id=${quizId}`);
+  },
+  create: async (data: {
+    reminder_type: 'activity' | 'quiz';
+    activity_id?: string;
+    quiz_id?: string;
+    reminder_datetime: string;
+    offset_minutes: number;
+  }): Promise<Reminder> => {
+    return api.post('/reminders/', data);
+  },
+  update: async (reminderId: string, data: Partial<Reminder>): Promise<Reminder> => {
+    return api.patch(`/reminders/${reminderId}/`, data);
+  },
+  delete: async (reminderId: string): Promise<boolean> => {
+    await api.delete(`/reminders/${reminderId}/`);
+    return true;
+  },
+};
+
+// Activity Comments API
+export const activityCommentsApi = {
+  getByActivity: async (activityId: string, options?: { submissionId?: string; studentId?: string }): Promise<ActivityComment[]> => {
+    const params = new URLSearchParams();
+    if (options?.submissionId) params.append('submission_id', options.submissionId);
+    if (options?.studentId) params.append('student_id', options.studentId);
+    const query = params.toString();
+    return api.get(`/activities/${activityId}/comments/${query ? `?${query}` : ''}`);
+  },
+  create: async (data: {
+    activity_id: string;
+    content?: string;
+    submission_id?: string;
+    parent_id?: string;
+    file_urls?: string[];
+  }): Promise<ActivityComment> => {
+    return api.post('/activity-comments/', data);
+  },
+  update: async (commentId: string, data: Partial<ActivityComment>): Promise<ActivityComment> => {
+    return api.patch(`/activity-comments/${commentId}/`, data);
+  },
+  delete: async (commentId: string): Promise<boolean> => {
+    await api.delete(`/activity-comments/${commentId}/`);
+    return true;
   },
 };
