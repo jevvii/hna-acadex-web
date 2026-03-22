@@ -45,7 +45,7 @@ export default function AuthenticatedLayout({
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
       <Sidebar />
-      <main className="ml-64 min-h-screen">
+      <main className="ml-64 min-h-screen px-8 pb-8 pt-10">
         {children}
       </main>
     </div>

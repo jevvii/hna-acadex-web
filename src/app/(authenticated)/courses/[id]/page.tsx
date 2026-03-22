@@ -45,6 +45,7 @@ import {
   Play,
   RotateCcw,
   Eye,
+  Layers,
 } from 'lucide-react';
 
 const tabs = [
@@ -193,7 +194,7 @@ function ModulesTab({
   if (!modules?.length) return <EmptyState message="No modules available" />;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {modules.map((module) => {
         // Derive module items from activities, quizzes, and files that belong to this module
         const modActivities = activities.filter((a) => a.weekly_module_id === module.id);
@@ -242,114 +243,136 @@ function ModulesTab({
           })),
         ];
 
+        const itemCount = moduleItems.length;
+        const lastUpdated = module.updated_at
+          ? new Date(module.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          : 'Recently';
+
         return (
-          <div key={module.id} className="bg-white rounded-xl shadow-card overflow-hidden">
+          <div key={module.id} className="bg-white rounded-2xl shadow-card overflow-hidden flex flex-col">
+            {/* Module Header */}
             <button
               onClick={() => toggleModule(module.id)}
-              className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center justify-between p-5 bg-gray-50/50 hover:bg-gray-100/50 transition-colors"
             >
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-lg bg-navy-100 flex items-center justify-center">
-                  <span className="font-display font-bold text-navy-600">
+                <div className="w-11 h-11 rounded-xl bg-navy-600 flex items-center justify-center shadow-sm">
+                  <span className="font-display font-bold text-white text-sm">
                     {module.is_exam_week ? 'EX' : `W${module.week_number}`}
                   </span>
                 </div>
                 <div className="text-left">
-                  <h3 className="font-display font-semibold text-navy-800">{module.title}</h3>
-                  <p className="text-sm text-gray-500">{module.description || 'No description'}</p>
+                  <h3 className="font-display font-semibold text-navy-800 text-base">{module.title}</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {itemCount} {itemCount === 1 ? 'item' : 'items'} • Updated {lastUpdated}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <span className={cn(
-                  'px-2 py-0.5 rounded-full text-xs font-medium',
-                  module.is_published
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-gray-100 text-gray-600'
-                )}>
-                  {module.is_published ? 'Published' : 'Draft'}
-                </span>
+                {module.is_exam_week && (
+                  <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-600 uppercase tracking-wide">
+                    Exam Week
+                  </span>
+                )}
                 <ChevronDown
                   className={cn(
-                    'w-5 h-5 text-gray-400 transition-transform',
+                    'w-5 h-5 text-gray-400 transition-transform duration-200',
                     expandedModules.has(module.id) && 'rotate-180'
                   )}
                 />
               </div>
             </button>
 
+            {/* Module Items */}
             <AnimatePresence initial={false}>
               {expandedModules.has(module.id) && (
                 <motion.div
                   initial={{ height: 0 }}
                   animate={{ height: 'auto' }}
                   exit={{ height: 0 }}
-                  className="overflow-hidden"
+                  className="overflow-hidden flex-1"
                 >
-                  <div className="px-5 pb-5 space-y-2">
+                  <div className="p-3 space-y-1">
                     {moduleItems.length > 0 ? (
                       moduleItems.map((item, index) => (
                         <motion.div
                           key={`${item.type}-${item.id}`}
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.05 }}
+                          transition={{ delay: index * 0.03 }}
                           onClick={() => {
                             if (item.type === 'activity') {
                               router.push(`/activities/${item.id}`);
                             } else if (item.type === 'quiz') {
-                              // Check if quiz can be clicked
                               if (item.status !== 'not-open') {
                                 router.push(`/quizzes/${item.id}`);
                               }
                             }
                           }}
                           className={cn(
-                            "flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors",
+                            "flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors",
                             (item.type === 'activity' || (item.type === 'quiz' && item.status !== 'not-open')) && "cursor-pointer",
-                            item.type === 'quiz' && item.status === 'not-open' && "opacity-75 cursor-not-allowed"
+                            item.type === 'quiz' && item.status === 'not-open' && "opacity-60 cursor-not-allowed"
                           )}
                         >
-                          <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', item.iconBg)}>
-                            {item.type === 'file' && <FolderOpen className={cn('w-4 h-4', item.iconColor)} />}
-                            {item.type === 'activity' && <FileText className={cn('w-4 h-4', item.iconColor)} />}
-                            {item.type === 'quiz' && <ClipboardCheck className={cn('w-4 h-4', item.iconColor)} />}
+                          <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0', item.iconBg)}>
+                            {item.type === 'file' && <FolderOpen className={cn('w-4.5 h-4.5', item.iconColor)} />}
+                            {item.type === 'activity' && <FileText className={cn('w-4.5 h-4.5', item.iconColor)} />}
+                            {item.type === 'quiz' && <ClipboardCheck className={cn('w-4.5 h-4.5', item.iconColor)} />}
                           </div>
-                          <div className="flex-1">
-                            <span className="text-navy-700">{item.title}</span>
-                            {item.meta && <span className="text-sm text-gray-400 ml-2">{item.meta}</span>}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-navy-800 truncate">{item.title}</div>
+                            <div className="text-xs text-gray-400 mt-0.5">{item.meta}</div>
                           </div>
-                          {/* Status indicators */}
-                          {item.type === 'activity' && item.status === 'graded' && (
-                            <span className="text-xs font-medium text-emerald-600">Graded</span>
-                          )}
-                          {item.type === 'activity' && item.status === 'submitted' && (
-                            <span className="text-xs font-medium text-blue-600">Submitted</span>
-                          )}
-                          {item.type === 'activity' && item.status === 'not-started' && (
-                            <span className="text-xs font-medium text-amber-600">Not Started</span>
-                          )}
-                          {item.type === 'activity' && item.status === 'late' && (
-                            <span className="text-xs font-medium text-red-600">Overdue</span>
-                          )}
-                          {item.type === 'quiz' && item.status === 'completed' && (
-                            <span className="text-xs font-medium text-emerald-600">Completed</span>
-                          )}
-                          {item.type === 'quiz' && item.status === 'in-progress' && (
-                            <span className="text-xs font-medium text-blue-600">In Progress</span>
-                          )}
-                          {item.type === 'quiz' && item.status === 'not-open' && (
-                            <span className="text-xs font-medium text-amber-600">Locked</span>
-                          )}
-                          {item.type === 'quiz' && item.status === 'closed' && (
-                            <span className="text-xs font-medium text-gray-500">Closed</span>
-                          )}
-                          {!item.published && (
-                            <span className="text-xs text-gray-400">Draft</span>
-                          )}
+                          <div className="flex-shrink-0">
+                            {/* Status indicators */}
+                            {item.type === 'activity' && item.status === 'graded' && (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                                <CheckCircle className="w-3 h-3" /> Graded
+                              </span>
+                            )}
+                            {item.type === 'activity' && item.status === 'submitted' && (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                                <CheckCircle className="w-3 h-3" /> Submitted
+                              </span>
+                            )}
+                            {item.type === 'activity' && item.status === 'not-started' && (
+                              <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Not Started</span>
+                            )}
+                            {item.type === 'activity' && item.status === 'late' && (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
+                                <AlertCircle className="w-3 h-3" /> Overdue
+                              </span>
+                            )}
+                            {item.type === 'quiz' && item.status === 'completed' && (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                                <CheckCircle className="w-3 h-3" /> Completed
+                              </span>
+                            )}
+                            {item.type === 'quiz' && item.status === 'in-progress' && (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                                <Clock className="w-3 h-3" /> In Progress
+                              </span>
+                            )}
+                            {item.type === 'quiz' && item.status === 'not-open' && (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                                <Lock className="w-3 h-3" /> Locked
+                              </span>
+                            )}
+                            {item.type === 'quiz' && item.status === 'closed' && (
+                              <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Closed</span>
+                            )}
+                            {!item.published && (
+                              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Draft</span>
+                            )}
+                          </div>
                         </motion.div>
                       ))
                     ) : (
-                      <p className="text-gray-500 py-4">No items in this module</p>
+                      <div className="text-center py-8 text-gray-400">
+                        <FolderOpen className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No items in this module</p>
+                      </div>
                     )}
                   </div>
                 </motion.div>
@@ -365,6 +388,7 @@ function ModulesTab({
 // Assignments Tab
 function AssignmentsTab({ activities }: { activities: Activity[] }) {
   const router = useRouter();
+  const [filter, setFilter] = useState<'all' | 'pending' | 'submitted' | 'graded'>('all');
 
   const getAssignmentConfig = (activity: Activity) => {
     const submission = activity.my_submission;
@@ -374,15 +398,22 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
       return {
         status: isLate ? 'late' : 'not-started',
         badge: isLate ? (
-          <span className="badge badge-error">Overdue</span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-600">
+            <Clock className="w-3.5 h-3.5" />
+            Overdue
+          </span>
         ) : (
-          <span className="badge badge-warning">Not Started</span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">
+            Not Started
+          </span>
         ),
         iconBg: isLate ? 'bg-red-50' : 'bg-amber-50',
         iconColor: isLate ? 'text-red-600' : 'text-amber-600',
-        buttonText: 'Start',
+        barColor: isLate ? 'bg-red-500' : 'bg-amber-500',
+        buttonText: isLate ? 'Submit Now' : 'Start Assignment',
         buttonVariant: 'btn-primary' as const,
         buttonDisabled: false,
+        pointsColor: 'text-navy-800',
       };
     }
 
@@ -390,91 +421,236 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
       case 'graded':
         return {
           status: 'graded',
-          badge: <span className="badge badge-success">Graded: {submission.score}</span>,
+          badge: (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600">
+              <CheckCircle className="w-3.5 h-3.5" />
+              Graded
+            </span>
+          ),
           iconBg: 'bg-emerald-50',
           iconColor: 'text-emerald-600',
-          buttonText: 'View',
-          buttonVariant: 'btn-outline' as const,
+          barColor: 'bg-emerald-500',
+          buttonText: 'View Feedback',
+          buttonVariant: 'btn-secondary' as const,
           buttonDisabled: false,
+          pointsColor: 'text-emerald-600',
         };
       case 'submitted':
         return {
           status: 'submitted',
-          badge: <span className="badge badge-info">Submitted</span>,
+          badge: (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-600">
+              <CheckCircle className="w-3.5 h-3.5" />
+              Submitted
+            </span>
+          ),
           iconBg: 'bg-blue-50',
           iconColor: 'text-blue-600',
-          buttonText: 'View',
-          buttonVariant: 'btn-outline' as const,
+          barColor: 'bg-blue-500',
+          buttonText: 'View Submission',
+          buttonVariant: 'btn-secondary' as const,
           buttonDisabled: false,
+          pointsColor: 'text-navy-800',
         };
       case 'late':
         return {
           status: 'late-submitted',
-          badge: <span className="badge badge-error">Late</span>,
-          iconBg: 'bg-red-50',
-          iconColor: 'text-red-600',
-          buttonText: 'View',
-          buttonVariant: 'btn-outline' as const,
+          badge: (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-600">
+              <Clock className="w-3.5 h-3.5" />
+              Submitted Late
+            </span>
+          ),
+          iconBg: 'bg-orange-50',
+          iconColor: 'text-orange-600',
+          barColor: 'bg-orange-500',
+          buttonText: 'View Submission',
+          buttonVariant: 'btn-secondary' as const,
           buttonDisabled: false,
+          pointsColor: 'text-navy-800',
         };
       default:
         return {
           status: 'not-started',
-          badge: <span className="badge badge-warning">Not Started</span>,
+          badge: (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500">
+              Not Started
+            </span>
+          ),
           iconBg: 'bg-amber-50',
           iconColor: 'text-amber-600',
-          buttonText: 'Start',
+          barColor: 'bg-amber-500',
+          buttonText: 'Start Assignment',
           buttonVariant: 'btn-primary' as const,
           buttonDisabled: false,
+          pointsColor: 'text-navy-800',
         };
     }
   };
 
   const assignments = activities?.filter((a) => a.is_published) || [];
+
+  // Filter assignments based on selected tab
+  const filteredAssignments = assignments.filter((activity) => {
+    const config = getAssignmentConfig(activity);
+    if (filter === 'all') return true;
+    if (filter === 'pending') return config.status === 'not-started' || config.status === 'late';
+    if (filter === 'submitted') return config.status === 'submitted' || config.status === 'late-submitted';
+    if (filter === 'graded') return config.status === 'graded';
+    return true;
+  });
+
+  // Get counts for filter tabs
+  const counts = {
+    all: assignments.length,
+    pending: assignments.filter(a => {
+      const config = getAssignmentConfig(a);
+      return config.status === 'not-started' || config.status === 'late';
+    }).length,
+    submitted: assignments.filter(a => {
+      const config = getAssignmentConfig(a);
+      return config.status === 'submitted' || config.status === 'late-submitted';
+    }).length,
+    graded: assignments.filter(a => {
+      const config = getAssignmentConfig(a);
+      return config.status === 'graded';
+    }).length,
+  };
+
   if (!assignments.length) return <EmptyState message="No assignments available" />;
 
   return (
-    <div className="space-y-4">
-      {assignments.map((activity: Activity) => {
-        const config = getAssignmentConfig(activity);
-        return (
-          <div
-            key={activity.id}
-            onClick={() => router.push(`/activities/${activity.id}`)}
-            className="bg-white rounded-xl shadow-card p-5 hover:shadow-card-hover transition-shadow cursor-pointer"
+    <div className="space-y-6">
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-2">
+        {[
+          { id: 'all', label: 'All' },
+          { id: 'pending', label: 'Pending' },
+          { id: 'submitted', label: 'Submitted' },
+          { id: 'graded', label: 'Graded' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setFilter(tab.id as typeof filter)}
+            className={cn(
+              'px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+              filter === tab.id
+                ? 'bg-navy-600 text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-100'
+            )}
           >
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-4">
-                <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', config.iconBg)}>
-                  <FileText className={cn('w-6 h-6', config.iconColor)} />
+            {tab.label}
+            <span
+              className={cn(
+                'ml-2 px-1.5 py-0.5 rounded-full text-xs',
+                filter === tab.id ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-600'
+              )}
+            >
+              {counts[tab.id as keyof typeof counts]}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Assignment Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {filteredAssignments.map((activity: Activity) => {
+          const config = getAssignmentConfig(activity);
+          const submission = activity.my_submission;
+          const isOverdue = activity.deadline && new Date(activity.deadline) < new Date() && !submission;
+
+          return (
+            <div
+              key={activity.id}
+              className="bg-white rounded-2xl shadow-card hover:shadow-card-hover transition-all duration-200 overflow-hidden group"
+            >
+              {/* Status Bar */}
+              <div className={cn('h-1.5 w-full', config.barColor)} />
+
+              <div className="p-5">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', config.iconBg)}>
+                    <FileText className={cn('w-6 h-6', config.iconColor)} />
+                  </div>
+                  {config.badge}
                 </div>
-                <div>
-                  <h3 className="font-display font-semibold text-navy-800">{activity.title}</h3>
-                  <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                    {activity.deadline && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        Due {formatDate(activity.deadline)}
+
+                {/* Title & Description */}
+                <h3 className="font-display font-semibold text-lg text-navy-800 mb-2 line-clamp-1">
+                  {activity.title}
+                </h3>
+                {activity.instructions && (
+                  <p className="text-sm text-gray-500 line-clamp-2 mb-4 leading-relaxed">
+                    {activity.instructions}
+                  </p>
+                )}
+
+                {/* Meta Grid */}
+                <div className="grid grid-cols-2 gap-3 mb-5">
+                  <div className={cn('flex items-center gap-2 text-sm', isOverdue ? 'text-red-600' : 'text-gray-500')}>
+                    <Calendar className={cn('w-4 h-4', isOverdue ? 'text-red-500' : 'text-gray-400')} />
+                    {activity.deadline ? (
+                      <span>
+                        {submission?.status === 'graded' ? `Graded ${formatDate(submission.graded_at || '')}` :
+                         submission?.status === 'submitted' || submission?.status === 'late' ? `Submitted ${formatDate(submission.submitted_at || '')}` :
+                         isOverdue ? `Due ${formatDate(activity.deadline)}` :
+                         `Due ${formatDate(activity.deadline)}`}
+                        {submission?.status === 'late' && ' (Late)'}
                       </span>
+                    ) : (
+                      <span>No due date</span>
                     )}
-                    <span>{activity.points} pts</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <ClipboardCheck className="w-4 h-4 text-gray-400" />
+                    <span>{activity.points} points</span>
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-                {config.badge}
-                <button
-                  onClick={() => router.push(`/activities/${activity.id}`)}
-                  className={cn('btn', config.buttonVariant)}
-                  disabled={config.buttonDisabled}
-                >
-                  {config.buttonText}
-                </button>
+
+                {/* Footer */}
+                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                  <span className={cn('text-sm font-semibold', config.pointsColor)}>
+                    {submission?.status === 'graded'
+                      ? `${submission.score}/${activity.points} (${Math.round((submission.score / activity.points) * 100)}%)`
+                      : submission?.status === 'submitted' || submission?.status === 'late'
+                      ? 'Pending Grade'
+                      : `${activity.points} points`}
+                  </span>
+                  <button
+                    onClick={() => router.push(`/activities/${activity.id}`)}
+                    className={cn(
+                      'btn text-sm px-4 py-2 rounded-xl transition-all duration-200',
+                      config.buttonVariant === 'btn-primary'
+                        ? 'btn-primary'
+                        : 'btn-secondary bg-gray-100 text-gray-700 hover:bg-gray-200 border-0'
+                    )}
+                  >
+                    {config.buttonText}
+                  </button>
+                </div>
               </div>
             </div>
+          );
+        })}
+      </div>
+
+      {filteredAssignments.length === 0 && (
+        <div className="text-center py-12 bg-white rounded-2xl border-2 border-dashed border-gray-200">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FileText className="w-8 h-8 text-gray-400" />
           </div>
-        );
-      })}
+          <h3 className="font-display font-semibold text-lg text-navy-800 mb-1">
+            No {filter === 'all' ? '' : filter} assignments
+          </h3>
+          <p className="text-gray-500">
+            {filter === 'pending' ? 'All caught up! No pending assignments.' :
+             filter === 'submitted' ? 'No submissions yet.' :
+             filter === 'graded' ? 'No graded assignments yet.' :
+             'No assignments available.'}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -1023,16 +1199,14 @@ export default function CoursePage() {
       </div>
 
       {/* Content */}
-      <div className="p-8 max-w-5xl">
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          {renderTabContent()}
-        </motion.div>
-      </div>
+      <motion.div
+        key={activeTab}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2 }}
+      >
+        {renderTabContent()}
+      </motion.div>
     </div>
   );
 }
