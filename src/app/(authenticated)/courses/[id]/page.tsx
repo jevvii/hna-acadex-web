@@ -8,11 +8,7 @@ import { useCoursesStore } from '@/store/courses';
 import { useIsStudent, useIsTeacher } from '@/store/auth';
 import { cn, getInitials } from '@/lib/utils';
 import {
-  modulesApi,
-  activitiesApi,
-  quizzesApi,
-  filesApi,
-  announcementsApi,
+  coursesApi,
   attendanceApi,
   gradesApi,
 } from '@/lib/api';
@@ -106,27 +102,19 @@ function EmptyState({ message }: { message: string }) {
 }
 
 // Modules Tab
-function ModulesTab({ courseId }: { courseId: string }) {
+function ModulesTab({ modules }: { modules: WeeklyModule[] }) {
   const [expandedModule, setExpandedModule] = useState<string | null>(null);
-
-  const { data: modules, isLoading, error } = useQuery({
-    queryKey: ['modules', courseId],
-    queryFn: () => modulesApi.getModules(courseId),
-    enabled: !!courseId,
-  });
 
   // Module items are included in the modules data
   const moduleItems = expandedModule
-    ? modules?.find((m: WeeklyModule) => m.id === expandedModule)?.items || []
+    ? modules?.find((m) => m.id === expandedModule)?.items || []
     : [];
 
-  if (isLoading) return <LoadingState />;
-  if (error) return <ErrorState message="Failed to load modules" />;
   if (!modules?.length) return <EmptyState message="No modules available" />;
 
   return (
     <div className="space-y-4">
-      {modules.map((module: WeeklyModule) => (
+      {modules.map((module) => (
         <div key={module.id} className="bg-white rounded-xl shadow-card overflow-hidden">
           <button
             onClick={() => setExpandedModule(expandedModule === module.id ? null : module.id)}
@@ -189,13 +177,7 @@ function ModulesTab({ courseId }: { courseId: string }) {
 }
 
 // Assignments Tab
-function AssignmentsTab({ courseId }: { courseId: string }) {
-  const { data: activities, isLoading, error } = useQuery({
-    queryKey: ['activities', courseId],
-    queryFn: () => activitiesApi.getActivities(courseId),
-    enabled: !!courseId,
-  });
-
+function AssignmentsTab({ activities }: { activities: Activity[] }) {
   const getStatusBadge = (activity: Activity) => {
     const submission = activity.my_submission;
     if (!submission) {
@@ -213,10 +195,7 @@ function AssignmentsTab({ courseId }: { courseId: string }) {
     }
   };
 
-  if (isLoading) return <LoadingState />;
-  if (error) return <ErrorState message="Failed to load assignments" />;
-
-  const assignments = activities?.filter((a: Activity) => a.is_published) || [];
+  const assignments = activities?.filter((a) => a.is_published) || [];
   if (!assignments.length) return <EmptyState message="No assignments available" />;
 
   return (
@@ -255,22 +234,13 @@ function AssignmentsTab({ courseId }: { courseId: string }) {
 }
 
 // Quizzes Tab
-function QuizzesTab({ courseId }: { courseId: string }) {
-  const { data: quizzes, isLoading, error } = useQuery({
-    queryKey: ['quizzes', courseId],
-    queryFn: () => quizzesApi.getQuizzes(courseId),
-    enabled: !!courseId,
-  });
-
-  if (isLoading) return <LoadingState />;
-  if (error) return <ErrorState message="Failed to load quizzes" />;
-
-  const publishedQuizzes = quizzes?.filter((q: Quiz) => q.is_published) || [];
+function QuizzesTab({ quizzes }: { quizzes: Quiz[] }) {
+  const publishedQuizzes = quizzes?.filter((q) => q.is_published) || [];
   if (!publishedQuizzes.length) return <EmptyState message="No quizzes available" />;
 
   return (
     <div className="space-y-4">
-      {publishedQuizzes.map((quiz: Quiz) => (
+      {publishedQuizzes.map((quiz) => (
         <div key={quiz.id} className="bg-white rounded-xl shadow-card p-5 hover:shadow-card-hover transition-shadow">
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-4">
@@ -308,14 +278,8 @@ function QuizzesTab({ courseId }: { courseId: string }) {
 }
 
 // Files Tab
-function FilesTab({ courseId }: { courseId: string }) {
+function FilesTab({ files }: { files: CourseFile[] }) {
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
-
-  const { data: files, isLoading, error } = useQuery({
-    queryKey: ['files', courseId],
-    queryFn: () => filesApi.getFiles(courseId),
-    enabled: !!courseId,
-  });
 
   const getFileIcon = (type?: string) => {
     switch (type?.toLowerCase()) {
@@ -337,12 +301,9 @@ function FilesTab({ courseId }: { courseId: string }) {
 
   const categories = ['All', 'Module', 'Assignment', 'Quiz', 'General'];
 
-  if (isLoading) return <LoadingState />;
-  if (error) return <ErrorState message="Failed to load files" />;
-
   const filteredFiles = categoryFilter === 'All'
     ? files
-    : files?.filter((f: CourseFile) => f.category === categoryFilter.toLowerCase());
+    : files?.filter((f) => f.category === categoryFilter.toLowerCase());
 
   if (!files?.length) return <EmptyState message="No files available" />;
 
@@ -389,17 +350,8 @@ function FilesTab({ courseId }: { courseId: string }) {
 }
 
 // Announcements Tab
-function AnnouncementsTab({ courseId }: { courseId: string }) {
-  const { data: announcements, isLoading, error } = useQuery({
-    queryKey: ['announcements', courseId],
-    queryFn: () => announcementsApi.getAnnouncements(courseId),
-    enabled: !!courseId,
-  });
-
-  if (isLoading) return <LoadingState />;
-  if (error) return <ErrorState message="Failed to load announcements" />;
-
-  const sortedAnnouncements = announcements?.sort((a: Announcement, b: Announcement) => {
+function AnnouncementsTab({ announcements }: { announcements: Announcement[] }) {
+  const sortedAnnouncements = announcements?.sort((a, b) => {
     // Pinned first, then by date
     if (a.is_published !== b.is_published) return Number(b.is_published) - Number(a.is_published);
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -409,7 +361,7 @@ function AnnouncementsTab({ courseId }: { courseId: string }) {
 
   return (
     <div className="space-y-4">
-      {sortedAnnouncements.map((announcement: Announcement) => (
+      {sortedAnnouncements.map((announcement) => (
         <div key={announcement.id} className={cn(
           'bg-white rounded-xl shadow-card p-5',
           announcement.is_published && 'border-l-4 border-gold-500'
@@ -626,6 +578,13 @@ export default function CoursePage() {
   const [activeTab, setActiveTab] = useState('modules');
   const { courses, fetchCourses } = useCoursesStore();
 
+  // Fetch course content (works for both students and teachers)
+  const { data: content, isLoading: contentLoading, error: contentError } = useQuery({
+    queryKey: ['courseContent', courseId],
+    queryFn: () => coursesApi.getCourseContent(courseId),
+    enabled: !!courseId,
+  });
+
   // Fetch courses if not loaded (safeguard for direct navigation)
   useEffect(() => {
     if (courses.length === 0) {
@@ -639,24 +598,34 @@ export default function CoursePage() {
   const courseTitle = courseInfo?.course_title || 'Course Title';
   const sectionName = courseInfo?.section_name || 'SECTION';
 
+  // Extract content from the API response
+  const modules = content?.modules || [];
+  const activities = content?.activities || [];
+  const files = content?.files || [];
+  const announcements = content?.announcements || [];
+  const quizzes = content?.quizzes || [];
+
   const renderTabContent = () => {
+    if (contentLoading) return <LoadingState />;
+    if (contentError) return <ErrorState message="Failed to load course content" />;
+
     switch (activeTab) {
       case 'modules':
-        return <ModulesTab courseId={courseId} />;
+        return <ModulesTab modules={modules} />;
       case 'assignments':
-        return <AssignmentsTab courseId={courseId} />;
+        return <AssignmentsTab activities={activities} />;
       case 'quizzes':
-        return <QuizzesTab courseId={courseId} />;
+        return <QuizzesTab quizzes={quizzes} />;
       case 'files':
-        return <FilesTab courseId={courseId} />;
+        return <FilesTab files={files} />;
       case 'announcements':
-        return <AnnouncementsTab courseId={courseId} />;
+        return <AnnouncementsTab announcements={announcements} />;
       case 'attendance':
         return <AttendanceTab courseId={courseId} />;
       case 'grades':
         return <GradesTab courseId={courseId} />;
       default:
-        return <ModulesTab courseId={courseId} />;
+        return <ModulesTab modules={modules} />;
     }
   };
 

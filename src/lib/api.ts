@@ -3,6 +3,7 @@ import type {
   StudentCourse,
   TeacherCourse,
   CourseSectionDetail,
+  CourseContent,
   WeeklyModule,
   ModuleItem,
   Activity,
@@ -178,6 +179,9 @@ export const coursesApi = {
     return api.get('/courses/teacher/');
   },
   getCourse: async (courseSectionId: string): Promise<CourseSectionDetail> => {
+    return api.get(`/course-sections/${courseSectionId}/`);
+  },
+  getCourseContent: async (courseSectionId: string): Promise<CourseContent> => {
     return api.get(`/course-sections/${courseSectionId}/content/`);
   },
 };

@@ -85,6 +85,14 @@ export interface CourseSectionDetail extends CourseSection {
   teacher?: Profile;
 }
 
+export interface CourseContent {
+  modules: WeeklyModule[];
+  activities: Activity[];
+  files: CourseFile[];
+  announcements: Announcement[];
+  quizzes: Quiz[];
+}
+
 export interface Enrollment {
   id: string;
   student_id: string;
