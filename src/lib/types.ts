@@ -343,7 +343,7 @@ export interface TodoItem {
   created_at: string;
 }
 
-export interface Notification {
+export interface UserNotification {
   id: string;
   recipient_id: string;
   type: NotificationType;
@@ -357,6 +357,9 @@ export interface Notification {
   is_read: boolean;
   created_at: string;
 }
+
+// Keep backward compatibility alias
+type Notification = UserNotification;
 
 export interface MeetingSession {
   id: string;

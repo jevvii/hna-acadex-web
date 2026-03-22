@@ -15,6 +15,7 @@ import type {
   CalendarEvent,
   TodoItem,
   GradebookData,
+  UserNotification,
 } from './types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
@@ -293,7 +294,7 @@ export const calendarApi = {
 
 // Notifications API
 export const notificationsApi = {
-  getNotifications: async (): Promise<Notification[]> => {
+  getNotifications: async (): Promise<UserNotification[]> => {
     return api.get('/notifications/');
   },
   markAsRead: async (notificationId: string) => {

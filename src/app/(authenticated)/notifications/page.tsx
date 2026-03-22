@@ -16,7 +16,10 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { notificationsApi } from '@/lib/api';
-import { Notification, NotificationType } from '@/lib/types';
+import { UserNotification, NotificationType } from '@/lib/types';
+
+// Type alias for convenience
+type Notification = UserNotification;
 
 const notificationIcons: Record<NotificationType, React.ReactNode> = {
   new_activity: <FileText className="w-5 h-5" />,
@@ -58,7 +61,7 @@ export default function NotificationsPage() {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
-  const { data: notifications, isLoading, error } = useQuery({
+  const { data: notifications, isLoading, error } = useQuery<UserNotification[]>({
     queryKey: ['notifications'],
     queryFn: () => notificationsApi.getNotifications(),
   });
@@ -84,12 +87,12 @@ export default function NotificationsPage() {
     },
   });
 
-  const filteredNotifications = notifications?.filter((n: Notification) => {
+  const filteredNotifications = notifications?.filter((n) => {
     if (filter === 'unread') return !n.is_read;
     return true;
   });
 
-  const unreadCount = notifications?.filter((n: Notification) => !n.is_read).length || 0;
+  const unreadCount = notifications?.filter((n) => !n.is_read).length || 0;
 
   const handleMarkAsRead = (id: string) => {
     markAsReadMutation.mutate(id);
@@ -193,7 +196,7 @@ export default function NotificationsPage() {
         className="space-y-3"
       >
         <AnimatePresence mode="popLayout">
-          {filteredNotifications?.map((notification: Notification, index: number) => (
+          {filteredNotifications?.map((notification, index: number) => (
             <motion.div
               key={notification.id}
               layout
