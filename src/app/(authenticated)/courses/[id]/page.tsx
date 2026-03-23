@@ -154,8 +154,8 @@ function ModulesTab({
 
     if (!submission) {
       return {
-        iconColor: isLate ? 'text-red-500' : 'text-amber-500',
-        iconBg: isLate ? 'bg-red-50' : 'bg-amber-50',
+        iconColor: isLate ? 'text-red-500' : 'text-emerald-500',
+        iconBg: isLate ? 'bg-red-50' : 'bg-emerald-50',
         status: isLate ? 'late' : 'not-started',
       };
     }
@@ -168,7 +168,7 @@ function ModulesTab({
       case 'late':
         return { iconColor: 'text-red-500', iconBg: 'bg-red-50', status: 'late-submitted' };
       default:
-        return { iconColor: 'text-amber-500', iconBg: 'bg-amber-50', status: 'not-started' };
+        return { iconColor: 'text-emerald-500', iconBg: 'bg-emerald-50', status: 'not-started' };
     }
   };
 
@@ -420,13 +420,13 @@ function AssignmentsTab({
             Overdue
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
-            Not Started
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-600 border border-emerald-100">
+            Available
           </span>
         ),
-        iconBg: isLate ? 'bg-amber-100' : 'bg-gray-100',
-        iconColor: isLate ? 'text-amber-600' : 'text-gray-500',
-        barColor: isLate ? 'bg-amber-500' : 'bg-gray-300',
+        iconBg: isLate ? 'bg-amber-100' : 'bg-emerald-100',
+        iconColor: isLate ? 'text-amber-600' : 'text-emerald-600',
+        barColor: isLate ? 'bg-amber-500' : 'bg-emerald-500',
         buttonText: isLate ? 'Submit Now' : 'Start Assignment',
         buttonVariant: 'btn-primary' as const,
         buttonDisabled: false,
@@ -490,13 +490,13 @@ function AssignmentsTab({
         return {
           status: 'not-started',
           badge: (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
-              Not Started
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-600 border border-emerald-100">
+              Available
             </span>
           ),
-          iconBg: 'bg-gray-100',
-          iconColor: 'text-gray-500',
-          barColor: 'bg-gray-300',
+          iconBg: 'bg-emerald-100',
+          iconColor: 'text-emerald-600',
+          barColor: 'bg-emerald-500',
           buttonText: 'Start Assignment',
           buttonVariant: 'btn-primary' as const,
           buttonDisabled: false,
