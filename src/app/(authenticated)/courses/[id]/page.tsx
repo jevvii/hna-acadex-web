@@ -48,6 +48,7 @@ import {
   Layers,
   CheckSquare,
   HelpCircle,
+  User,
 } from 'lucide-react';
 
 const tabs = [
@@ -613,10 +614,10 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
                 <div className="flex items-center justify-between">
                   <span className={cn('text-sm font-semibold', config.pointsColor)}>
                     {submission?.status === 'graded'
-                      ? `${submission.score}/${activity.points} points`
+                      ? `${submission.score}/${activity.points}`
                       : submission?.status === 'submitted' || submission?.status === 'late'
                       ? 'Pending Grade'
-                      : `${activity.points} points`}
+                      : `${activity.points} pts`}
                   </span>
                   <button
                     onClick={(e) => {
@@ -1180,6 +1181,12 @@ export default function CoursePage() {
   const { courses, fetchCourses } = useCoursesStore();
 
   // Fetch course content (works for both students and teachers)
+  const { data: courseDetail } = useQuery({
+    queryKey: ['courseDetail', courseId],
+    queryFn: () => coursesApi.getCourse(courseId),
+    enabled: !!courseId,
+  });
+
   const { data: content, isLoading: contentLoading, error: contentError } = useQuery({
     queryKey: ['courseContent', courseId],
     queryFn: () => coursesApi.getCourseContent(courseId),
@@ -1193,11 +1200,17 @@ export default function CoursePage() {
     }
   }, [courses.length, fetchCourses]);
 
-  // Find course metadata from the courses list
+  // Find course metadata from the courses list for fallback
   const courseInfo = courses.find((c) => c.course_section_id === courseId);
-  const courseCode = courseInfo?.course_code || 'COURSE';
-  const courseTitle = courseInfo?.course_title || 'Course Title';
-  const sectionName = courseInfo?.section_name || 'SECTION';
+
+  // Use course detail from API for complete metadata, fallback to store data
+  const courseCode = courseDetail?.course?.code || courseInfo?.course_code || 'COURSE';
+  const courseTitle = courseDetail?.course?.title || courseInfo?.course_title || 'Course Title';
+  const sectionName = courseDetail?.section?.name || courseInfo?.section_name || 'SECTION';
+  const teacherName = courseDetail?.teacher?.full_name || courseInfo?.teacher_name || 'Teacher';
+  const gradeLevel = courseDetail?.section?.grade_level || courseInfo?.grade_level;
+  const strand = courseDetail?.section?.strand || courseInfo?.strand;
+  const studentCount = courseDetail?.student_count || courseInfo?.student_count;
 
   // Extract content from the API response
   const modules = content?.modules || [];
@@ -1246,12 +1259,28 @@ export default function CoursePage() {
         </div>
         <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <div className="flex items-center gap-2 text-sm font-medium text-white/80 mb-2">
-              <span className="text-gold-400">{courseCode}</span>
+            <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-amber-400 mb-3">
+              <span className="uppercase">{courseCode}</span>
               <span>@</span>
-              <span>{sectionName}</span>
+              <span className="uppercase">{sectionName}</span>
             </div>
-            <h1 className="font-display text-4xl font-bold">{courseTitle}</h1>
+            <h1 className="text-4xl font-bold text-white mb-4" style={{ fontFamily: "'Crimson Pro', serif" }}>
+              {courseTitle}
+            </h1>
+            <div className="flex items-center gap-6 text-sm text-white/90">
+              <span className="flex items-center gap-2">
+                <User className="w-4 h-4" />
+                {teacherName}
+              </span>
+              <span className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                {courseDetail?.student_count ? `${courseDetail.student_count} Students` : courseInfo?.student_count ? `${courseInfo.student_count} Students` : 'Students'}
+              </span>
+              <span className="flex items-center gap-2">
+                <Layers className="w-4 h-4" />
+                {gradeLevel} - {strand}
+              </span>
+            </div>
           </motion.div>
         </div>
       </div>
