@@ -110,6 +110,14 @@ function SubmissionModal({
   const [files, setFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [comments, setComments] = useState('');
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  const handleClose = () => {
+    setFiles([]);
+    setComments('');
+    setIsSuccess(false);
+    onClose();
+  };
 
   const submitMutation = useMutation({
     mutationFn: async (data: { files: File[]; comments: string }) => {
@@ -121,9 +129,7 @@ function SubmissionModal({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activity', activityId] });
       queryClient.invalidateQueries({ queryKey: ['activities'] });
-      onClose();
-      setFiles([]);
-      setComments('');
+      setIsSuccess(true);
     },
   });
 
@@ -147,13 +153,15 @@ function SubmissionModal({
   const isLateSubmission = timeStatus.text.includes('Overdue');
 
   return (
-    <Dialog.Root open={isOpen} onOpenChange={onClose}>
+    <Dialog.Root open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
         <Dialog.Content className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 bg-white rounded-2xl shadow-2xl z-50 md:w-full md:max-w-2xl md:max-h-[90vh] overflow-hidden flex flex-col">
           <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-navy-50/50 to-transparent">
             <div>
-              <Dialog.Title className="text-xl font-bold text-navy-900">Submit Assignment</Dialog.Title>
+              <Dialog.Title className="text-xl font-bold text-navy-900">
+                {isSuccess ? 'Submission Complete' : 'Submit Assignment'}
+              </Dialog.Title>
               <p className="text-sm text-gray-500 mt-1">{activity.title}</p>
             </div>
             <Dialog.Close className="p-2 hover:bg-gray-100 rounded-full transition-colors">
@@ -162,84 +170,110 @@ function SubmissionModal({
           </div>
 
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {isLateSubmission && (
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
-                <div>
-                  <p className="font-medium text-amber-800">Late Submission</p>
-                  <p className="text-sm text-amber-700 mt-1">The due date has passed. Your submission will be marked as late.</p>
+            {isSuccess ? (
+              // Success state - matches React Native implementation
+              <div className="flex flex-col items-center justify-center py-8">
+                <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
+                  <CheckCircle className="w-10 h-10 text-emerald-600" />
                 </div>
+                <h3 className="text-xl font-bold text-navy-900 mb-2">Successfully Submitted!</h3>
+                <p className="text-gray-500 text-center max-w-md">
+                  Your submission has been received and is now waiting to be graded.
+                </p>
               </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-navy-800 mb-3">Upload Files</label>
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                className={cn(
-                  'border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200',
-                  isDragging ? 'border-navy-500 bg-navy-50' : 'border-gray-300 hover:border-navy-400 hover:bg-gray-50'
-                )}
-              >
-                <div className="w-16 h-16 bg-navy-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Upload className="w-8 h-8 text-navy-600" />
-                </div>
-                <p className="text-navy-800 font-medium mb-2">Drag and drop files here</p>
-                <p className="text-gray-500 text-sm mb-4">or</p>
-                <label className="inline-flex items-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 cursor-pointer transition-colors">
-                  <FileUp className="w-4 h-4" />
-                  Browse Files
-                  <input type="file" multiple className="hidden" onChange={handleFileSelect} />
-                </label>
-              </div>
-            </div>
-
-            {files.length > 0 && (
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-navy-800">Selected Files ({files.length})</label>
-                <div className="space-y-2">
-                  {files.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Paperclip className="w-4 h-4 text-navy-500" />
-                        <span className="text-sm text-navy-700 truncate max-w-xs">{file.name}</span>
-                        <span className="text-xs text-gray-400">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
-                      </div>
-                      <button onClick={() => removeFile(index)} className="p-1 hover:bg-gray-200 rounded transition-colors">
-                        <X className="w-4 h-4 text-gray-500" />
-                      </button>
+            ) : (
+              <>
+                {isLateSubmission && (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+                    <div>
+                      <p className="font-medium text-amber-800">Late Submission</p>
+                      <p className="text-sm text-amber-700 mt-1">The due date has passed. Your submission will be marked as late.</p>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                  </div>
+                )}
 
-            <div>
-              <label className="block text-sm font-medium text-navy-800 mb-2">Comments (Optional)</label>
-              <textarea
-                value={comments}
-                onChange={(e) => setComments(e.target.value)}
-                placeholder="Add any comments for your instructor..."
-                className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-navy-500 focus:border-transparent resize-none"
-                rows={4}
-              />
-            </div>
+                <div>
+                  <label className="block text-sm font-medium text-navy-800 mb-3">Upload Files</label>
+                  <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    className={cn(
+                      'border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200',
+                      isDragging ? 'border-navy-500 bg-navy-50' : 'border-gray-300 hover:border-navy-400 hover:bg-gray-50'
+                    )}
+                  >
+                    <div className="w-16 h-16 bg-navy-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Upload className="w-8 h-8 text-navy-600" />
+                    </div>
+                    <p className="text-navy-800 font-medium mb-2">Drag and drop files here</p>
+                    <p className="text-gray-500 text-sm mb-4">or</p>
+                    <label className="inline-flex items-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 cursor-pointer transition-colors">
+                      <FileUp className="w-4 h-4" />
+                      Browse Files
+                      <input type="file" multiple className="hidden" onChange={handleFileSelect} />
+                    </label>
+                  </div>
+                </div>
+
+                {files.length > 0 && (
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-navy-800">Selected Files ({files.length})</label>
+                    <div className="space-y-2">
+                      {files.map((file, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <Paperclip className="w-4 h-4 text-navy-500" />
+                            <span className="text-sm text-navy-700 truncate max-w-xs">{file.name}</span>
+                            <span className="text-xs text-gray-400">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                          </div>
+                          <button onClick={() => removeFile(index)} className="p-1 hover:bg-gray-200 rounded transition-colors">
+                            <X className="w-4 h-4 text-gray-500" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-navy-800 mb-2">Comments (Optional)</label>
+                  <textarea
+                    value={comments}
+                    onChange={(e) => setComments(e.target.value)}
+                    placeholder="Add any comments for your instructor..."
+                    className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-navy-500 focus:border-transparent resize-none"
+                    rows={4}
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
-            <button onClick={onClose} className="px-6 py-2.5 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium">
-              Cancel
-            </button>
-            <button
-              onClick={() => submitMutation.mutate({ files, comments })}
-              disabled={submitMutation.isPending || files.length === 0}
-              className="px-6 py-2.5 bg-navy-600 text-white rounded-lg hover:bg-navy-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2"
-            >
-              {submitMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckSquare className="w-4 h-4" />}
-              Submit Assignment
-            </button>
+            {isSuccess ? (
+              <button
+                onClick={handleClose}
+                className="px-6 py-2.5 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition-colors font-medium"
+              >
+                Done
+              </button>
+            ) : (
+              <>
+                <button onClick={handleClose} className="px-6 py-2.5 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium">
+                  Cancel
+                </button>
+                <button
+                  onClick={() => submitMutation.mutate({ files, comments })}
+                  disabled={submitMutation.isPending || files.length === 0}
+                  className="px-6 py-2.5 bg-navy-600 text-white rounded-lg hover:bg-navy-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2"
+                >
+                  {submitMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckSquare className="w-4 h-4" />}
+                  Submit Assignment
+                </button>
+              </>
+            )}
           </div>
         </Dialog.Content>
       </Dialog.Portal>
