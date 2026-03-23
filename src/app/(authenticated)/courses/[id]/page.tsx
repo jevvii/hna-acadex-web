@@ -214,9 +214,10 @@ function ModulesTab({
     <div className="space-y-5">
       {modules.map((module) => {
         // Derive module items from activities, quizzes, and files that belong to this module
-        const modActivities = activities.filter((a) => a.weekly_module_id === module.id);
-        const modQuizzes = quizzes.filter((q) => q.weekly_module_id === module.id);
-        const modFiles = files.filter((f) => f.weekly_module_id === module.id);
+        // For students, filter out unpublished/hidden items
+        const modActivities = activities.filter((a) => a.weekly_module_id === module.id && (isTeacher || a.is_published));
+        const modQuizzes = quizzes.filter((q) => q.weekly_module_id === module.id && (isTeacher || q.is_published));
+        const modFiles = files.filter((f) => f.weekly_module_id === module.id && (isTeacher || f.is_visible));
 
         // Combine all items with their type and status config for display
         const moduleItems = [
@@ -353,8 +354,11 @@ function ModulesTab({
                                 <CheckCircle className="w-3 h-3" /> Submitted
                               </span>
                             )}
-                            {item.type === 'activity' && item.status === 'not-started' && (
+                            {item.type === 'activity' && item.status === 'not-started' && !isTeacher && (
                               <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Not Started</span>
+                            )}
+                            {item.type === 'activity' && item.status === 'not-started' && isTeacher && (
+                              <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Available</span>
                             )}
                             {item.type === 'activity' && item.status === 'late' && (
                               <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded-full">
