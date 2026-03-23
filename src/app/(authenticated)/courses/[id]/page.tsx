@@ -250,9 +250,6 @@ function ModulesTab({
         ];
 
         const itemCount = moduleItems.length;
-        const lastUpdated = module.updated_at
-          ? new Date(module.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-          : 'Recently';
 
         return (
           <div key={module.id} className="bg-white rounded-2xl shadow-card overflow-hidden flex flex-col">
@@ -270,7 +267,7 @@ function ModulesTab({
                 <div className="text-left">
                   <h3 className="font-display font-semibold text-navy-800 text-base">{module.title}</h3>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {itemCount} {itemCount === 1 ? 'item' : 'items'} • Updated {lastUpdated}
+                    {itemCount} {itemCount === 1 ? 'item' : 'items'}
                   </p>
                 </div>
               </div>
@@ -392,7 +389,21 @@ function ModulesTab({
 }
 
 // Assignments Tab
-function AssignmentsTab({ activities, isTeacher, onAddActivity }: { activities: Activity[]; isTeacher?: boolean; onAddActivity?: () => void }) {
+function AssignmentsTab({
+  activities,
+  isTeacher,
+  onAddActivity,
+  onEditActivity,
+  onDeleteActivity,
+  onGradeActivity,
+}: {
+  activities: Activity[];
+  isTeacher?: boolean;
+  onAddActivity?: () => void;
+  onEditActivity?: (activity: Activity) => void;
+  onDeleteActivity?: (activity: Activity) => void;
+  onGradeActivity?: (activity: Activity) => void;
+}) {
   const router = useRouter();
   const [filter, setFilter] = useState<'all' | 'pending' | 'submitted' | 'graded'>('all');
 
@@ -633,20 +644,32 @@ function AssignmentsTab({ activities, isTeacher, onAddActivity }: { activities: 
                       ? 'Pending Grade'
                       : `${activity.points} pts`}
                   </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/activities/${activity.id}`);
-                    }}
-                    className={cn(
-                      'text-sm font-medium transition-colors duration-200',
-                      config.buttonVariant === 'btn-primary'
-                        ? 'text-navy-600 hover:text-navy-700'
-                        : 'text-gray-500 hover:text-gray-700'
-                    )}
-                  >
-                    {config.buttonText} →
-                  </button>
+                  {isTeacher ? (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/activities/${activity.id}`);
+                      }}
+                      className="text-sm font-medium text-navy-600 hover:text-navy-700 transition-colors duration-200"
+                    >
+                      Edit/Grade →
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/activities/${activity.id}`);
+                      }}
+                      className={cn(
+                        'text-sm font-medium transition-colors duration-200',
+                        config.buttonVariant === 'btn-primary'
+                          ? 'text-navy-600 hover:text-navy-700'
+                          : 'text-gray-500 hover:text-gray-700'
+                      )}
+                    >
+                      {config.buttonText} →
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -712,7 +735,9 @@ function QuizzesTab({ quizzes, isTeacher, onAddQuiz }: { quizzes: Quiz[]; isTeac
     }
 
     if (quiz.my_attempt?.is_submitted) {
-      const percentage = Math.round((quiz.my_attempt.score / quiz.my_attempt.max_score) * 100);
+      const score = quiz.my_attempt.score ?? 0;
+      const maxScore = quiz.my_attempt.max_score ?? 1;
+      const percentage = Math.round((score / maxScore) * 100);
       return {
         status: 'completed',
         iconBg: 'bg-emerald-500',
@@ -724,7 +749,7 @@ function QuizzesTab({ quizzes, isTeacher, onAddQuiz }: { quizzes: Quiz[]; isTeac
         scoreLabel: `${quiz.my_attempt.score}/${quiz.my_attempt.max_score}`,
         buttonText: 'Review',
         canClick: true,
-        submittedDate: quiz.my_attempt.submitted_at,
+        submittedDate: (quiz.my_attempt as any).submitted_at,
         bestOf: quiz.attempt_limit > 1 ? `Best of ${quiz.attempt_limit}` : null,
       };
     }
@@ -783,9 +808,10 @@ function QuizzesTab({ quizzes, isTeacher, onAddQuiz }: { quizzes: Quiz[]; isTeac
         return (
           <div
             key={quiz.id}
+            onClick={() => isTeacher && router.push(`/quizzes/${quiz.id}`)}
             className={cn(
               "flex items-center gap-5 p-6 bg-white rounded-2xl shadow-card transition-all duration-200",
-              config.canClick ? "hover:shadow-card-hover" : "opacity-75"
+              config.canClick || isTeacher ? "hover:shadow-card-hover cursor-pointer" : "opacity-75"
             )}
           >
             {/* Quiz Icon */}
@@ -827,10 +853,10 @@ function QuizzesTab({ quizzes, isTeacher, onAddQuiz }: { quizzes: Quiz[]; isTeac
                     ? `${attemptsRemaining} attempt${attemptsRemaining !== 1 ? 's' : ''} remaining`
                     : `${quiz.attempt_limit} attempt${quiz.attempt_limit !== 1 ? 's' : ''} allowed`}
                 </span>
-                {isCompleted && quiz.my_attempt?.submitted_at && (
+                {isCompleted && (quiz.my_attempt as any)?.submitted_at && (
                   <span className="flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5" />
-                    Completed {formatDate(quiz.my_attempt.submitted_at)}
+                    Completed {formatDate((quiz.my_attempt as any).submitted_at)}
                   </span>
                 )}
                 {config.status === 'not-open' && quiz.open_at && (
@@ -873,24 +899,33 @@ function QuizzesTab({ quizzes, isTeacher, onAddQuiz }: { quizzes: Quiz[]; isTeac
               )}
 
               {/* Action Button */}
-              {config.status !== 'not-open' && config.status !== 'closed' && (
+              {isTeacher ? (
                 <button
-                  onClick={() => {
-                    if (config.status === 'in-progress' && quiz.my_in_progress_attempt) {
-                      router.push(`/quizzes/${quiz.id}/take?attempt=${quiz.my_in_progress_attempt.attempt_id}`);
-                    } else {
-                      router.push(`/quizzes/${quiz.id}`);
-                    }
-                  }}
-                  className={cn(
-                    'px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors',
-                    isCompleted
-                      ? 'bg-slate-100 text-navy-700 hover:bg-slate-200'
-                      : 'bg-navy-600 text-white hover:bg-navy-700'
-                  )}
+                  onClick={() => router.push(`/quizzes/${quiz.id}`)}
+                  className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-navy-600 text-white hover:bg-navy-700 transition-colors"
                 >
-                  {config.buttonText}
+                  Edit/Grade
                 </button>
+              ) : (
+                config.status !== 'not-open' && config.status !== 'closed' && (
+                  <button
+                    onClick={() => {
+                      if (config.status === 'in-progress' && quiz.my_in_progress_attempt) {
+                        router.push(`/quizzes/${quiz.id}/take?attempt=${quiz.my_in_progress_attempt.attempt_id}`);
+                      } else {
+                        router.push(`/quizzes/${quiz.id}`);
+                      }
+                    }}
+                    className={cn(
+                      'px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors',
+                      isCompleted
+                        ? 'bg-slate-100 text-navy-700 hover:bg-slate-200'
+                        : 'bg-navy-600 text-white hover:bg-navy-700'
+                    )}
+                  >
+                    {config.buttonText}
+                  </button>
+                )
               )}
 
               {/* Locked indicator */}
@@ -1237,10 +1272,10 @@ export default function CoursePage() {
   const courseCode = courseDetail?.course?.code || courseInfo?.course_code || 'COURSE';
   const courseTitle = courseDetail?.course?.title || courseInfo?.course_title || 'Course Title';
   const sectionName = courseDetail?.section?.name || courseInfo?.section_name || 'SECTION';
-  const teacherName = courseDetail?.teacher?.full_name || courseInfo?.teacher_name || 'Teacher';
+  const teacherName = courseDetail?.teacher?.full_name || (courseInfo as any)?.teacher_name || 'Teacher';
   const gradeLevel = courseDetail?.section?.grade_level || courseInfo?.grade_level;
   const strand = courseDetail?.section?.strand || courseInfo?.strand;
-  const studentCount = courseDetail?.student_count || courseInfo?.student_count;
+  const studentCount = (courseDetail as any)?.student_count || (courseInfo as any)?.student_count;
 
   // Extract content from the API response
   const modules = content?.modules || [];
@@ -1304,7 +1339,7 @@ export default function CoursePage() {
               </span>
               <span className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
-                {courseDetail?.student_count ? `${courseDetail.student_count} Students` : courseInfo?.student_count ? `${courseInfo.student_count} Students` : 'Students'}
+                {(courseDetail as any)?.student_count ? `${(courseDetail as any).student_count} Students` : (courseInfo as any)?.student_count ? `${(courseInfo as any).student_count} Students` : 'Students'}
               </span>
               <span className="flex items-center gap-2">
                 <Layers className="w-4 h-4" />

@@ -275,7 +275,7 @@ function QuestionRenderer({
       return (
         <MultipleChoiceQuestion
           question={question.question_text}
-          choices={question.choices || []}
+          choices={(question as any).choices || []}
           value={value}
           onChange={onChange}
         />
@@ -292,7 +292,7 @@ function QuestionRenderer({
       return (
         <FillBlankQuestion
           question={question.question_text}
-          blanks={question.blanks || []}
+          blanks={(question as any).blanks || []}
           value={value}
           onChange={(blankId, answer) => {
             const newValue = { ...(value || {}), [blankId]: answer };
@@ -364,13 +364,13 @@ export default function QuizTakingPage() {
 
     const timer = setInterval(() => {
       setTimeRemaining((prev) => {
-        if (prev <= 1) {
+        if ((prev ?? 0) <= 1) {
           clearInterval(timer);
           setIsTimeUp(true);
           setIsSubmitModalOpen(true);
           return 0;
         }
-        return prev - 1;
+        return (prev ?? 0) - 1;
       });
     }, 1000);
 
@@ -641,8 +641,7 @@ export default function QuizTakingPage() {
                 </Dialog.Description>
 
                 {answeredQuestions.size < totalQuestions && (
-                  <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg mb-4 text-sm text-amber-700"
-003e
+                  <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg mb-4 text-sm text-amber-700">
                     <AlertCircle className="w-4 h-4" />
                     <span>You have {totalQuestions - answeredQuestions.size} unanswered questions.</span>
                   </div>

@@ -160,6 +160,7 @@ export interface WeeklyModule {
   is_exam_week: boolean;
   is_published: boolean;
   sort_order: number;
+  updated_at?: string;
   items?: ModuleItem[];
 }
 

@@ -38,13 +38,9 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
       return quizzesApi.quickCreate(courseId, {
         title,
         instructions,
-        course_section: courseId,
         attempt_limit: parseInt(attemptLimit),
         time_limit_minutes: timeLimit ? parseInt(timeLimit) : undefined,
         questions: [],
-        weekly_module_id: selectedModuleId || undefined,
-        open_at: hasOpenDate && openDate ? new Date(openDate).toISOString() : undefined,
-        close_at: hasCloseDate && closeDate ? new Date(closeDate).toISOString() : undefined,
       });
     },
     onSuccess: () => {

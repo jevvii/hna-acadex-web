@@ -8,8 +8,9 @@ import * as Popover from '@radix-ui/react-popover';
 import { format, isBefore, isAfter } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { quizzesApi, reminderApi } from '@/lib/api';
-import { Quiz } from '@/lib/types';
+import { Quiz, SubmissionStatus } from '@/lib/types';
 import { CircularScore } from '@/components/CircularScore';
+import { useIsTeacher } from '@/store/auth';
 import {
   ChevronLeft,
   Clock,
@@ -26,12 +27,34 @@ import {
   Eye,
   Lock,
   Play,
+  TrendingUp,
+  Users,
+  Award,
+  Edit3,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 // Helper functions
 function formatDate(dateStr?: string): string {
   if (!dateStr) return 'Not set';
   return format(new Date(dateStr), 'MMM d, yyyy h:mm a');
+}
+
+// Calculate class statistics for quiz
+function calculateQuizStats(attempts: any[]) {
+  const scoredAttempts = attempts.filter(a => a.score !== null && a.score !== undefined);
+  if (scoredAttempts.length === 0) {
+    return { average: null, highest: null, lowest: null, totalCount: attempts.length };
+  }
+  const scores = scoredAttempts.map(a => a.score!);
+  const total = scores.reduce((sum, score) => sum + score, 0);
+  return {
+    average: total / scores.length,
+    highest: Math.max(...scores),
+    lowest: Math.min(...scores),
+    totalCount: attempts.length,
+  };
 }
 
 function formatDuration(minutes?: number): string {
@@ -228,7 +251,47 @@ function RemindersSection({ quizId, deadline }: { quizId: string; deadline?: str
   );
 }
 
-// Attempt history item
+// Stats Card Component
+function StatsCard({ label, value, colorClass }: { label: string; value: string | number; colorClass?: string }) {
+  return (
+    <div className="bg-slate-50 rounded-xl p-4 text-center">
+      <p className="text-xs text-gray-500 mb-1">{label}</p>
+      <p className={cn('text-2xl font-bold', colorClass || 'text-navy-700')}>{value}</p>
+    </div>
+  );
+}
+
+// Student status badge for quiz
+function QuizStudentStatusBadge({ status, score, maxScore }: { status: SubmissionStatus; score?: number; maxScore?: number }) {
+  const configs = {
+    not_submitted: {
+      label: 'Not Started',
+      className: 'bg-gray-100 text-gray-600 border border-gray-200',
+    },
+    submitted: {
+      label: 'Submitted',
+      className: 'bg-blue-50 text-blue-600 border border-blue-200',
+    },
+    late: {
+      label: 'Late',
+      className: 'bg-amber-50 text-amber-600 border border-amber-200',
+    },
+    graded: {
+      label: score !== undefined && maxScore ? `${score}/${maxScore}` : 'Graded',
+      className: 'bg-emerald-50 text-emerald-600 border border-emerald-200',
+    },
+  };
+
+  const config = configs[status] || configs.not_submitted;
+
+  return (
+    <span className={cn('px-3 py-1 rounded-full text-xs font-medium', config.className)}>
+      {config.label}
+    </span>
+  );
+}
+
+// Quiz Attempt history item
 function AttemptHistoryItem({
   attempt,
   isBest,
@@ -282,6 +345,7 @@ export default function QuizDetailsPage() {
   const router = useRouter();
   const quizId = params.id as string;
   const queryClient = useQueryClient();
+  const isTeacher = useIsTeacher();
 
   const [isStartingQuiz, setIsStartingQuiz] = useState(false);
 
@@ -294,6 +358,13 @@ export default function QuizDetailsPage() {
     queryKey: ['quiz', quizId],
     queryFn: () => quizzesApi.getQuiz(quizId),
     enabled: !!quizId,
+  });
+
+  // Fetch grading list for teacher view
+  const { data: gradingData } = useQuery({
+    queryKey: ['quiz-grading', quizId],
+    queryFn: () => quizzesApi.getGradingList(quizId),
+    enabled: !!quizId && isTeacher,
   });
 
   const takeQuizMutation = useMutation({
@@ -405,6 +476,12 @@ export default function QuizDetailsPage() {
       ]
     : [];
 
+  // Teacher view state
+  const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
+
+  // Calculate stats for teacher view
+  const stats = gradingData ? calculateQuizStats(gradingData) : null;
+
   if (isLoading) {
     return (
       <div className="min-h-screen">
@@ -513,7 +590,191 @@ export default function QuizDetailsPage() {
         >
           {/* Main content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Hero action card */}
+            {isTeacher ? (
+              <>
+                {/* Class Statistics Card */}
+                <div className="bg-white rounded-xl shadow-card p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <TrendingUp className="w-5 h-5 text-navy-600" />
+                    <h2 className="font-display font-semibold text-navy-800">Class Statistics</h2>
+                  </div>
+                  {stats && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <StatsCard
+                        label="Average"
+                        value={stats.average !== null ? stats.average.toFixed(1) : '-'}
+                        colorClass="text-navy-700"
+                      />
+                      <StatsCard
+                        label="Highest"
+                        value={stats.highest !== null ? stats.highest.toFixed(1) : '-'}
+                        colorClass="text-emerald-600"
+                      />
+                      <StatsCard
+                        label="Lowest"
+                        value={stats.lowest !== null ? stats.lowest.toFixed(1) : '-'}
+                        colorClass="text-red-600"
+                      />
+                      <StatsCard
+                        label="Students"
+                        value={stats.totalCount}
+                        colorClass="text-navy-700"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Quiz Info Card */}
+                <div className="bg-white rounded-xl shadow-card p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-display font-semibold text-navy-800">Quiz Details</h2>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => router.push(`/quizzes/${quizId}/edit`)}
+                        className="btn btn-outline text-sm"
+                      >
+                        <Edit3 className="w-4 h-4 mr-1" />
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex items-center gap-2">
+                      <HelpCircle className="w-4 h-4 text-navy-500" />
+                      <span className="text-gray-600">Questions:</span>
+                      <span className="font-medium text-navy-700">{quiz.question_count || 0}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Award className="w-4 h-4 text-navy-500" />
+                      <span className="text-gray-600">Points:</span>
+                      <span className="font-medium text-navy-700">{quiz.points || quiz.question_count || 0}</span>
+                    </div>
+                    {quiz.time_limit_minutes && (
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-navy-500" />
+                        <span className="text-gray-600">Time Limit:</span>
+                        <span className="font-medium text-navy-700">{formatDuration(quiz.time_limit_minutes)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4 text-navy-500" />
+                      <span className="text-gray-600">Attempts:</span>
+                      <span className="font-medium text-navy-700">{quiz.attempt_limit || 1}</span>
+                    </div>
+                    {quiz.open_at && (
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-navy-500" />
+                        <span className="text-gray-600">Opens:</span>
+                        <span className="font-medium text-navy-700">{formatDate(quiz.open_at)}</span>
+                      </div>
+                    )}
+                    {quiz.close_at && (
+                      <div className="flex items-center gap-2">
+                        <Lock className="w-4 h-4 text-navy-500" />
+                        <span className="text-gray-600">Closes:</span>
+                        <span className="font-medium text-navy-700">{formatDate(quiz.close_at)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Instructions */}
+                {quiz.instructions && (
+                  <div className="bg-white rounded-xl shadow-card p-6">
+                    <h2 className="font-display font-semibold text-navy-800 mb-4">Instructions</h2>
+                    <div className="prose prose-sm max-w-none text-gray-700">{quiz.instructions}</div>
+                  </div>
+                )}
+
+                {/* Student Submissions */}
+                {gradingData && (
+                  <div className="bg-white rounded-xl shadow-card p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-5 h-5 text-navy-600" />
+                        <h2 className="font-display font-semibold text-navy-800">Student Attempts</h2>
+                      </div>
+                      <span className="text-sm text-gray-500">
+                        {gradingData.filter((a: any) => a.score !== undefined).length} of {gradingData.length} graded
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {gradingData.map((attempt: any) => {
+                        const isExpanded = expandedStudentId === attempt.student_id;
+                        return (
+                          <div
+                            key={attempt.student_id}
+                            className="bg-white rounded-xl border border-gray-200 overflow-hidden"
+                          >
+                            <button
+                              onClick={() => setExpandedStudentId(isExpanded ? null : attempt.student_id)}
+                              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-navy-100 flex items-center justify-center">
+                                  <span className="text-navy-700 font-semibold text-sm">
+                                    {attempt.student_name?.charAt(0).toUpperCase() || '?'}
+                                  </span>
+                                </div>
+                                <div className="text-left">
+                                  <p className="font-medium text-navy-800">{attempt.student_name || 'Unknown Student'}</p>
+                                  <p className="text-xs text-gray-500">{attempt.student_email}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <QuizStudentStatusBadge
+                                  status={attempt.score !== undefined ? 'graded' : 'submitted'}
+                                  score={attempt.score}
+                                  maxScore={attempt.max_score || quiz.points}
+                                />
+                                {isExpanded ? (
+                                  <ChevronUp className="w-4 h-4 text-gray-400" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                                )}
+                              </div>
+                            </button>
+                            {isExpanded && (
+                              <div className="px-4 pb-4 border-t border-gray-100 bg-gray-50/50">
+                                {attempt.submitted_at && (
+                                  <div className="py-2 text-sm text-gray-600">
+                                    <span className="font-medium">Submitted:</span>{' '}
+                                    {formatDate(attempt.submitted_at)}
+                                  </div>
+                                )}
+                                {attempt.time_taken_seconds && (
+                                  <div className="py-2 text-sm text-gray-600">
+                                    <span className="font-medium">Time Taken:</span>{' '}
+                                    {Math.round(attempt.time_taken_seconds / 60)} minutes
+                                  </div>
+                                )}
+                                {attempt.pending_manual_grading && (
+                                  <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                                    <p className="text-sm text-amber-800">
+                                      <AlertCircle className="w-4 h-4 inline mr-1" />
+                                      Requires manual grading
+                                    </p>
+                                  </div>
+                                )}
+                                <button
+                                  onClick={() => router.push(`/quizzes/${quizId}/grade/${attempt.student_id}`)}
+                                  className="mt-3 w-full flex items-center justify-center gap-2 btn btn-primary"
+                                >
+                                  <Edit3 className="w-4 h-4" />
+                                  {attempt.score !== undefined ? 'Update Grade' : 'Grade Submission'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Hero action card */}
             <div
               className={cn(
                 'rounded-xl shadow-card p-8 text-center',
@@ -625,11 +886,69 @@ export default function QuizDetailsPage() {
                 </div>
               </div>
             )}
-          </div>
+          </>
+        )}
+      </div>
 
-          {/* Sidebar */}
+      {/* Sidebar */}
           <div className="space-y-6">
-            {/* Quiz Details */}
+            {isTeacher ? (
+              <>
+                {/* Teacher Actions */}
+                <div className="bg-white rounded-xl shadow-card p-6">
+                  <h3 className="font-display font-semibold text-navy-800 mb-4">Teacher Actions</h3>
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => router.push(`/quizzes/${quizId}/edit`)}
+                      className="w-full btn btn-primary"
+                    >
+                      <Edit3 className="w-4 h-4 mr-2" />
+                      Edit Quiz
+                    </button>
+                    <button
+                      onClick={() => {/* TODO: Add delete confirmation */}}
+                      className="w-full btn btn-outline text-red-600 border-red-200 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Quiz
+                    </button>
+                  </div>
+                </div>
+
+                {/* Submission Summary */}
+                {gradingData && (
+                  <div className="bg-white rounded-xl shadow-card p-6">
+                    <h3 className="font-display font-semibold text-navy-800 mb-4">Submission Summary</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Total Students</span>
+                        <span className="font-semibold text-navy-800">{gradingData.length}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Started</span>
+                        <span className="font-semibold text-blue-600">
+                          {gradingData.filter((a: any) => a.status !== 'not_submitted').length}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Graded</span>
+                        <span className="font-semibold text-emerald-600">
+                          {gradingData.filter((a: any) => a.score !== undefined).length}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Need Grading</span>
+                        <span className="font-semibold text-amber-600">
+                          {gradingData.filter((a: any) => a.status !== 'not_submitted' && a.score === undefined).length}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Quiz Details */}
             <div className="bg-white rounded-xl shadow-card p-6">
               <h3 className="font-display font-semibold text-navy-800 mb-4">Quiz Details</h3>
               <div className="space-y-4">
@@ -692,9 +1011,11 @@ export default function QuizDetailsPage() {
                 </div>
               </div>
             )}
-          </div>
-        </motion.div>
+          </>
+        )}
       </div>
-    </div>
+    </motion.div>
+  </div>
+</div>
   );
 }

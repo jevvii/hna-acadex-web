@@ -25,6 +25,7 @@ import {
   ChevronDown,
   ChevronUp,
   MessageCircle,
+  CheckCircle,
 } from 'lucide-react';
 
 // Helper functions
