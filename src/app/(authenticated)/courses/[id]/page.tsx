@@ -6,6 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCoursesStore } from '@/store/courses';
 import { useIsStudent, useIsTeacher } from '@/store/auth';
+import { CreateActivityModal } from '@/components/modals/CreateActivityModal';
+import { CreateQuizModal } from '@/components/modals/CreateQuizModal';
 import { cn, getInitials } from '@/lib/utils';
 import {
   coursesApi,
@@ -48,6 +50,7 @@ import {
   Layers,
   CheckSquare,
   HelpCircle,
+  Plus,
   User,
 } from 'lucide-react';
 
@@ -389,7 +392,7 @@ function ModulesTab({
 }
 
 // Assignments Tab
-function AssignmentsTab({ activities }: { activities: Activity[] }) {
+function AssignmentsTab({ activities, isTeacher, onAddActivity }: { activities: Activity[]; isTeacher?: boolean; onAddActivity?: () => void }) {
   const router = useRouter();
   const [filter, setFilter] = useState<'all' | 'pending' | 'submitted' | 'graded'>('all');
 
@@ -524,35 +527,46 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
 
   return (
     <div className="space-y-6">
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-3">
-        {[
-          { id: 'all', label: 'All' },
-          { id: 'pending', label: 'Pending' },
-          { id: 'submitted', label: 'Submitted' },
-          { id: 'graded', label: 'Graded' },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setFilter(tab.id as typeof filter)}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200',
-              filter === tab.id
-                ? 'bg-navy-600 text-white'
-                : 'text-gray-500 hover:bg-gray-100'
-            )}
-          >
-            {tab.label}
-            <span
+      {/* Filter Tabs and Add Button */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {[
+            { id: 'all', label: 'All' },
+            { id: 'pending', label: 'Pending' },
+            { id: 'submitted', label: 'Submitted' },
+            { id: 'graded', label: 'Graded' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setFilter(tab.id as typeof filter)}
               className={cn(
-                'px-2 py-0.5 rounded-full text-xs',
-                filter === tab.id ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-600'
+                'flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200',
+                filter === tab.id
+                  ? 'bg-navy-600 text-white'
+                  : 'text-gray-500 hover:bg-gray-100'
               )}
             >
-              {counts[tab.id as keyof typeof counts]}
-            </span>
+              {tab.label}
+              <span
+                className={cn(
+                  'px-2 py-0.5 rounded-full text-xs',
+                  filter === tab.id ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-600'
+                )}
+              >
+                {counts[tab.id as keyof typeof counts]}
+              </span>
+            </button>
+          ))}
+        </div>
+        {isTeacher && (
+          <button
+            onClick={onAddActivity}
+            className="flex items-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg text-sm font-medium hover:bg-navy-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add Activity
           </button>
-        ))}
+        )}
       </div>
 
       {/* Assignment Grid */}
@@ -661,7 +675,7 @@ function AssignmentsTab({ activities }: { activities: Activity[] }) {
 }
 
 // Quizzes Tab
-function QuizzesTab({ quizzes }: { quizzes: Quiz[] }) {
+function QuizzesTab({ quizzes, isTeacher, onAddQuiz }: { quizzes: Quiz[]; isTeacher?: boolean; onAddQuiz?: () => void }) {
   const router = useRouter();
 
   const getQuizConfig = (quiz: Quiz) => {
@@ -747,6 +761,19 @@ function QuizzesTab({ quizzes }: { quizzes: Quiz[] }) {
 
   return (
     <div className="space-y-5">
+      {/* Header with Add Button */}
+      {isTeacher && (
+        <div className="flex items-center justify-end">
+          <button
+            onClick={onAddQuiz}
+            className="flex items-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg text-sm font-medium hover:bg-navy-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add Quiz
+          </button>
+        </div>
+      )}
+
       {publishedQuizzes.map((quiz) => {
         const config = getQuizConfig(quiz);
         const Icon = config.icon;
@@ -1177,7 +1204,10 @@ function GradesTab({ courseId }: { courseId: string }) {
 export default function CoursePage() {
   const params = useParams();
   const courseId = params.id as string;
+  const isTeacher = useIsTeacher();
   const [activeTab, setActiveTab] = useState('modules');
+  const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
+  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const { courses, fetchCourses } = useCoursesStore();
 
   // Fetch course content (works for both students and teachers)
@@ -1227,9 +1257,9 @@ export default function CoursePage() {
       case 'modules':
         return <ModulesTab modules={modules} activities={activities} quizzes={quizzes} files={files} />;
       case 'assignments':
-        return <AssignmentsTab activities={activities} />;
+        return <AssignmentsTab activities={activities} isTeacher={isTeacher} onAddActivity={() => setIsActivityModalOpen(true)} />;
       case 'quizzes':
-        return <QuizzesTab quizzes={quizzes} />;
+        return <QuizzesTab quizzes={quizzes} isTeacher={isTeacher} onAddQuiz={() => setIsQuizModalOpen(true)} />;
       case 'files':
         return <FilesTab files={files} />;
       case 'announcements':
@@ -1321,6 +1351,20 @@ export default function CoursePage() {
       >
         {renderTabContent()}
       </motion.div>
+
+      {/* Modals */}
+      <CreateActivityModal
+        isOpen={isActivityModalOpen}
+        onClose={() => setIsActivityModalOpen(false)}
+        courseId={courseId}
+        modules={modules}
+      />
+      <CreateQuizModal
+        isOpen={isQuizModalOpen}
+        onClose={() => setIsQuizModalOpen(false)}
+        courseId={courseId}
+        modules={modules}
+      />
     </div>
   );
 }
