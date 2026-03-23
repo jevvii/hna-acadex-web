@@ -505,7 +505,10 @@ function AssignmentsTab({
     }
   };
 
-  const assignments = activities?.filter((a) => a.is_published) || [];
+  // Teachers can see all activities (including drafts), students only see published
+  const assignments = isTeacher
+    ? (activities || [])
+    : (activities?.filter((a) => a.is_published) || []);
 
   // Filter assignments based on selected tab
   const filteredAssignments = assignments.filter((activity) => {
@@ -781,7 +784,10 @@ function QuizzesTab({ quizzes, isTeacher, onAddQuiz }: { quizzes: Quiz[]; isTeac
     };
   };
 
-  const publishedQuizzes = quizzes?.filter((q) => q.is_published) || [];
+  // Teachers can see all quizzes (including drafts), students only see published
+  const publishedQuizzes = isTeacher
+    ? (quizzes || [])
+    : (quizzes?.filter((q) => q.is_published) || []);
   if (!publishedQuizzes.length) return <EmptyState message="No quizzes available" />;
 
   return (

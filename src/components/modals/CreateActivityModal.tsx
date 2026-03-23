@@ -41,6 +41,7 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
       formData.append('attempt_limit', attemptLimit);
       formData.append('score_selection_policy', scorePolicy);
       formData.append('allowed_file_types', JSON.stringify(fileTypes));
+      formData.append('is_published', 'true'); // Publish immediately
       if (hasDeadline && deadline) {
         formData.append('deadline', new Date(deadline).toISOString());
       }
