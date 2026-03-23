@@ -15,6 +15,7 @@ import {
   gradesApi,
   activitiesApi,
   quizzesApi,
+  filesApi,
 } from '@/lib/api';
 import {
   WeeklyModule,
@@ -119,12 +120,20 @@ function ModulesTab({
   modules,
   activities,
   quizzes,
-  files
+  files,
+  isTeacher,
+  onToggleActivityPublish,
+  onToggleQuizPublish,
+  onToggleFileVisibility,
 }: {
   modules: WeeklyModule[];
   activities: Activity[];
   quizzes: Quiz[];
   files: CourseFile[];
+  isTeacher?: boolean;
+  onToggleActivityPublish?: (activity: Activity) => void;
+  onToggleQuizPublish?: (quiz: Quiz) => void;
+  onToggleFileVisibility?: (file: CourseFile) => void;
 }) {
   const router = useRouter();
   // Track which modules are expanded - all expanded by default when modules load
@@ -222,6 +231,7 @@ function ModulesTab({
               iconColor: config.iconColor,
               iconBg: config.iconBg,
               status: config.status,
+              originalItem: a,
             };
           }),
           ...modQuizzes.map((q) => {
@@ -237,6 +247,7 @@ function ModulesTab({
               status: config.status,
               openAt: q.open_at,
               closeAt: q.close_at,
+              originalItem: q,
             };
           }),
           ...modFiles.map((f) => ({
@@ -248,6 +259,7 @@ function ModulesTab({
             iconColor: 'text-blue-500',
             iconBg: 'bg-blue-50',
             status: 'file',
+            originalItem: f,
           })),
         ];
 
@@ -367,8 +379,39 @@ function ModulesTab({
                             {item.type === 'quiz' && item.status === 'closed' && (
                               <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Closed</span>
                             )}
-                            {!item.published && (
-                              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Draft</span>
+                            {/* Draft/Hidden badge for teachers */}
+                            {!item.published && isTeacher && (
+                              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                                {item.type === 'file' ? 'Hidden' : 'Draft'}
+                              </span>
+                            )}
+                            {/* Toggle publish button for teachers */}
+                            {isTeacher && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (item.type === 'activity' && onToggleActivityPublish) {
+                                    onToggleActivityPublish(item.originalItem);
+                                  } else if (item.type === 'quiz' && onToggleQuizPublish) {
+                                    onToggleQuizPublish(item.originalItem);
+                                  } else if (item.type === 'file' && onToggleFileVisibility) {
+                                    onToggleFileVisibility(item.originalItem);
+                                  }
+                                }}
+                                className={cn(
+                                  'p-1.5 rounded-lg transition-colors',
+                                  item.published
+                                    ? 'text-emerald-600 hover:bg-emerald-50'
+                                    : 'text-gray-400 hover:bg-gray-100'
+                                )}
+                                title={item.published ? 'Unpublish' : 'Publish'}
+                              >
+                                {item.published ? (
+                                  <CheckCircle className="w-4 h-4" />
+                                ) : (
+                                  <div className="w-4 h-4 rounded-full border-2 border-current" />
+                                )}
+                              </button>
                             )}
                           </div>
                         </motion.div>
@@ -1012,7 +1055,7 @@ function QuizzesTab({ quizzes, isTeacher, onAddQuiz, onTogglePublish }: { quizze
 
 
 // Files Tab
-function FilesTab({ files }: { files: CourseFile[] }) {
+function FilesTab({ files, isTeacher, onTogglePublish }: { files: CourseFile[]; isTeacher?: boolean; onTogglePublish?: (file: CourseFile) => void }) {
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
 
   const getFileIcon = (type?: string) => {
@@ -1035,9 +1078,11 @@ function FilesTab({ files }: { files: CourseFile[] }) {
 
   const categories = ['All', 'Module', 'Assignment', 'Quiz', 'General'];
 
+  // Teachers see all files, students only see visible files
+  const visibleFiles = isTeacher ? files : files?.filter((f) => f.is_visible);
   const filteredFiles = categoryFilter === 'All'
-    ? files
-    : files?.filter((f) => f.category === categoryFilter.toLowerCase());
+    ? visibleFiles
+    : visibleFiles?.filter((f) => f.category === categoryFilter.toLowerCase());
 
   if (!files?.length) return <EmptyState message="No files available" />;
 
@@ -1063,12 +1108,35 @@ function FilesTab({ files }: { files: CourseFile[] }) {
       </div>
       <div className="divide-y divide-gray-100">
         {filteredFiles?.map((file: CourseFile) => (
-          <div key={file.id} className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors">
+          <div key={file.id} className={cn("flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors", !file.is_visible && isTeacher && "opacity-60")}>
             {getFileIcon(file.file_type)}
-            <div className="flex-1">
-              <p className="font-medium text-navy-800">{file.file_name}</p>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <p className={cn("font-medium", file.is_visible ? 'text-navy-800' : 'text-gray-500')}>{file.file_name}</p>
+                {!file.is_visible && isTeacher && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
+                    Hidden
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-gray-500">{formatFileSize(file.file_size_bytes)} • {formatDate(file.created_at)}</p>
             </div>
+            {isTeacher && onTogglePublish && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTogglePublish(file);
+                }}
+                className={cn(
+                  'text-xs font-medium px-2 py-1 rounded transition-colors',
+                  file.is_visible
+                    ? 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                )}
+              >
+                {file.is_visible ? 'Hide' : 'Show'}
+              </button>
+            )}
             <a
               href={file.file_url}
               download
@@ -1337,6 +1405,16 @@ export default function CoursePage() {
     }
   };
 
+  // Toggle file visibility status
+  const toggleFileVisibility = async (file: CourseFile) => {
+    try {
+      await filesApi.toggleFileVisibility(file.id, !file.is_visible);
+      queryClient.invalidateQueries({ queryKey: ['courseContent', courseId] });
+    } catch (error) {
+      console.error('Failed to toggle file visibility:', error);
+    }
+  };
+
   // Fetch course content (works for both students and teachers)
   const { data: courseDetail } = useQuery({
     queryKey: ['courseDetail', courseId],
@@ -1382,13 +1460,22 @@ export default function CoursePage() {
 
     switch (activeTab) {
       case 'modules':
-        return <ModulesTab modules={modules} activities={activities} quizzes={quizzes} files={files} />;
+        return <ModulesTab
+          modules={modules}
+          activities={activities}
+          quizzes={quizzes}
+          files={files}
+          isTeacher={isTeacher}
+          onToggleActivityPublish={toggleActivityPublish}
+          onToggleQuizPublish={toggleQuizPublish}
+          onToggleFileVisibility={toggleFileVisibility}
+        />;
       case 'assignments':
         return <AssignmentsTab activities={activities} isTeacher={isTeacher} onAddActivity={() => setIsActivityModalOpen(true)} onTogglePublish={toggleActivityPublish} />;
       case 'quizzes':
         return <QuizzesTab quizzes={quizzes} isTeacher={isTeacher} onAddQuiz={() => setIsQuizModalOpen(true)} onTogglePublish={toggleQuizPublish} />;
       case 'files':
-        return <FilesTab files={files} />;
+        return <FilesTab files={files} isTeacher={isTeacher} onTogglePublish={toggleFileVisibility} />;
       case 'announcements':
         return <AnnouncementsTab announcements={announcements} />;
       case 'attendance':

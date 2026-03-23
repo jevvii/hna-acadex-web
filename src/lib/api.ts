@@ -287,6 +287,9 @@ export const filesApi = {
     formData.append('course_section_id', courseSectionId);
     return api.postForm('/course-files/', formData);
   },
+  toggleFileVisibility: async (fileId: string, isVisible: boolean) => {
+    return api.patch(`/course-files/${fileId}/`, { is_visible: isVisible });
+  },
 };
 
 // Announcements API - uses announcements endpoint with course_section filter
