@@ -107,7 +107,21 @@ async function request(path: string, options: RequestOptions = {}, retry = true)
       clearAuthTokens();
       throw new ApiError('Session expired. Please sign in again.', 401, null);
     }
-    return request(path, options, false);
+    // Update headers with new token for retry
+    if (newToken) headers.Authorization = `Bearer ${newToken}`;
+    const retryRes = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers,
+      body: body == null ? undefined : (isFormData ? body : JSON.stringify(body)),
+    });
+    if (!retryRes.ok) {
+      const text = await retryRes.text();
+      const data = text ? JSON.parse(text) : null;
+      const detail = data?.detail || data?.message || JSON.stringify(data) || 'Request failed';
+      throw new ApiError(detail, retryRes.status, data);
+    }
+    const text = await retryRes.text();
+    return text ? JSON.parse(text) : null;
   }
 
   const text = await res.text();
