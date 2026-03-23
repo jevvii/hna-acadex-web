@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCoursesStore } from '@/store/courses';
 import { useIsStudent, useIsTeacher } from '@/store/auth';
@@ -13,6 +13,8 @@ import {
   coursesApi,
   attendanceApi,
   gradesApi,
+  activitiesApi,
+  quizzesApi,
 } from '@/lib/api';
 import {
   WeeklyModule,
@@ -396,6 +398,7 @@ function AssignmentsTab({
   onEditActivity,
   onDeleteActivity,
   onGradeActivity,
+  onTogglePublish,
 }: {
   activities: Activity[];
   isTeacher?: boolean;
@@ -403,6 +406,7 @@ function AssignmentsTab({
   onEditActivity?: (activity: Activity) => void;
   onDeleteActivity?: (activity: Activity) => void;
   onGradeActivity?: (activity: Activity) => void;
+  onTogglePublish?: (activity: Activity) => void;
 }) {
   const router = useRouter();
   const [filter, setFilter] = useState<'all' | 'pending' | 'submitted' | 'graded'>('all');
@@ -597,19 +601,26 @@ function AssignmentsTab({
               onClick={() => router.push(`/activities/${activity.id}`)}
             >
               {/* Status Bar */}
-              <div className={cn('h-1.5 w-full', config.barColor)} />
+              <div className={cn('h-1.5 w-full', activity.is_published ? config.barColor : 'bg-gray-300')} />
 
               <div className="p-6">
-                {/* Header - Icon + Badge */}
+                {/* Header - Icon + Badges */}
                 <div className="flex items-center justify-between mb-4">
-                  <div className={cn('w-11 h-11 rounded-full flex items-center justify-center', config.iconBg)}>
-                    <FileText className={cn('w-5 h-5', config.iconColor)} />
+                  <div className="flex items-center gap-2">
+                    <div className={cn('w-11 h-11 rounded-full flex items-center justify-center', activity.is_published ? config.iconBg : 'bg-gray-100')}>
+                      <FileText className={cn('w-5 h-5', activity.is_published ? config.iconColor : 'text-gray-400')} />
+                    </div>
+                    {!activity.is_published && isTeacher && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
+                        Draft
+                      </span>
+                    )}
                   </div>
                   {config.badge}
                 </div>
 
                 {/* Title */}
-                <h3 className="font-display font-semibold text-xl text-navy-800 mb-2" style={{ fontFamily: "'Crimson Pro', serif" }}>
+                <h3 className={cn('font-display font-semibold text-xl mb-2', activity.is_published ? 'text-navy-800' : 'text-gray-500')} style={{ fontFamily: "'Crimson Pro', serif" }}>
                   {activity.title}
                 </h3>
 
@@ -640,7 +651,7 @@ function AssignmentsTab({
 
                 {/* Footer */}
                 <div className="flex items-center justify-between">
-                  <span className={cn('text-sm font-semibold', config.pointsColor)}>
+                  <span className={cn('text-sm font-semibold', activity.is_published ? config.pointsColor : 'text-gray-500')}>
                     {submission?.status === 'graded'
                       ? `${submission.score}/${activity.points}`
                       : submission?.status === 'submitted' || submission?.status === 'late'
@@ -648,15 +659,33 @@ function AssignmentsTab({
                       : `${activity.points} pts`}
                   </span>
                   {isTeacher ? (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/activities/${activity.id}`);
-                      }}
-                      className="text-sm font-medium text-navy-600 hover:text-navy-700 transition-colors duration-200"
-                    >
-                      Edit/Grade →
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {onTogglePublish && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onTogglePublish(activity);
+                          }}
+                          className={cn(
+                            'text-xs font-medium px-2 py-1 rounded transition-colors',
+                            activity.is_published
+                              ? 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                              : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                          )}
+                        >
+                          {activity.is_published ? 'Unpublish' : 'Publish'}
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/activities/${activity.id}`);
+                        }}
+                        className="text-sm font-medium text-navy-600 hover:text-navy-700 transition-colors duration-200"
+                      >
+                        Edit/Grade →
+                      </button>
+                    </div>
                   ) : (
                     <button
                       onClick={(e) => {
@@ -701,7 +730,7 @@ function AssignmentsTab({
 }
 
 // Quizzes Tab
-function QuizzesTab({ quizzes, isTeacher, onAddQuiz }: { quizzes: Quiz[]; isTeacher?: boolean; onAddQuiz?: () => void }) {
+function QuizzesTab({ quizzes, isTeacher, onAddQuiz, onTogglePublish }: { quizzes: Quiz[]; isTeacher?: boolean; onAddQuiz?: () => void; onTogglePublish?: (quiz: Quiz) => void }) {
   const router = useRouter();
 
   const getQuizConfig = (quiz: Quiz) => {
@@ -817,28 +846,38 @@ function QuizzesTab({ quizzes, isTeacher, onAddQuiz }: { quizzes: Quiz[]; isTeac
             onClick={() => isTeacher && router.push(`/quizzes/${quiz.id}`)}
             className={cn(
               "flex items-center gap-5 p-6 bg-white rounded-2xl shadow-card transition-all duration-200",
-              config.canClick || isTeacher ? "hover:shadow-card-hover cursor-pointer" : "opacity-75"
+              config.canClick || isTeacher ? "hover:shadow-card-hover cursor-pointer" : "opacity-75",
+              !quiz.is_published && isTeacher && "border-l-4 border-gray-300"
             )}
           >
             {/* Quiz Icon */}
             <div className={cn(
               'w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0',
-              config.iconBg
+              quiz.is_published ? config.iconBg : 'bg-gray-100'
             )}>
-              <Icon className={cn('w-6 h-6', config.iconColor)} />
+              <Icon className={cn('w-6 h-6', quiz.is_published ? config.iconColor : 'text-gray-400')} />
             </div>
 
             {/* Quiz Content */}
             <div className="flex-1 min-w-0">
-              <h3 className={cn(
-                "font-display font-semibold text-lg",
-                config.status === 'not-open' || config.status === 'closed' ? 'text-gray-500' : 'text-navy-800'
-              )}>
-                {quiz.title}
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className={cn(
+                  "font-display font-semibold text-lg",
+                  !quiz.is_published ? 'text-gray-500' :
+                  config.status === 'not-open' || config.status === 'closed' ? 'text-gray-500' : 'text-navy-800'
+                )}>
+                  {quiz.title}
+                </h3>
+                {!quiz.is_published && isTeacher && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
+                    Draft
+                  </span>
+                )}
+              </div>
               {quiz.instructions && (
                 <p className={cn(
                   "text-sm mt-1 line-clamp-1",
+                  !quiz.is_published ? 'text-gray-400' :
                   config.status === 'not-open' || config.status === 'closed' ? 'text-gray-400' : 'text-gray-500'
                 )}>
                   {quiz.instructions}
@@ -876,6 +915,13 @@ function QuizzesTab({ quizzes, isTeacher, onAddQuiz }: { quizzes: Quiz[]; isTeac
 
             {/* Right Section: Status Badge + Score + Button */}
             <div className="flex items-center gap-4 flex-shrink-0">
+              {/* Draft Badge for teachers */}
+              {!quiz.is_published && isTeacher && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
+                  Draft
+                </span>
+              )}
+
               {/* Status Badge - only show if exists */}
               {config.badge && (
                 <span className={cn('px-3 py-1 rounded-full text-xs font-medium', config.badgeColor)}>
@@ -906,12 +952,30 @@ function QuizzesTab({ quizzes, isTeacher, onAddQuiz }: { quizzes: Quiz[]; isTeac
 
               {/* Action Button */}
               {isTeacher ? (
-                <button
-                  onClick={() => router.push(`/quizzes/${quiz.id}`)}
-                  className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-navy-600 text-white hover:bg-navy-700 transition-colors"
-                >
-                  Edit/Grade
-                </button>
+                <div className="flex items-center gap-2">
+                  {onTogglePublish && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onTogglePublish(quiz);
+                      }}
+                      className={cn(
+                        'text-xs font-medium px-2 py-1 rounded transition-colors',
+                        quiz.is_published
+                          ? 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                      )}
+                    >
+                      {quiz.is_published ? 'Unpublish' : 'Publish'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => router.push(`/quizzes/${quiz.id}`)}
+                    className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-navy-600 text-white hover:bg-navy-700 transition-colors"
+                  >
+                    Edit/Grade
+                  </button>
+                </div>
               ) : (
                 config.status !== 'not-open' && config.status !== 'closed' && (
                   <button
@@ -1246,10 +1310,32 @@ export default function CoursePage() {
   const params = useParams();
   const courseId = params.id as string;
   const isTeacher = useIsTeacher();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('modules');
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const { courses, fetchCourses } = useCoursesStore();
+
+  // Toggle activity publish status
+  const toggleActivityPublish = async (activity: Activity) => {
+    try {
+      await activitiesApi.toggleActivityPublish(activity.id, !activity.is_published);
+      queryClient.invalidateQueries({ queryKey: ['courseContent', courseId] });
+    } catch (error) {
+      console.error('Failed to toggle activity publish status:', error);
+    }
+  };
+
+  // Toggle quiz publish status
+  const toggleQuizPublish = async (quiz: Quiz) => {
+    try {
+      await quizzesApi.toggleQuizPublish(quiz.id, !quiz.is_published);
+      queryClient.invalidateQueries({ queryKey: ['courseContent', courseId] });
+    } catch (error) {
+      console.error('Failed to toggle quiz publish status:', error);
+    }
+  };
 
   // Fetch course content (works for both students and teachers)
   const { data: courseDetail } = useQuery({
@@ -1298,9 +1384,9 @@ export default function CoursePage() {
       case 'modules':
         return <ModulesTab modules={modules} activities={activities} quizzes={quizzes} files={files} />;
       case 'assignments':
-        return <AssignmentsTab activities={activities} isTeacher={isTeacher} onAddActivity={() => setIsActivityModalOpen(true)} />;
+        return <AssignmentsTab activities={activities} isTeacher={isTeacher} onAddActivity={() => setIsActivityModalOpen(true)} onTogglePublish={toggleActivityPublish} />;
       case 'quizzes':
-        return <QuizzesTab quizzes={quizzes} isTeacher={isTeacher} onAddQuiz={() => setIsQuizModalOpen(true)} />;
+        return <QuizzesTab quizzes={quizzes} isTeacher={isTeacher} onAddQuiz={() => setIsQuizModalOpen(true)} onTogglePublish={toggleQuizPublish} />;
       case 'files':
         return <FilesTab files={files} />;
       case 'announcements':

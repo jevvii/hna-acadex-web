@@ -227,6 +227,9 @@ export const activitiesApi = {
   deleteActivity: async (activityId: string) => {
     return api.delete(`/activities/${activityId}/`);
   },
+  toggleActivityPublish: async (activityId: string, isPublished: boolean) => {
+    return api.patch(`/activities/${activityId}/`, { is_published: isPublished });
+  },
 };
 
 // Quizzes API - uses quizzes endpoint with course_section filter
@@ -269,6 +272,9 @@ export const quizzesApi = {
   },
   deleteQuiz: async (quizId: string) => {
     return api.delete(`/quizzes/${quizId}/`);
+  },
+  toggleQuizPublish: async (quizId: string, isPublished: boolean) => {
+    return api.patch(`/quizzes/${quizId}/`, { is_published: isPublished });
   },
 };
 
