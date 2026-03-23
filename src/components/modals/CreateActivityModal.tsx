@@ -35,7 +35,6 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
   const createMutation = useMutation({
     mutationFn: async () => {
       const formData = new FormData();
-      formData.append('course_section', courseId);
       formData.append('title', title);
       formData.append('instructions', description);
       formData.append('points', points);

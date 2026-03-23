@@ -218,7 +218,7 @@ export const activitiesApi = {
     return api.post(`/activity-submissions/${submissionId}/grade/`, data);
   },
   createActivity: async (courseSectionId: string, formData: FormData) => {
-    formData.append('course_section', courseSectionId);
+    formData.append('course_section_id', courseSectionId);
     return api.postForm('/activities/', formData);
   },
   updateActivity: async (activityId: string, formData: FormData) => {
@@ -259,10 +259,10 @@ export const quizzesApi = {
     attempt_limit: number;
     questions: QuizQuestion[];
   }) => {
-    return api.post('/quizzes/quick-create/', { course_section: courseSectionId, ...data });
+    return api.post('/quizzes/quick-create/', { course_section_id: courseSectionId, ...data });
   },
   createQuiz: async (courseSectionId: string, data: Partial<Quiz>) => {
-    return api.post('/quizzes/', { course_section: courseSectionId, ...data });
+    return api.post('/quizzes/', { course_section_id: courseSectionId, ...data });
   },
   updateQuiz: async (quizId: string, data: Partial<Quiz>) => {
     return api.patch(`/quizzes/${quizId}/`, data);
@@ -278,7 +278,7 @@ export const filesApi = {
     return api.get(`/course-files/?course_section=${courseSectionId}`);
   },
   uploadFile: async (courseSectionId: string, formData: FormData) => {
-    formData.append('course_section', courseSectionId);
+    formData.append('course_section_id', courseSectionId);
     return api.postForm('/course-files/', formData);
   },
 };
