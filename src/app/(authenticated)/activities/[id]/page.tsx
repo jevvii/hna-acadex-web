@@ -3,14 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Popover from '@radix-ui/react-popover';
-import { format } from 'date-fns';
+import { format, differenceInDays, differenceInHours } from 'date-fns';
 import { useIsStudent, useIsTeacher } from '@/store/auth';
 import { cn } from '@/lib/utils';
-import { activitiesApi, reminderApi, Reminder } from '@/lib/api';
-import { Activity, Submission, SubmissionStatus, ScoreSelectionPolicy } from '@/lib/types';
+import { activitiesApi, reminderApi } from '@/lib/api';
+import { Activity, Submission, SubmissionStatus } from '@/lib/types';
 import { CircularScore } from '@/components/CircularScore';
 import {
   ChevronLeft,
@@ -32,293 +32,56 @@ import {
   ChevronDown,
   ChevronUp,
   MessageSquare,
-  MoreVertical,
+  Upload,
+  FileUp,
+  X,
+  Paperclip,
+  Eye,
+  CheckSquare,
+  GraduationCap,
+  FileCheck,
+  AlertTriangle,
 } from 'lucide-react';
 
 // Extended submission type with student info
 interface SubmissionWithStudent extends Submission {
   student_name?: string;
   student_email?: string;
-  attempts_used?: number;
-  attempts_remaining?: number;
-  best_score?: number | null;
-  score_selection_policy?: ScoreSelectionPolicy;
-  all_submissions?: Submission[];
-}
-
-// Extended submission type with student info
-interface SubmissionWithStudent extends Submission {
-  student_name?: string;
-  student_email?: string;
-  attempt_limit?: number;
-  attempts_used?: number;
-  attempts_remaining?: number;
-  all_submissions?: Submission[];
-  best_score?: number | null;
-  score_selection_policy?: ScoreSelectionPolicy;
 }
 
 // Helper functions
 function formatDate(dateStr?: string): string {
-  if (!dateStr) return 'No due date';
-  return format(new Date(dateStr), 'MMM d, yyyy');
+  if (!dateStr) return 'Not set';
+  return format(new Date(dateStr), 'MMM d, yyyy h:mm a');
 }
 
-// Calculate class statistics
-function calculateStats(submissions: SubmissionWithStudent[]) {
-  const gradedSubmissions = submissions.filter(s => s.score !== null && s.score !== undefined);
-  if (gradedSubmissions.length === 0) {
-    return { average: null, highest: null, lowest: null, gradedCount: 0, totalCount: submissions.length };
+function getTimeStatus(dueDate?: string): { text: string; color: string; urgent: boolean } {
+  if (!dueDate) return { text: 'No due date', color: 'text-gray-500', urgent: false };
+  const due = new Date(dueDate);
+  const now = new Date();
+  const daysLeft = differenceInDays(due, now);
+  const hoursLeft = differenceInHours(due, now);
+
+  if (daysLeft < 0) {
+    return { text: `Overdue by ${Math.abs(daysLeft)} day${Math.abs(daysLeft) !== 1 ? 's' : ''}`, color: 'text-red-600', urgent: true };
   }
-  const scores = gradedSubmissions.map(s => s.score!);
-  const total = scores.reduce((sum, score) => sum + score, 0);
-  return {
-    average: total / scores.length,
-    highest: Math.max(...scores),
-    lowest: Math.min(...scores),
-    gradedCount: gradedSubmissions.length,
-    totalCount: submissions.length,
-  };
-}
-
-function formatTime(dateStr?: string): string {
-  if (!dateStr) return '';
-  return format(new Date(dateStr), 'h:mm a');
-}
-
-function isLate(deadline?: string): boolean {
-  if (!deadline) return false;
-  return new Date(deadline) < new Date();
-}
-
-function getDaysRemaining(deadline?: string): number | null {
-  if (!deadline) return null;
-  const diff = new Date(deadline).getTime() - new Date().getTime();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
-}
-
-// Loading state
-function LoadingState() {
-  return (
-    <div className="flex items-center justify-center py-12">
-      <Loader2 className="w-8 h-8 text-navy-600 animate-spin" />
-    </div>
-  );
-}
-
-// Error state
-function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-      <AlertCircle className="w-12 h-12 mb-3 text-red-500" />
-      <p className="mb-4">{message}</p>
-      {onRetry && (
-        <button onClick={onRetry} className="btn btn-outline">
-          Try Again
-        </button>
-      )}
-    </div>
-  );
-}
-
-// Status badge component
-function StatusBadge({ status, submission }: { status: SubmissionStatus; submission?: Activity['my_submission'] }) {
-  const configs = {
-    not_submitted: {
-      label: 'Not Submitted',
-      className: 'badge badge-warning',
-      icon: AlertCircle,
-    },
-    submitted: {
-      label: 'Submitted',
-      className: 'badge badge-info',
-      icon: CheckCircle,
-    },
-    late: {
-      label: 'Late',
-      className: 'badge badge-error',
-      icon: Clock,
-    },
-    graded: {
-      label: submission?.score !== undefined ? `Graded: ${submission.score}` : 'Graded',
-      className: 'badge badge-success',
-      icon: CheckCircle,
-    },
-  };
-
-  const config = configs[status] || configs.not_submitted;
-  const Icon = config.icon;
-
-  return (
-    <span className={cn('flex items-center gap-1', config.className)}>
-      <Icon className="w-3 h-3" />
-      {config.label}
-    </span>
-  );
-}
-
-// Student status badge for teacher view
-function StudentStatusBadge({ submission, maxPoints }: { submission: SubmissionWithStudent; maxPoints: number }) {
-  const configs = {
-    not_submitted: {
-      label: 'Not Submitted',
-      className: 'bg-gray-100 text-gray-600 border border-gray-200',
-    },
-    submitted: {
-      label: 'Submitted',
-      className: 'bg-blue-50 text-blue-600 border border-blue-200',
-    },
-    late: {
-      label: 'Late',
-      className: 'bg-amber-50 text-amber-600 border border-amber-200',
-    },
-    graded: {
-      label: submission.score !== undefined ? `${submission.score}/${maxPoints}` : 'Graded',
-      className: 'bg-emerald-50 text-emerald-600 border border-emerald-200',
-    },
-  };
-
-  const config = configs[submission.status] || configs.not_submitted;
-
-  return (
-    <span className={cn('px-3 py-1 rounded-full text-xs font-medium', config.className)}>
-      {config.label}
-    </span>
-  );
-}
-
-// Stats Card Component
-function StatsCard({ label, value, colorClass }: { label: string; value: string | number; colorClass?: string }) {
-  return (
-    <div className="bg-slate-50 rounded-xl p-4 text-center">
-      <p className="text-xs text-gray-500 mb-1">{label}</p>
-      <p className={cn('text-2xl font-bold', colorClass || 'text-navy-700')}>{value}</p>
-    </div>
-  );
-}
-
-// Student Submissions List Component
-function StudentSubmissionsList({
-  submissions,
-  activity,
-  onGrade,
-}: {
-  submissions: SubmissionWithStudent[];
-  activity: Activity;
-  onGrade: (submission: SubmissionWithStudent) => void;
-}) {
-  const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
-
-  const submissionCount = submissions.filter(s => s.status !== 'not_submitted').length;
-  const gradedCount = submissions.filter(s => s.status === 'graded').length;
-
-  if (submissions.length === 0) {
-    return (
-      <div className="text-center py-12 text-gray-500">
-        <Users className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-        <p>No students enrolled yet.</p>
-      </div>
-    );
+  if (daysLeft === 0) {
+    if (hoursLeft <= 0) {
+      return { text: 'Overdue', color: 'text-red-600', urgent: true };
+    }
+    return { text: `Due in ${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''}`, color: 'text-amber-600', urgent: hoursLeft <= 6 };
   }
+  if (daysLeft === 1) {
+    return { text: 'Due tomorrow', color: 'text-amber-600', urgent: true };
+  }
+  return { text: `Due in ${daysLeft} days`, color: 'text-emerald-600', urgent: false };
+}
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-display font-semibold text-navy-800">Student Submissions</h3>
-        <span className="text-sm text-gray-500">
-          {submissionCount} of {submissions.length} submitted • {gradedCount} graded
-        </span>
-      </div>
-
-      <div className="space-y-2">
-        {submissions.map((sub) => {
-          const isExpanded = expandedStudentId === sub.student_id;
-          const hasMultipleAttempts = (sub.attempts_used || 0) > 1;
-
-          return (
-            <div
-              key={sub.student_id}
-              className="bg-white rounded-xl border border-gray-200 overflow-hidden"
-            >
-              <button
-                onClick={() => setExpandedStudentId(isExpanded ? null : sub.student_id)}
-                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-navy-100 flex items-center justify-center">
-                    <span className="text-navy-700 font-semibold text-sm">
-                      {sub.student_name?.charAt(0).toUpperCase() || '?'}
-                    </span>
-                  </div>
-                  <div className="text-left">
-                    <p className="font-medium text-navy-800">{sub.student_name || 'Unknown Student'}</p>
-                    <p className="text-xs text-gray-500">{sub.student_email}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <StudentStatusBadge submission={sub} maxPoints={activity.points} />
-                  {hasMultipleAttempts && (
-                    <span className="text-xs text-gray-500">{sub.attempts_used} attempts</span>
-                  )}
-                  {isExpanded ? (
-                    <ChevronUp className="w-4 h-4 text-gray-400" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
-                  )}
-                </div>
-              </button>
-
-              {isExpanded && sub.status !== 'not_submitted' && (
-                <div className="px-4 pb-4 border-t border-gray-100 bg-gray-50/50">
-                  {/* Best Score Info */}
-                  {hasMultipleAttempts && sub.best_score != null && (
-                    <div className="py-3 text-sm text-gray-600">
-                      <span className="font-medium">Best Score:</span> {sub.best_score.toFixed(1)} ({sub.score_selection_policy === 'highest' ? 'Highest' : 'Latest'})
-                    </div>
-                  )}
-
-                  {/* All Attempts */}
-                  {sub.all_submissions && sub.all_submissions.length > 1 && (
-                    <div className="py-3">
-                      <p className="text-xs text-gray-500 mb-2">All Attempts:</p>
-                      <div className="space-y-2">
-                        {sub.all_submissions.map((attempt, idx) => (
-                          <div key={attempt.id || idx} className="flex items-center justify-between text-sm bg-white rounded-lg p-3 border border-gray-100">
-                            <span className="text-gray-600">Attempt {attempt.attempt_number || idx + 1}</span>
-                            <span className="font-medium text-navy-700">
-                              {attempt.score != null ? attempt.score.toFixed(1) : 'Not graded'}
-                            </span>
-                            <span className="text-xs text-gray-400">{formatDate(attempt.submitted_at)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Submission Date */}
-                  {sub.submitted_at && (
-                    <div className="py-2 text-sm text-gray-600">
-                      <span className="font-medium">Submitted:</span> {formatDate(sub.submitted_at)} at {formatTime(sub.submitted_at)}
-                    </div>
-                  )}
-
-                  {/* Grade Button */}
-                  <button
-                    onClick={() => onGrade(sub)}
-                    className="mt-3 w-full flex items-center justify-center gap-2 btn btn-primary"
-                  >
-                    <Edit3 className="w-4 h-4" />
-                    {sub.status === 'graded' ? 'Update Grade' : 'Grade Submission'}
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+function getSubmissionStatus(submission?: { status: SubmissionStatus; graded_at?: string }): { label: string; color: string } {
+  if (!submission) return { label: 'Not Submitted', color: 'bg-gray-100 text-gray-600 border-gray-200' };
+  if (submission.graded_at) return { label: 'Graded', color: 'bg-emerald-50 text-emerald-600 border-emerald-200' };
+  if (submission.status === 'late') return { label: 'Submitted Late', color: 'bg-amber-50 text-amber-600 border-amber-200' };
+  return { label: 'Submitted', color: 'bg-blue-50 text-blue-600 border-blue-200' };
 }
 
 // Reminder presets
@@ -332,42 +95,175 @@ const REMINDER_PRESETS = [
   { label: '1 week before', offsetMinutes: 7 * 24 * 60 },
 ];
 
-// Reminder picker component
-function ReminderPicker({
-  deadline,
-  onSelect,
+// Submission Modal Component
+function SubmissionModal({
+  activity,
+  isOpen,
   onClose,
 }: {
-  deadline?: string;
-  onSelect: (reminderDate: Date, offsetMinutes: number) => void;
+  activity: Activity;
+  isOpen: boolean;
   onClose: () => void;
 }) {
-  if (!deadline) return null;
+  const queryClient = useQueryClient();
+  const activityId = activity.id;
+  const [files, setFiles] = useState<File[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [comments, setComments] = useState('');
 
-  const deadlineDate = new Date(deadline);
+  const submitMutation = useMutation({
+    mutationFn: async (data: { files: File[]; comments: string }) => {
+      const formData = new FormData();
+      data.files.forEach((file) => formData.append('files', file));
+      formData.append('comments', data.comments);
+      return activitiesApi.submitActivity(activityId, formData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['activity', activityId] });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
+      onClose();
+      setFiles([]);
+      setComments('');
+    },
+  });
+
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
+  const handleDragLeave = () => setIsDragging(false);
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    setFiles((prev) => [...prev, ...droppedFiles]);
+  };
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const selectedFiles = Array.from(e.target.files);
+      setFiles((prev) => [...prev, ...selectedFiles]);
+    }
+  };
+  const removeFile = (index: number) => setFiles((prev) => prev.filter((_, i) => i !== index));
+
+  const timeStatus = activity.deadline ? getTimeStatus(activity.deadline) : { text: '', color: '', urgent: false };
+  const isLateSubmission = timeStatus.text.includes('Overdue');
 
   return (
+    <Dialog.Root open={isOpen} onOpenChange={onClose}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
+        <Dialog.Content className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 bg-white rounded-2xl shadow-2xl z-50 md:w-full md:max-w-2xl md:max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-navy-50/50 to-transparent">
+            <div>
+              <Dialog.Title className="text-xl font-bold text-navy-900">Submit Assignment</Dialog.Title>
+              <p className="text-sm text-gray-500 mt-1">{activity.title}</p>
+            </div>
+            <Dialog.Close className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+              <X className="w-5 h-5 text-gray-500" />
+            </Dialog.Close>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            {isLateSubmission && (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+                <div>
+                  <p className="font-medium text-amber-800">Late Submission</p>
+                  <p className="text-sm text-amber-700 mt-1">The due date has passed. Your submission will be marked as late.</p>
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-navy-800 mb-3">Upload Files</label>
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={cn(
+                  'border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200',
+                  isDragging ? 'border-navy-500 bg-navy-50' : 'border-gray-300 hover:border-navy-400 hover:bg-gray-50'
+                )}
+              >
+                <div className="w-16 h-16 bg-navy-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Upload className="w-8 h-8 text-navy-600" />
+                </div>
+                <p className="text-navy-800 font-medium mb-2">Drag and drop files here</p>
+                <p className="text-gray-500 text-sm mb-4">or</p>
+                <label className="inline-flex items-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 cursor-pointer transition-colors">
+                  <FileUp className="w-4 h-4" />
+                  Browse Files
+                  <input type="file" multiple className="hidden" onChange={handleFileSelect} />
+                </label>
+              </div>
+            </div>
+
+            {files.length > 0 && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-navy-800">Selected Files ({files.length})</label>
+                <div className="space-y-2">
+                  {files.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Paperclip className="w-4 h-4 text-navy-500" />
+                        <span className="text-sm text-navy-700 truncate max-w-xs">{file.name}</span>
+                        <span className="text-xs text-gray-400">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                      </div>
+                      <button onClick={() => removeFile(index)} className="p-1 hover:bg-gray-200 rounded transition-colors">
+                        <X className="w-4 h-4 text-gray-500" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-navy-800 mb-2">Comments (Optional)</label>
+              <textarea
+                value={comments}
+                onChange={(e) => setComments(e.target.value)}
+                placeholder="Add any comments for your instructor..."
+                className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-navy-500 focus:border-transparent resize-none"
+                rows={4}
+              />
+            </div>
+          </div>
+
+          <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
+            <button onClick={onClose} className="px-6 py-2.5 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors font-medium">
+              Cancel
+            </button>
+            <button
+              onClick={() => submitMutation.mutate({ files, comments })}
+              disabled={submitMutation.isPending || files.length === 0}
+              className="px-6 py-2.5 bg-navy-600 text-white rounded-lg hover:bg-navy-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2"
+            >
+              {submitMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckSquare className="w-4 h-4" />}
+              Submit Assignment
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+// Reminder picker component
+function ReminderPicker({ deadline, onSelect, onClose }: { deadline?: string; onSelect: (reminderDate: Date, offsetMinutes: number) => void; onClose: () => void }) {
+  if (!deadline) return null;
+  const deadlineDate = new Date(deadline);
+  return (
     <div className="bg-white rounded-xl shadow-lg p-4 w-72">
-      <h4 className="font-display font-semibold text-navy-800 mb-3">Set Reminder</h4>
+      <h4 className="font-bold text-navy-800 mb-3">Set Reminder</h4>
       <div className="space-y-2 max-h-64 overflow-y-auto">
         {REMINDER_PRESETS.map((preset) => {
           const reminderDate = new Date(deadlineDate.getTime() - preset.offsetMinutes * 60 * 1000);
           const isPast = reminderDate < new Date();
-
           return (
             <button
               key={preset.offsetMinutes}
               disabled={isPast}
-              onClick={() => {
-                onSelect(reminderDate, preset.offsetMinutes);
-                onClose();
-              }}
-              className={cn(
-                'w-full text-left px-4 py-3 rounded-lg transition-colors',
-                isPast
-                  ? 'opacity-50 cursor-not-allowed bg-gray-100'
-                  : 'hover:bg-navy-50'
-              )}
+              onClick={() => { onSelect(reminderDate, preset.offsetMinutes); onClose(); }}
+              className={cn('w-full text-left px-4 py-3 rounded-lg transition-colors', isPast ? 'opacity-50 cursor-not-allowed bg-gray-100' : 'hover:bg-navy-50')}
             >
               <p className="font-medium text-navy-800">{preset.label}</p>
               <p className="text-sm text-gray-500">{format(reminderDate, 'MMM d, yyyy h:mm a')}</p>
@@ -375,54 +271,26 @@ function ReminderPicker({
           );
         })}
       </div>
-      <button onClick={onClose} className="btn btn-outline w-full mt-4">
-        Cancel
-      </button>
+      <button onClick={onClose} className="btn btn-outline w-full mt-4">Cancel</button>
     </div>
   );
 }
 
 // Reminders section
-function RemindersSection({
-  activityId,
-  deadline,
-}: {
-  activityId: string;
-  deadline?: string;
-}) {
+function RemindersSection({ activityId, deadline }: { activityId: string; deadline?: string }) {
   const queryClient = useQueryClient();
   const [isPickerOpen, setIsPickerOpen] = useState(false);
-
-  const { data: reminders = [], isLoading } = useQuery({
-    queryKey: ['reminders', 'activity', activityId],
-    queryFn: () => reminderApi.getByActivity(activityId),
-    enabled: !!activityId,
-  });
-
+  const { data: reminders = [], isLoading } = useQuery({ queryKey: ['reminders', 'activity', activityId], queryFn: () => reminderApi.getByActivity(activityId), enabled: !!activityId });
   const createMutation = useMutation({
-    mutationFn: (data: { reminder_datetime: string; offset_minutes: number }) =>
-      reminderApi.create({
-        reminder_type: 'activity',
-        activity_id: activityId,
-        ...data,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['reminders', 'activity', activityId] });
-    },
+    mutationFn: (data: { reminder_datetime: string; offset_minutes: number }) => reminderApi.create({ reminder_type: 'activity', activity_id: activityId, ...data }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reminders', 'activity', activityId] }),
   });
-
   const deleteMutation = useMutation({
     mutationFn: (reminderId: string) => reminderApi.delete(reminderId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['reminders', 'activity', activityId] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reminders', 'activity', activityId] }),
   });
-
   const handleAddReminder = (reminderDate: Date, offsetMinutes: number) => {
-    createMutation.mutate({
-      reminder_datetime: reminderDate.toISOString(),
-      offset_minutes: offsetMinutes,
-    });
+    createMutation.mutate({ reminder_datetime: reminderDate.toISOString(), offset_minutes: offsetMinutes });
   };
 
   return (
@@ -435,50 +303,29 @@ function RemindersSection({
         {deadline && (
           <Popover.Root open={isPickerOpen} onOpenChange={setIsPickerOpen}>
             <Popover.Trigger asChild>
-              <button className="btn btn-outline text-sm py-2 px-3">
-                <Plus className="w-4 h-4 mr-1" />
-                Add
-              </button>
+              <button className="btn btn-outline text-sm py-2 px-3"><Plus className="w-4 h-4 mr-1" />Add</button>
             </Popover.Trigger>
             <Popover.Portal>
               <Popover.Content className="z-50" side="bottom" align="end">
-                <ReminderPicker
-                  deadline={deadline}
-                  onSelect={handleAddReminder}
-                  onClose={() => setIsPickerOpen(false)}
-                />
+                <ReminderPicker deadline={deadline} onSelect={handleAddReminder} onClose={() => setIsPickerOpen(false)} />
               </Popover.Content>
             </Popover.Portal>
           </Popover.Root>
         )}
       </div>
-
       {isLoading ? (
         <div className="py-4 text-center text-gray-500">Loading reminders...</div>
       ) : reminders.length === 0 ? (
-        <p className="text-gray-500 text-sm">
-          {deadline
-            ? 'No reminders set. Add one to get notified before the deadline.'
-            : 'No deadline set for this activity.'}
-        </p>
+        <p className="text-gray-500 text-sm">{deadline ? 'No reminders set. Add one to get notified before the deadline.' : 'No deadline set for this activity.'}</p>
       ) : (
         <div className="space-y-2">
           {reminders.map((reminder) => (
-            <div
-              key={reminder.id}
-              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-            >
+            <div key={reminder.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-gray-400" />
-                <span className="text-sm text-navy-700">
-                  {format(new Date(reminder.reminder_datetime), 'MMM d, yyyy h:mm a')}
-                </span>
+                <span className="text-sm text-navy-700">{format(new Date(reminder.reminder_datetime), 'MMM d, yyyy h:mm a')}</span>
               </div>
-              <button
-                onClick={() => deleteMutation.mutate(reminder.id)}
-                disabled={deleteMutation.isPending}
-                className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-              >
+              <button onClick={() => deleteMutation.mutate(reminder.id)} disabled={deleteMutation.isPending} className="p-1 text-gray-400 hover:text-red-500 transition-colors">
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
@@ -489,705 +336,428 @@ function RemindersSection({
   );
 }
 
-// Grade Submission Modal
-function GradeSubmissionModal({
-  isOpen,
-  onClose,
-  submission,
-  maxPoints,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  submission: SubmissionWithStudent | null;
-  maxPoints: number;
-}) {
-  const [score, setScore] = useState('');
-  const [feedback, setFeedback] = useState('');
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    if (submission) {
-      setScore(submission.score?.toString() || '');
-      setFeedback(submission.feedback || '');
-    } else {
-      setScore('');
-      setFeedback('');
-    }
-  }, [submission]);
-
-  const gradeMutation = useMutation({
-    mutationFn: async (data: { score: number; feedback?: string }) => {
-      if (!submission?.id) throw new Error('No submission selected');
-      return activitiesApi.gradeSubmission(submission.id, {
-        score: data.score,
-        feedback: data.feedback,
-        status: 'graded',
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activity-submissions'] });
-      queryClient.invalidateQueries({ queryKey: ['activity'] });
-      onClose();
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const numScore = parseFloat(score);
-    if (isNaN(numScore) || numScore < 0 || numScore > maxPoints) return;
-    gradeMutation.mutate({ score: numScore, feedback: feedback || undefined });
-  };
-
+// Stats Card Component
+function StatsCard({ label, value, colorClass, icon: Icon }: { label: string; value: string | number; colorClass?: string; icon?: React.ElementType }) {
   return (
-    <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
-        <Dialog.Content className="fixed inset-0 flex items-center justify-center z-50 p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
-          >
-            <div className="bg-navy-600 px-6 py-4">
-              <Dialog.Title className="text-white font-display font-semibold text-lg">
-                Grade Submission
-              </Dialog.Title>
-              <Dialog.Description className="text-white/70 text-sm">
-                {submission?.student_name}
-              </Dialog.Description>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-navy-700 mb-2">
-                  Score (0-{maxPoints})
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={maxPoints}
-                  step="0.1"
-                  value={score}
-                  onChange={(e) => setScore(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-500"
-                  placeholder={`Enter score out of ${maxPoints}`}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-navy-700 mb-2">
-                  Feedback (Optional)
-                </label>
-                <textarea
-                  value={feedback}
-                  onChange={(e) => setFeedback(e.target.value)}
-                  rows={4}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-500 resize-none"
-                  placeholder="Enter feedback for the student..."
-                />
-              </div>
-
-              {gradeMutation.isError && (
-                <div className="text-red-500 text-sm">{gradeMutation.error?.message || 'Failed to grade submission'}</div>
-              )}
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 btn btn-outline"
-                  disabled={gradeMutation.isPending}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 btn btn-primary"
-                  disabled={gradeMutation.isPending}
-                >
-                  {gradeMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    'Save Grade'
-                  )}
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <div className="bg-slate-50 rounded-xl p-4 text-center">
+      {Icon && <Icon className="w-5 h-5 text-gray-400 mx-auto mb-2" />}
+      <p className="text-xs text-gray-500 mb-1">{label}</p>
+      <p className={cn('text-2xl font-bold', colorClass || 'text-navy-700')}>{value}</p>
+    </div>
   );
 }
+
+// Student status badge
+function StudentStatusBadge({ status, score }: { status: SubmissionStatus; score?: number }) {
+  const configs = {
+    not_submitted: { label: 'Not Submitted', className: 'bg-gray-100 text-gray-600 border border-gray-200' },
+    submitted: { label: 'Submitted', className: 'bg-blue-50 text-blue-600 border border-blue-200' },
+    late: { label: 'Late', className: 'bg-amber-50 text-amber-600 border border-amber-200' },
+    graded: { label: score !== undefined ? `${score}/100` : 'Graded', className: 'bg-emerald-50 text-emerald-600 border border-emerald-200' },
+  };
+  const config = configs[status] || configs.not_submitted;
+  return <span className={cn('px-3 py-1 rounded-full text-xs font-medium', config.className)}>{config.label}</span>;
+}
+
+// Main page component
 export default function ActivityDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const activityId = params.id as string;
+  const queryClient = useQueryClient();
   const isStudent = useIsStudent();
   const isTeacher = useIsTeacher();
-  const queryClient = useQueryClient();
+  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
 
-  const {
-    data: activity,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
+  const { data: activity, isLoading, error, refetch } = useQuery({
     queryKey: ['activity', activityId],
     queryFn: () => activitiesApi.getActivity(activityId),
     enabled: !!activityId,
   });
 
-  // Fetch all submissions for teacher view
-  const { data: allSubmissions } = useQuery({
+  const { data: submissions = [] } = useQuery({
     queryKey: ['activity-submissions', activityId],
     queryFn: () => activitiesApi.getAllSubmissions(activityId),
     enabled: !!activityId && isTeacher,
   });
 
-  // Determine submission status
-  const submission = activity?.my_submission;
-  const submissionStatus: SubmissionStatus = submission?.status || 'not_submitted';
-  const isGraded = submissionStatus === 'graded';
-  const isSubmitted = submissionStatus === 'submitted' || submissionStatus === 'graded';
-
-  // Get action button text and handler
-  const getActionButton = () => {
-    if (isGraded) {
-      return {
-        text: 'View Feedback',
-        onClick: () => router.push(`/activities/${activityId}/submit`),
-      };
-    }
-    if (isSubmitted) {
-      return {
-        text: 'View Submission',
-        onClick: () => router.push(`/activities/${activityId}/submit`),
-      };
-    }
-    return {
-      text: 'Submit Assignment',
-      onClick: () => router.push(`/activities/${activityId}/submit`),
-      primary: true,
-    };
-  };
-
-  const actionButton = getActionButton();
-  const daysRemaining = getDaysRemaining(activity?.deadline);
-
-  // Grade modal state
-  const [isGradeModalOpen, setIsGradeModalOpen] = useState(false);
-  const [selectedSubmission, setSelectedSubmission] = useState<SubmissionWithStudent | null>(null);
-  const [gradeScore, setGradeScore] = useState('');
-  const [gradeFeedback, setGradeFeedback] = useState('');
-
-  const gradeMutation = useMutation({
-    mutationFn: ({ submissionId, score, feedback }: { submissionId: string; score: number; feedback?: string }) =>
-      activitiesApi.gradeSubmission(submissionId, { score, feedback, status: 'graded' }),
+  const deleteMutation = useMutation({
+    mutationFn: () => activitiesApi.deleteActivity(activityId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activity-submissions', activityId] });
-      setIsGradeModalOpen(false);
-      setSelectedSubmission(null);
-      setGradeScore('');
-      setGradeFeedback('');
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
+      queryClient.invalidateQueries({ queryKey: ['course-activities'] });
+      router.push('/courses');
     },
   });
 
-  const handleGrade = (submission: SubmissionWithStudent) => {
-    setSelectedSubmission(submission);
-    setGradeScore(submission.score?.toString() || '');
-    setGradeFeedback(submission.feedback || '');
-    setIsGradeModalOpen(true);
-  };
-
-  const handleSubmitGrade = () => {
-    if (!selectedSubmission || !gradeScore) return;
-    gradeMutation.mutate({
-      submissionId: selectedSubmission.id,
-      score: parseFloat(gradeScore),
-      feedback: gradeFeedback || undefined,
-    });
-  };
+  const timeStatus = activity?.deadline ? getTimeStatus(activity.deadline) : { text: '', color: '', urgent: false };
+  const submissionStatus = activity?.my_submission
+    ? getSubmissionStatus(activity.my_submission as unknown as Submission)
+    : getSubmissionStatus(undefined);
 
   // Calculate stats for teacher view
-  const stats = allSubmissions ? calculateStats(allSubmissions) : null;
+  const calculateStats = (subs: SubmissionWithStudent[]) => {
+    const gradedSubs = subs.filter((s) => s.graded_at);
+    const scores = gradedSubs.map((s) => s.score || 0).filter((s) => s > 0);
+    const average = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+    const highest = scores.length > 0 ? Math.max(...scores) : null;
+    const lowest = scores.length > 0 ? Math.min(...scores) : null;
+    return { average, highest, lowest, total: subs.length };
+  };
+
+  const stats = isTeacher && submissions.length > 0 ? calculateStats(submissions as SubmissionWithStudent[]) : null;
 
   if (isLoading) {
     return (
-      <div className="min-h-screen">
-        <LoadingState />
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-navy-600 animate-spin" />
       </div>
     );
   }
 
   if (error || !activity) {
     return (
-      <div className="min-h-screen p-8">
-        <ErrorState
-          message="Failed to load activity details"
-          onRetry={refetch}
-        />
+      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-gray-500">
+        <AlertCircle className="w-12 h-12 mb-3 text-red-500" />
+        <p className="mb-4">Failed to load activity details</p>
+        <button onClick={() => refetch()} className="btn btn-outline">Try Again</button>
       </div>
     );
   }
 
+  const hasSubmitted = !!activity.my_submission?.submitted_at;
+
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-slate-50/50">
       {/* Header */}
-      <div className="relative h-48 bg-gradient-to-r from-navy-600 to-blue-700 overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
-                <path d="M 60 0 L 0 0 0 60" fill="none" stroke="white" strokeWidth="1"/>
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" />
-          </svg>
-        </div>
-        <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <button
-              onClick={() => router.back()}
-              className="flex items-center gap-2 text-white/80 hover:text-white mb-4 transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Back to Course
+      <div className="bg-white border-b border-gray-200">
+        <div className="px-4 lg:px-8 py-6">
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+            <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-500 hover:text-navy-600 mb-4 transition-colors">
+              <ChevronLeft className="w-4 h-4" /> Back
             </button>
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="font-display text-3xl font-bold">{activity.title}</h1>
-                <p className="text-white/80 mt-2">
-                  {activity.points} points
-                </p>
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <h1 className="font-display text-2xl lg:text-3xl font-bold text-navy-900">{activity.title}</h1>
+                  {hasSubmitted ? (
+                    <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium flex items-center gap-1">
+                      <CheckCircle className="w-4 h-4" /> Submitted
+                    </span>
+                  ) : (
+                    <span className={cn('px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1', timeStatus.urgent ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700')}>
+                      <Clock className="w-4 h-4" /> {timeStatus.text}
+                    </span>
+                  )}
+                </div>
+                <p className="text-gray-600 max-w-3xl">{activity.description || 'No description provided.'}</p>
               </div>
-              <StatusBadge status={submissionStatus} submission={submission} />
+              <div className="flex items-center gap-3">
+                {isStudent && (
+                  <button
+                    onClick={() => setIsSubmitModalOpen(true)}
+                    disabled={hasSubmitted}
+                    className={cn(
+                      'btn flex items-center gap-2',
+                      hasSubmitted ? 'btn-outline opacity-50 cursor-not-allowed' : 'btn-primary'
+                    )}
+                  >
+                    {hasSubmitted ? <CheckCircle className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
+                    {hasSubmitted ? 'Submitted' : 'Submit Assignment'}
+                  </button>
+                )}
+              </div>
             </div>
           </motion.div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="p-8 max-w-5xl">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.2 }}
-          className="grid grid-cols-1 lg:grid-cols-3 gap-6"
-        >
-          {/* Main content */}
-          <div className="lg:col-span-2 space-y-6">
-            {isTeacher ? (
-              <>
-                {/* Class Statistics Card */}
-                <div className="bg-white rounded-xl shadow-card p-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <TrendingUp className="w-5 h-5 text-navy-600" />
-                    <h2 className="font-display font-semibold text-navy-800">Class Statistics</h2>
-                  </div>
-                  {stats && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <StatsCard
-                        label="Average"
-                        value={stats.average !== null ? stats.average.toFixed(1) : '-'}
-                        colorClass="text-navy-700"
-                      />
-                      <StatsCard
-                        label="Highest"
-                        value={stats.highest !== null ? stats.highest.toFixed(1) : '-'}
-                        colorClass="text-emerald-600"
-                      />
-                      <StatsCard
-                        label="Lowest"
-                        value={stats.lowest !== null ? stats.lowest.toFixed(1) : '-'}
-                        colorClass="text-red-600"
-                      />
-                      <StatsCard
-                        label="Graded"
-                        value={`${stats.gradedCount}/${stats.totalCount}`}
-                        colorClass="text-navy-700"
-                      />
-                    </div>
-                  )}
+      {/* Main Content - Full Width Layout */}
+      <div className="p-4 lg:p-8">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+          {/* Left Column - Main Content */}
+          <div className="xl:col-span-8 space-y-6">
+            {/* Teacher Stats */}
+            {isTeacher && stats && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <TrendingUp className="w-5 h-5 text-navy-600" />
+                  <h2 className="font-display font-semibold text-navy-800">Class Statistics</h2>
                 </div>
-
-                {/* Activity Info */}
-                <div className="bg-white rounded-xl shadow-card p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-display font-semibold text-navy-800">Activity Details</h2>
-                    <div className="flex gap-2">
-                      <button className="btn btn-outline text-sm">
-                        <Edit3 className="w-4 h-4 mr-1" />
-                        Edit
-                      </button>
-                    </div>
-                  </div>
-                  <div className="space-y-3 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Award className="w-4 h-4 text-navy-500" />
-                      <span className="text-gray-600">Points:</span>
-                      <span className="font-medium text-navy-700">{activity.points}</span>
-                    </div>
-                    {activity.deadline && (
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-navy-500" />
-                        <span className="text-gray-600">Due:</span>
-                        <span className="font-medium text-navy-700">{formatDate(activity.deadline)} at {formatTime(activity.deadline)}</span>
-                      </div>
-                    )}
-                    {(activity as any).attempt_limit > 1 && (
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-navy-500" />
-                        <span className="text-gray-600">Attempts:</span>
-                        <span className="font-medium text-navy-700">{(activity as any).attempt_limit} attempts allowed</span>
-                      </div>
-                    )}
-                  </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatsCard label="Average" value={stats.average !== null ? stats.average.toFixed(1) : '-'} colorClass="text-navy-700" icon={Award} />
+                  <StatsCard label="Highest" value={stats.highest !== null ? stats.highest.toFixed(1) : '-'} colorClass="text-emerald-600" icon={TrendingUp} />
+                  <StatsCard label="Lowest" value={stats.lowest !== null ? stats.lowest.toFixed(1) : '-'} colorClass="text-red-600" icon={TrendingUp} />
+                  <StatsCard label="Students" value={stats.total} colorClass="text-navy-700" icon={Users} />
                 </div>
-
-                {/* Instructions */}
-                {activity.instructions && (
-                  <div className="bg-white rounded-xl shadow-card p-6">
-                    <h2 className="font-display font-semibold text-navy-800 mb-4">Instructions</h2>
-                    <div className="prose prose-sm max-w-none text-gray-700">
-                      {activity.instructions}
-                    </div>
-                  </div>
-                )}
-
-                {/* Support file */}
-                {activity.support_file_url && (
-                  <div className="bg-white rounded-xl shadow-card p-6">
-                    <h2 className="font-display font-semibold text-navy-800 mb-4">Support File</h2>
-                    <a
-                      href={activity.support_file_url}
-                      download
-                      className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                        <FileText className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-navy-800">Support Document</p>
-                        <p className="text-sm text-gray-500">Click to download</p>
-                      </div>
-                      <Download className="w-5 h-5 text-gray-400" />
-                    </a>
-                  </div>
-                )}
-
-                {/* Student Submissions */}
-                {allSubmissions && (
-                  <div className="bg-white rounded-xl shadow-card p-6">
-                    <StudentSubmissionsList
-                      submissions={allSubmissions}
-                      activity={activity}
-                      onGrade={handleGrade}
-                    />
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                {/* Status Card */}
-                <div
-                  className={cn(
-                    'rounded-xl shadow-card p-6',
-                    isGraded
-                      ? 'bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200'
-                      : isSubmitted
-                      ? 'bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200'
-                      : daysRemaining !== null && daysRemaining < 0
-                      ? 'bg-gradient-to-r from-red-50 to-orange-50 border border-red-200'
-                      : daysRemaining !== null && daysRemaining <= 2
-                      ? 'bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200'
-                      : 'bg-white'
-                  )}
-                >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div
-                    className={cn(
-                      'w-14 h-14 rounded-xl flex items-center justify-center',
-                      isGraded
-                        ? 'bg-emerald-100'
-                        : isSubmitted
-                        ? 'bg-blue-100'
-                        : 'bg-gray-100'
-                    )}
-                  >
-                    {isGraded ? (
-                      <CheckCircle className="w-7 h-7 text-emerald-600" />
-                    ) : isSubmitted ? (
-                      <FileText className="w-7 h-7 text-blue-600" />
-                    ) : (
-                      <Clock className="w-7 h-7 text-gray-500" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Status</p>
-                    <p
-                      className={cn(
-                        'font-semibold',
-                        isGraded
-                          ? 'text-emerald-700'
-                          : isSubmitted
-                          ? 'text-blue-700'
-                          : 'text-gray-700'
-                      )}
-                    >
-                      {isGraded
-                        ? 'Graded'
-                        : isSubmitted
-                        ? 'Submitted'
-                        : daysRemaining !== null && daysRemaining < 0
-                        ? 'Late'
-                        : 'Not Submitted'}
-                    </p>
-                  </div>
-                </div>
-
-                {isGraded && submission?.score !== undefined && (
-                  <CircularScore score={submission.score} maxScore={activity.points} />
-                )}
-              </div>
-
-              {!isSubmitted && activity.deadline && (
-                <div className="mt-4 pt-4 border-t border-gray-200/50">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="w-4 h-4" />
-                    <span
-                      className={cn(
-                        daysRemaining !== null && daysRemaining < 0
-                          ? 'text-red-600'
-                          : daysRemaining !== null && daysRemaining <= 2
-                          ? 'text-amber-600'
-                          : 'text-gray-600'
-                      )}
-                    >
-                      {daysRemaining !== null && daysRemaining < 0
-                        ? `Due ${Math.abs(daysRemaining)} days ago`
-                        : daysRemaining !== null && daysRemaining === 0
-                        ? 'Due today'
-                        : daysRemaining !== null && daysRemaining === 1
-                        ? 'Due tomorrow'
-                        : `Due in ${daysRemaining} days`}
-                    </span>
-                    <span className="text-gray-400">• {formatDate(activity.deadline)} at {formatTime(activity.deadline)}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Description */}
-            {activity.description && (
-              <div className="bg-white rounded-xl shadow-card p-6">
-                <h2 className="font-display font-semibold text-navy-800 mb-4">Description</h2>
-                <div className="prose prose-sm max-w-none text-gray-700">
-                  {activity.description}
-                </div>
-              </div>
+              </motion.div>
             )}
+
+            {/* Assignment Details */}
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-display font-semibold text-navy-800 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-navy-600" /> Assignment Details
+                </h2>
+                {isTeacher && (
+                  <button onClick={() => router.push(`/activities/${activityId}/edit`)} className="btn btn-outline text-sm">
+                    <Edit3 className="w-4 h-4 mr-1" /> Edit
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                    <Clock className="w-5 h-5 text-navy-500" />
+                    <div>
+                      <p className="text-sm text-gray-500">Due Date</p>
+                      <p className="font-medium text-navy-800">{formatDate(activity.deadline)}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                    <Award className="w-5 h-5 text-navy-500" />
+                    <div>
+                      <p className="text-sm text-gray-500">Points</p>
+                      <p className="font-medium text-navy-800">{activity.points || 'Not graded'}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                    <CheckCircle className="w-5 h-5 text-navy-500" />
+                    <div>
+                      <p className="text-sm text-gray-500">Submission Type</p>
+                      <p className="font-medium text-navy-800">File Upload</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                    <AlertCircle className="w-5 h-5 text-navy-500" />
+                    <div>
+                      <p className="text-sm text-gray-500">Late Submissions</p>
+                      <p className="font-medium text-navy-800">Allowed</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
 
             {/* Instructions */}
             {activity.instructions && (
-              <div className="bg-white rounded-xl shadow-card p-6">
-                <h2 className="font-display font-semibold text-navy-800 mb-4">Instructions</h2>
-                <div className="prose prose-sm max-w-none text-gray-700">
-                  {activity.instructions}
-                </div>
-              </div>
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 className="font-display font-semibold text-navy-800 mb-4 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-navy-600" /> Instructions
+                </h2>
+                <div className="prose prose-slate max-w-none text-gray-700">{activity.instructions}</div>
+              </motion.div>
             )}
 
-            {/* Feedback section (when graded) */}
-            {isGraded && submission?.feedback && (
-              <div className="bg-white rounded-xl shadow-card p-6">
-                <h2 className="font-display font-semibold text-navy-800 mb-4">Feedback</h2>
-                <div className="bg-emerald-50 rounded-lg p-4 border-l-4 border-emerald-400">
-                  <div className="flex items-start gap-3">
-                    <Edit3 className="w-5 h-5 text-emerald-600 mt-0.5" />
-                    <p className="text-gray-700">{submission.feedback}</p>
+            {/* Student Submission List (Teacher View) */}
+            {isTeacher && submissions.length > 0 && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="p-6 border-b border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-display font-semibold text-navy-800 flex items-center gap-2">
+                      <Users className="w-5 h-5 text-navy-600" /> Student Submissions
+                    </h2>
+                    <span className="text-sm text-gray-500">{(submissions as SubmissionWithStudent[]).filter((s) => s.graded_at).length} of {submissions.length} graded</span>
                   </div>
                 </div>
-              </div>
-            )}
-
-            {/* Support file */}
-            {activity.support_file_url && (
-              <div className="bg-white rounded-xl shadow-card p-6">
-                <h2 className="font-display font-semibold text-navy-800 mb-4">Support File</h2>
-                <a
-                  href={activity.support_file_url}
-                  download
-                  className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-navy-800">Support Document</p>
-                    <p className="text-sm text-gray-500">Click to download</p>
-                  </div>
-                  <Download className="w-5 h-5 text-gray-400" />
-                </a>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Sidebar */}
-          <div className="space-y-6">
-            {isTeacher ? (
-              <>
-                {/* Teacher Actions */}
-                <div className="bg-white rounded-xl shadow-card p-6">
-                  <h3 className="font-display font-semibold text-navy-800 mb-4">Teacher Actions</h3>
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => router.push(`/activities/${activityId}/edit`)}
-                      className="w-full btn btn-primary"
-                    >
-                      <Edit3 className="w-4 h-4 mr-2" />
-                      Edit Activity
-                    </button>
-                    <button
-                      onClick={() => {/* TODO: Add delete confirmation */}}
-                      className="w-full btn btn-outline text-red-600 border-red-200 hover:bg-red-50"
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete Activity
-                    </button>
-                  </div>
-                </div>
-
-                {/* Submission Summary */}
-                {stats && (
-                  <div className="bg-white rounded-xl shadow-card p-6">
-                    <h3 className="font-display font-semibold text-navy-800 mb-4">Submission Summary</h3>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-600">Total Students</span>
-                        <span className="font-semibold text-navy-800">{stats.totalCount}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-600">Submitted</span>
-                        <span className="font-semibold text-blue-600">{(allSubmissions as SubmissionWithStudent[])?.filter((s: SubmissionWithStudent) => s.status !== 'not_submitted').length || 0}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-600">Graded</span>
-                        <span className="font-semibold text-emerald-600">{stats.gradedCount}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-600">Pending</span>
-                        <span className="font-semibold text-amber-600">
-                          {stats.totalCount - stats.gradedCount}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Allowed File Types */}
-                {activity.allowed_file_types && activity.allowed_file_types.length > 0 && (
-                  <div className="bg-white rounded-xl shadow-card p-6">
-                    <h3 className="font-display font-semibold text-navy-800 mb-4">Allowed File Types</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {activity.allowed_file_types.map((type) => (
-                        <span
-                          key={type}
-                          className="px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-600"
+                <div className="divide-y divide-gray-100">
+                  {(submissions as SubmissionWithStudent[]).map((submission) => {
+                    const isExpanded = expandedStudentId === submission.student_id;
+                    return (
+                      <div key={submission.id} className="hover:bg-slate-50/50 transition-colors">
+                        <button
+                          onClick={() => setExpandedStudentId(isExpanded ? null : submission.student_id || null)}
+                          className="w-full flex items-center justify-between p-4"
                         >
-                          {type.toUpperCase()}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                {/* Action Card */}
-                <div className="bg-white rounded-xl shadow-card p-6">
-                  <button
-                    onClick={actionButton.onClick}
-                    className={cn(
-                      'w-full btn',
-                      actionButton.primary ? 'btn-primary' : 'btn-outline'
-                    )}
-                  >
-                    {actionButton.text}
-                  </button>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-navy-100 to-navy-200 flex items-center justify-center">
+                              <span className="text-navy-700 font-semibold text-sm">{(submission.student_name || 'U').charAt(0).toUpperCase()}</span>
+                            </div>
+                            <div className="text-left">
+                              <p className="font-medium text-navy-800">{submission.student_name || 'Unknown Student'}</p>
+                              <p className="text-xs text-gray-500">{submission.student_email}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <StudentStatusBadge status={submission.status} score={submission.score} />
+                            {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                          </div>
+                        </button>
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
+                              <div className="px-4 pb-4 pt-0 border-t border-gray-100">
+                                {submission.file_urls && submission.file_urls.length > 0 && (
+                                  <div className="mt-3">
+                                    <p className="text-sm font-medium text-navy-700 mb-2">Attachments:</p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {submission.file_urls.map((url: string, index: number) => (
+                                        <a key={index} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm text-navy-700 transition-colors">
+                                          <Paperclip className="w-4 h-4" />
+                                          File {index + 1}
+                                          <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {submission.feedback && (
+                                  <div className="mt-3 p-3 bg-slate-50 rounded-lg">
+                                    <p className="text-sm font-medium text-navy-700 mb-1">Feedback:</p>
+                                    <p className="text-sm text-gray-600">{submission.feedback}</p>
+                                  </div>
+                                )}
+                                <div className="mt-4 flex gap-2">
+                                  <button onClick={() => router.push(`/activities/${activityId}/submissions/${submission.id}/grade`)} className="btn btn-primary text-sm flex-1">
+                                    <Edit3 className="w-4 h-4 mr-1" /> {submission.graded_at ? 'Update Grade' : 'Grade Submission'}
+                                  </button>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
 
-                  {!isSubmitted && activity.deadline && (
-                    <p className="text-sm text-gray-500 mt-4 text-center">
-                      {activity.attempt_limit && activity.attempt_limit > 1
-                        ? `${activity.attempt_limit} attempts allowed`
-                        : 'Single attempt only'}
-                    </p>
+            {/* Student's Own Submission */}
+            {isStudent && activity.my_submission && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 className="font-display font-semibold text-navy-800 mb-4 flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-emerald-600" /> Your Submission
+                </h2>
+                <div className="space-y-4">
+                  {activity.my_submission.file_urls && activity.my_submission.file_urls.length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium text-navy-700 mb-2">Submitted Files:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {activity.my_submission.file_urls.map((url: string, index: number) => (
+                          <a key={index} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm text-navy-700 transition-colors">
+                            <Paperclip className="w-4 h-4" /> File {index + 1}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {activity.my_submission.status === 'graded' ? (
+                    <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <CircularScore score={activity.my_submission.score || 0} maxScore={activity.points || 100} size={80} />
+                        <div>
+                          <p className="font-medium text-emerald-800">Graded</p>
+                          {activity.my_submission.feedback && (
+                            <div className="mt-2">
+                              <p className="text-sm font-medium text-emerald-700">Feedback:</p>
+                              <p className="text-sm text-emerald-600">{activity.my_submission.feedback}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3">
+                      <AlertCircle className="w-5 h-5 text-amber-600" />
+                      <p className="text-amber-800">Your submission is pending grading.</p>
+                    </div>
                   )}
                 </div>
+              </motion.div>
+            )}
+          </div>
 
-                {/* Reminders */}
-                <RemindersSection activityId={activityId} deadline={activity.deadline} />
+          {/* Right Column - Sidebar */}
+          <div className="xl:col-span-4 space-y-6">
+            {/* Actions Card */}
+            <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <h3 className="font-display font-semibold text-navy-800 mb-4">{isTeacher ? 'Teacher Actions' : 'Actions'}</h3>
+              <div className="space-y-3">
+                {isTeacher ? (
+                  <>
+                    <button onClick={() => router.push(`/activities/${activityId}/edit`)} className="w-full btn btn-primary flex items-center justify-center gap-2">
+                      <Edit3 className="w-4 h-4" /> Edit Activity
+                    </button>
+                    <button onClick={() => { if (confirm('Are you sure you want to delete this activity?')) deleteMutation.mutate(); }} className="w-full btn btn-outline text-red-600 border-red-200 hover:bg-red-50 flex items-center justify-center gap-2">
+                      <Trash2 className="w-4 h-4" /> Delete Activity
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setIsSubmitModalOpen(true)}
+                    disabled={hasSubmitted}
+                    className={cn('w-full btn flex items-center justify-center gap-2', hasSubmitted ? 'btn-outline opacity-50 cursor-not-allowed' : 'btn-primary')}
+                  >
+                    {hasSubmitted ? <CheckCircle className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
+                    {hasSubmitted ? 'Already Submitted' : 'Submit Assignment'}
+                  </button>
+                )}
+              </div>
+            </motion.div>
 
-                {/* Submission Details (when submitted) */}
-                {isSubmitted && submission?.submitted_at && (
-                  <div className="bg-white rounded-xl shadow-card p-6">
-                    <h3 className="font-display font-semibold text-navy-800 mb-4">Submission Details</h3>
-                    <div className="space-y-3 text-sm">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-green-500" />
-                        <span className="text-gray-600">
-                          Submitted {formatDate(submission.submitted_at)} at {formatTime(submission.submitted_at)}
-                        </span>
+            {/* Submission Summary (Teacher) */}
+            {isTeacher && submissions.length > 0 && (
+              <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h3 className="font-display font-semibold text-navy-800 mb-4">Submission Summary</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <span className="text-gray-600 flex items-center gap-2"><Users className="w-4 h-4" /> Total Students</span>
+                    <span className="font-semibold text-navy-800">{submissions.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <span className="text-gray-600 flex items-center gap-2"><Upload className="w-4 h-4" /> Submitted</span>
+                    <span className="font-semibold text-emerald-600">{(submissions as SubmissionWithStudent[]).filter((s) => s.submitted_at).length}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <span className="text-gray-600 flex items-center gap-2"><Clock className="w-4 h-4" /> Not Submitted</span>
+                    <span className="font-semibold text-amber-600">{(submissions as SubmissionWithStudent[]).filter((s) => !s.submitted_at).length}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <span className="text-gray-600 flex items-center gap-2"><CheckCircle className="w-4 h-4" /> Graded</span>
+                    <span className="font-semibold text-blue-600">{(submissions as SubmissionWithStudent[]).filter((s) => s.graded_at).length}</span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Student Submission Status */}
+            {isStudent && (
+              <>
+                <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                  <h3 className="font-display font-semibold text-navy-800 mb-4">Submission Status</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Status</span>
+                      <span className={cn('px-3 py-1 rounded-full text-sm font-medium', submissionStatus.color)}>{submissionStatus.label}</span>
+                    </div>
+                    {activity.my_submission?.submitted_at && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Submitted</span>
+                        <span className="font-medium text-navy-800">{formatDate(activity.my_submission.submitted_at)}</span>
                       </div>
-                      {submission.attempt_number && (
-                        <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4 text-gray-400" />
-                          <span className="text-gray-600">
-                            Attempt {submission.attempt_number}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    )}
+                    {activity.my_submission?.status === 'graded' && activity.my_submission.score !== undefined && (
+                      <div className="p-4 bg-emerald-50 rounded-lg text-center">
+                        <p className="text-sm text-emerald-600 mb-1">Your Score</p>
+                        <p className="text-3xl font-bold text-emerald-700">{activity.my_submission.score}<span className="text-lg text-emerald-500">/{activity.points || 100}</span></p>
+                      </div>
+                    )}
                   </div>
-                )}
+                </motion.div>
 
-                {/* Allowed File Types */}
-                {activity.allowed_file_types && activity.allowed_file_types.length > 0 && (
-                  <div className="bg-white rounded-xl shadow-card p-6">
-                    <h3 className="font-display font-semibold text-navy-800 mb-4">Allowed File Types</h3>
-                    <div className="flex flex-wrap gap-2">
-                      {activity.allowed_file_types.map((type) => (
-                        <span
-                          key={type}
-                          className="px-3 py-1 bg-gray-100 rounded-full text-sm text-gray-600"
-                        >
-                          {type.toUpperCase()}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <RemindersSection activityId={activityId} deadline={activity.deadline} />
               </>
             )}
           </div>
-        </motion.div>
+        </div>
       </div>
 
-      {/* Grade Modal */}
-      <GradeSubmissionModal
-        isOpen={isGradeModalOpen}
-        onClose={() => setIsGradeModalOpen(false)}
-        submission={selectedSubmission}
-        maxPoints={activity?.points || 100}
-      />
+      {/* Submission Modal */}
+      <SubmissionModal activity={activity} isOpen={isSubmitModalOpen} onClose={() => setIsSubmitModalOpen(false)} />
     </div>
   );
 }
