@@ -460,7 +460,13 @@ export default function ActivityDetailsPage() {
     );
   }
 
+  // Check if resubmission is allowed (after activity is confirmed to exist)
   const hasSubmitted = !!activity.my_submission?.submitted_at;
+  const attemptLimit = activity.attempt_limit || 1;
+  const attemptsUsed = activity.my_submission?.attempt_number || (hasSubmitted ? 1 : 0);
+  const attemptsRemaining = attemptLimit - attemptsUsed;
+  const canResubmit = hasSubmitted && attemptsRemaining > 0;
+  const isGraded = activity.my_submission?.status === 'graded';
 
   return (
     <div className="min-h-screen bg-slate-50/50">
@@ -667,18 +673,80 @@ export default function ActivityDetailsPage() {
                   <CheckCircle className="w-5 h-5 text-emerald-600" /> Your Submission
                 </h2>
                 <div className="space-y-4">
+                  {/* Submitted Files with Preview */}
                   {activity.my_submission.file_urls && activity.my_submission.file_urls.length > 0 && (
                     <div>
-                      <p className="text-sm font-medium text-navy-700 mb-2">Submitted Files:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {activity.my_submission.file_urls.map((url: string, index: number) => (
-                          <a key={index} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm text-navy-700 transition-colors">
-                            <Paperclip className="w-4 h-4" /> File {index + 1}
-                          </a>
-                        ))}
+                      <p className="text-sm font-medium text-navy-700 mb-3">Submitted Files:</p>
+                      <div className="space-y-3">
+                        {activity.my_submission.file_urls.map((url: string, index: number) => {
+                          const fileName = url.split('/').pop()?.split('?')[0] || `File ${index + 1}`;
+                          const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+                          const isPdf = /\.pdf$/i.test(url);
+
+                          return (
+                            <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
+                              {/* File Header */}
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-3 p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                              >
+                                <div className="w-10 h-10 rounded-lg bg-navy-100 flex items-center justify-center">
+                                  {isImage ? (
+                                    <img src={url} alt={fileName} className="w-full h-full object-cover rounded-lg" />
+                                  ) : isPdf ? (
+                                    <FileText className="w-5 h-5 text-red-500" />
+                                  ) : (
+                                    <Paperclip className="w-5 h-5 text-navy-600" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-navy-800 truncate">{fileName}</p>
+                                  <p className="text-xs text-gray-500">Click to download</p>
+                                </div>
+                                <ExternalLink className="w-4 h-4 text-gray-400" />
+                              </a>
+
+                              {/* Image Preview */}
+                              {isImage && (
+                                <div className="p-3 bg-gray-50 border-t border-gray-200">
+                                  <img
+                                    src={url}
+                                    alt={fileName}
+                                    className="max-w-full h-auto max-h-64 mx-auto rounded-lg shadow-sm"
+                                  />
+                                </div>
+                              )}
+
+                              {/* PDF Preview */}
+                              {isPdf && (
+                                <div className="p-3 bg-gray-50 border-t border-gray-200">
+                                  <iframe
+                                    src={url}
+                                    className="w-full h-48 rounded-lg"
+                                    title={`PDF Preview ${index + 1}`}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
+
+                  {/* Text Content */}
+                  {activity.my_submission.text_content && (
+                    <div>
+                      <p className="text-sm font-medium text-navy-700 mb-2">Text Submission:</p>
+                      <div className="p-4 bg-gray-50 rounded-lg text-sm text-gray-700 whitespace-pre-wrap">
+                        {activity.my_submission.text_content}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Grading Status */}
                   {activity.my_submission.status === 'graded' ? (
                     <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
                       <div className="flex items-center gap-3">
@@ -721,14 +789,48 @@ export default function ActivityDetailsPage() {
                     </button>
                   </>
                 ) : (
-                  <button
-                    onClick={() => setIsSubmitModalOpen(true)}
-                    disabled={hasSubmitted}
-                    className={cn('w-full btn flex items-center justify-center gap-2', hasSubmitted ? 'btn-outline opacity-50 cursor-not-allowed' : 'btn-primary')}
-                  >
-                    {hasSubmitted ? <CheckCircle className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
-                    {hasSubmitted ? 'Already Submitted' : 'Submit Assignment'}
-                  </button>
+                  <>
+                    {activity.my_submission?.status === 'graded' ? (
+                      /* Graded - show score */
+                      <div className="p-4 bg-emerald-50 rounded-xl text-center">
+                        <p className="text-sm text-emerald-600 mb-1">Your Score</p>
+                        <p className="text-3xl font-bold text-emerald-700">
+                          {activity.my_submission.score}<span className="text-lg text-emerald-500">/{activity.points || 100}</span>
+                        </p>
+                        {activity.my_submission.feedback && (
+                          <div className="mt-3 p-3 bg-white rounded-lg text-left">
+                            <p className="text-xs text-gray-500 mb-1">Feedback</p>
+                            <p className="text-sm text-gray-700">{activity.my_submission.feedback}</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : hasSubmitted ? (
+                      /* Submitted but not graded - check if can resubmit */
+                      activity.attempt_limit && (activity.my_submission?.attempt_number || 1) >= activity.attempt_limit ? (
+                        <div className="p-4 bg-blue-50 rounded-xl text-center">
+                          <CheckCircle className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                          <p className="font-medium text-blue-800">Submitted</p>
+                          <p className="text-sm text-blue-600 mt-1">Waiting to be graded</p>
+                        </div>
+                      ) : (
+                        /* Can resubmit */
+                        <button
+                          onClick={() => setIsSubmitModalOpen(true)}
+                          className="w-full btn btn-primary flex items-center justify-center gap-2"
+                        >
+                          <Upload className="w-4 h-4" /> Resubmit Assignment
+                        </button>
+                      )
+                    ) : (
+                      /* Not submitted yet */
+                      <button
+                        onClick={() => setIsSubmitModalOpen(true)}
+                        className="w-full btn btn-primary flex items-center justify-center gap-2"
+                      >
+                        <Upload className="w-4 h-4" /> Submit Assignment
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </motion.div>
@@ -758,34 +860,8 @@ export default function ActivityDetailsPage() {
               </motion.div>
             )}
 
-            {/* Student Submission Status */}
-            {isStudent && (
-              <>
-                <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                  <h3 className="font-display font-semibold text-navy-800 mb-4">Submission Status</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Status</span>
-                      <span className={cn('px-3 py-1 rounded-full text-sm font-medium', submissionStatus.color)}>{submissionStatus.label}</span>
-                    </div>
-                    {activity.my_submission?.submitted_at && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-600">Submitted</span>
-                        <span className="font-medium text-navy-800">{formatDate(activity.my_submission.submitted_at)}</span>
-                      </div>
-                    )}
-                    {activity.my_submission?.status === 'graded' && activity.my_submission.score !== undefined && (
-                      <div className="p-4 bg-emerald-50 rounded-lg text-center">
-                        <p className="text-sm text-emerald-600 mb-1">Your Score</p>
-                        <p className="text-3xl font-bold text-emerald-700">{activity.my_submission.score}<span className="text-lg text-emerald-500">/{activity.points || 100}</span></p>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-
-                <RemindersSection activityId={activityId} deadline={activity.deadline} />
-              </>
-            )}
+            {/* Reminders (Student) */}
+            {isStudent && <RemindersSection activityId={activityId} deadline={activity.deadline} />}
           </div>
         </div>
       </div>
