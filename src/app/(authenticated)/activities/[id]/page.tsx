@@ -79,12 +79,82 @@ function getTimeStatus(dueDate?: string): { text: string; color: string; urgent:
   return { text: `Due in ${daysLeft} days`, color: 'text-emerald-600', urgent: false };
 }
 
-// PDF Preview Component - Shows PDF inline using browser's built-in viewer
+// PDF Preview Component - Fetches PDF with auth and displays via blob URL
 function PdfPreview({ url, fileName }: { url: string; fileName: string }) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    let objectUrl: string | null = null;
+
+    const fetchPdf = async () => {
+      try {
+        setIsLoading(true);
+        setHasError(false);
+
+        const response = await fetch(url, {
+          credentials: 'include',
+          headers: {
+            'Accept': 'application/pdf,*/*',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch PDF: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        objectUrl = URL.createObjectURL(blob);
+        setBlobUrl(objectUrl);
+      } catch (err) {
+        console.error('PDF fetch error:', err);
+        setHasError(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPdf();
+
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [url]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-80 bg-gray-50">
+        <Loader2 className="w-8 h-8 text-navy-600 animate-spin" />
+        <span className="ml-2 text-sm text-gray-600">Loading PDF...</span>
+      </div>
+    );
+  }
+
+  if (hasError || !blobUrl) {
+    return (
+      <div className="flex flex-col items-center justify-center h-80 bg-gray-50">
+        <FileText className="w-12 h-12 text-gray-400 mb-3" />
+        <p className="text-sm text-gray-600 mb-3">Could not preview PDF</p>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-navy-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          <ExternalLink className="w-4 h-4" />
+          Open in new tab
+        </a>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
       <iframe
-        src={url}
+        src={blobUrl}
         className="w-full h-80"
         title={`PDF Preview - ${fileName}`}
       />
