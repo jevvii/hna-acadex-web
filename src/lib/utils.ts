@@ -1,8 +1,29 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const API_ORIGIN = API_BASE_URL.replace(/\/api$/, '');
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+/**
+ * Resolve a file URL to a full URL for media/submission files
+ * Handles relative paths from the backend API
+ */
+export function resolveFileUrl(rawUrl: string | undefined | null): string {
+  if (!rawUrl) return '';
+  if (/^(file:|data:|blob:)/i.test(rawUrl)) return rawUrl;
+
+  // Already a full URL - normalize localhost references
+  if (/^https?:\/\//i.test(rawUrl)) {
+    return rawUrl.replace(/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?/i, API_ORIGIN);
+  }
+
+  // Relative path - prepend API origin
+  if (rawUrl.startsWith('/')) return `${API_ORIGIN}${rawUrl}`;
+  return `${API_ORIGIN}/${rawUrl.replace(/^\.?\//, '')}`;
 }
 
 export function formatDate(date: string | Date): string {

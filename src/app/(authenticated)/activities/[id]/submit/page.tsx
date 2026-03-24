@@ -386,8 +386,10 @@ export default function ActivitySubmissionPage() {
       uploadedFiles.forEach((file) => formData.append('files', file));
       return activitiesApi.submitActivity(activityId, formData);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['activity', activityId] });
+    onSuccess: async () => {
+      // Refetch activity data to ensure fresh submission status before navigation
+      await queryClient.refetchQueries({ queryKey: ['activity', activityId] });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
       router.push(`/activities/${activityId}`);
     },
   });

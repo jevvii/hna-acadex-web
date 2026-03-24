@@ -204,6 +204,9 @@ export interface Activity {
     submitted_at?: string;
     attempt_number?: number;
   } | null;
+  my_submissions?: Submission[];
+  attempts_used?: number;
+  attempts_remaining?: number;
   class_stats?: {
     lowest_score?: number | null;
     highest_score?: number | null;

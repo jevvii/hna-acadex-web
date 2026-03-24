@@ -8,7 +8,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import * as Popover from '@radix-ui/react-popover';
 import { format, differenceInDays, differenceInHours } from 'date-fns';
 import { useIsStudent, useIsTeacher } from '@/store/auth';
-import { cn } from '@/lib/utils';
+import { cn, resolveFileUrl } from '@/lib/utils';
 import { activitiesApi, reminderApi } from '@/lib/api';
 import { Activity, Submission, SubmissionStatus } from '@/lib/types';
 import { CircularScore } from '@/components/CircularScore';
@@ -405,6 +405,7 @@ export default function ActivityDetailsPage() {
   const isTeacher = useIsTeacher();
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
+  const [selectedAttemptIndex, setSelectedAttemptIndex] = useState<number>(0);
 
   const { data: activity, isLoading, error, refetch } = useQuery({
     queryKey: ['activity', activityId],
@@ -611,119 +612,173 @@ export default function ActivityDetailsPage() {
               </motion.div>
             )}
 
-            {/* Student's Submitted Files - Canvas Style */}
-            {isStudent && activity.my_submission?.file_urls && activity.my_submission.file_urls.length > 0 && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-display font-semibold text-navy-800 flex items-center gap-2">
-                    <Paperclip className="w-5 h-5 text-navy-600" /> Your Submission Files
-                  </h2>
-                  <span className="text-sm text-gray-500">
-                    {activity.my_submission.file_urls.length} file{activity.my_submission.file_urls.length !== 1 ? 's' : ''}
-                  </span>
-                </div>
+            {/* Student's Submitted Files - Canvas Style with Attempt History */}
+            {isStudent && activity.my_submissions && activity.my_submissions.length > 0 && (() => {
+              // Get all submissions sorted by attempt (latest first)
+              const allAttempts = activity.my_submissions || [];
+              const selectedSubmission = allAttempts[selectedAttemptIndex] || allAttempts[0];
+              const fileUrls = selectedSubmission?.file_urls || [];
 
-                <div className="space-y-4">
-                  {activity.my_submission.file_urls.map((url: string, index: number) => {
-                    const fileName = url.split('/').pop()?.split('?')[0] || `File ${index + 1}`;
-                    const decodedName = decodeURIComponent(fileName);
-                    const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url);
-                    const isPdf = /\.pdf$/i.test(url);
-                    const isDocx = /\.docx?$/i.test(url);
-
-                    return (
-                      <div key={index} className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50/50">
-                        {/* File Header */}
-                        <div className="flex items-center gap-3 p-4 bg-white">
-                          <div className="w-10 h-10 rounded-lg bg-navy-100 flex items-center justify-center shrink-0">
-                            {isImage ? (
-                              <img src={url} alt="" className="w-full h-full object-cover rounded-lg" />
-                            ) : isPdf ? (
-                              <FileText className="w-5 h-5 text-red-500" />
-                            ) : isDocx ? (
-                              <FileText className="w-5 h-5 text-blue-500" />
-                            ) : (
-                              <Paperclip className="w-5 h-5 text-navy-600" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-navy-800 truncate">{decodedName}</p>
-                            <p className="text-xs text-gray-500">
-                              {isImage ? 'Image' : isPdf ? 'PDF Document' : isDocx ? 'Word Document' : 'File'}
-                            </p>
-                          </div>
-                          <a
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-navy-700 bg-navy-50 hover:bg-navy-100 rounded-lg transition-colors"
+              return (
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-display font-semibold text-navy-800 flex items-center gap-2">
+                      <Paperclip className="w-5 h-5 text-navy-600" /> Your Submission Files
+                    </h2>
+                    <div className="flex items-center gap-3">
+                      {/* Attempt Dropdown */}
+                      {allAttempts.length > 1 && (
+                        <div className="flex items-center gap-2">
+                          <label htmlFor="attempt-select" className="text-sm text-gray-500">Attempt:</label>
+                          <select
+                            id="attempt-select"
+                            value={selectedAttemptIndex}
+                            onChange={(e) => setSelectedAttemptIndex(Number(e.target.value))}
+                            className="text-sm border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-navy-500"
                           >
-                            <Download className="w-4 h-4" />
-                            Download
-                          </a>
+                            {allAttempts.map((sub, idx) => (
+                              <option key={sub.id || idx} value={idx}>
+                                #{sub.attempt_number || allAttempts.length - idx} {sub.status === 'graded' ? '(Graded)' : sub.status === 'submitted' ? '(Submitted)' : ''}
+                              </option>
+                            ))}
+                          </select>
                         </div>
+                      )}
+                      <span className="text-sm text-gray-500">
+                        {fileUrls.length} file{fileUrls.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  </div>
 
-                        {/* Image Preview */}
-                        {isImage && (
-                          <div className="p-4 bg-gray-50 border-t border-gray-200">
-                            <a href={url} target="_blank" rel="noopener noreferrer" className="block">
-                              <img
-                                src={url}
-                                alt={decodedName}
-                                className="max-w-full h-auto max-h-80 mx-auto rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-zoom-in"
-                              />
-                            </a>
-                          </div>
-                        )}
+                  {/* Attempt info */}
+                  {selectedSubmission && (
+                    <div className="mb-4 flex items-center gap-4 text-sm text-gray-500">
+                      {selectedSubmission.submitted_at && (
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-4 h-4" />
+                          {format(new Date(selectedSubmission.submitted_at), 'MMM d, yyyy h:mm a')}
+                        </span>
+                      )}
+                      {selectedSubmission.status === 'graded' && selectedSubmission.score !== undefined && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">
+                          Score: {selectedSubmission.score}/{activity.points || 100}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
-                        {/* PDF Preview */}
-                        {isPdf && (
-                          <div className="p-4 bg-gray-50 border-t border-gray-200">
-                            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                              <iframe
-                                src={url}
-                                className="w-full h-80"
-                                title={`PDF Preview - ${decodedName}`}
-                              />
-                            </div>
-                          </div>
-                        )}
+                  {fileUrls.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <Paperclip className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p>No files in this attempt</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {fileUrls.map((url: string, index: number) => {
+                        const resolvedUrl = resolveFileUrl(url);
+                        const fileName = url.split('/').pop()?.split('?')[0] || `File ${index + 1}`;
+                        const decodedName = decodeURIComponent(fileName);
+                        const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url);
+                        const isPdf = /\.pdf$/i.test(url);
+                        const isDocx = /\.docx?$/i.test(url);
 
-                        {/* DOCX Preview - Show message */}
-                        {isDocx && (
-                          <div className="p-4 bg-gray-50 border-t border-gray-200">
-                            <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg text-blue-700">
-                              <FileText className="w-5 h-5" />
-                              <div className="flex-1">
-                                <p className="text-sm font-medium">Word Document Preview</p>
-                                <p className="text-xs text-blue-600">Download to view this document</p>
+                        return (
+                          <div key={index} className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50/50">
+                            {/* File Header */}
+                            <div className="flex items-center gap-3 p-4 bg-white">
+                              <div className="w-10 h-10 rounded-lg bg-navy-100 flex items-center justify-center shrink-0">
+                                {isImage ? (
+                                  <img src={resolvedUrl} alt="" className="w-full h-full object-cover rounded-lg" />
+                                ) : isPdf ? (
+                                  <FileText className="w-5 h-5 text-red-500" />
+                                ) : isDocx ? (
+                                  <FileText className="w-5 h-5 text-blue-500" />
+                                ) : (
+                                  <Paperclip className="w-5 h-5 text-navy-600" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-navy-800 truncate">{decodedName}</p>
+                                <p className="text-xs text-gray-500">
+                                  {isImage ? 'Image' : isPdf ? 'PDF Document' : isDocx ? 'Word Document' : 'File'}
+                                </p>
                               </div>
                               <a
-                                href={url}
+                                href={resolvedUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                                className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-navy-700 bg-navy-50 hover:bg-navy-100 rounded-lg transition-colors"
                               >
                                 <Download className="w-4 h-4" />
-                                Open
+                                Download
                               </a>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
 
-                {/* Submission metadata */}
-                {activity.my_submission.submitted_at && (
-                  <div className="mt-4 pt-4 border-t border-gray-200 flex items-center gap-2 text-sm text-gray-500">
-                    <Clock className="w-4 h-4" />
-                    <span>Submitted on {formatDate(activity.my_submission.submitted_at)}</span>
-                  </div>
-                )}
-              </motion.div>
-            )}
+                            {/* Image Preview */}
+                            {isImage && (
+                              <div className="p-4 bg-gray-50 border-t border-gray-200">
+                                <a href={resolvedUrl} target="_blank" rel="noopener noreferrer" className="block">
+                                  <img
+                                    src={resolvedUrl}
+                                    alt={decodedName}
+                                    className="max-w-full h-auto max-h-80 mx-auto rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-zoom-in"
+                                  />
+                                </a>
+                              </div>
+                            )}
+
+                            {/* PDF Preview */}
+                            {isPdf && (
+                              <div className="p-4 bg-gray-50 border-t border-gray-200">
+                                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                                  <iframe
+                                    src={resolvedUrl}
+                                    className="w-full h-80"
+                                    title={`PDF Preview - ${decodedName}`}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* DOCX Preview - Show message */}
+                            {isDocx && (
+                              <div className="p-4 bg-gray-50 border-t border-gray-200">
+                                <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg text-blue-700">
+                                  <FileText className="w-5 h-5" />
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium">Word Document Preview</p>
+                                    <p className="text-xs text-blue-600">Download to view this document</p>
+                                  </div>
+                                  <a
+                                    href={resolvedUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                    Open
+                                  </a>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Text content if any */}
+                  {selectedSubmission?.text_content && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <h3 className="text-sm font-medium text-navy-700 mb-2">Text Submission:</h3>
+                      <div className="p-4 bg-gray-50 rounded-lg text-sm text-gray-700 whitespace-pre-wrap">
+                        {selectedSubmission.text_content}
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })()}
 
             {/* Student Submission List (Teacher View) */}
             {isTeacher && submissions.length > 0 && (
@@ -764,17 +819,64 @@ export default function ActivityDetailsPage() {
                             <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
                               <div className="px-4 pb-4 pt-0 border-t border-gray-100">
                                 {submission.file_urls && submission.file_urls.length > 0 && (
-                                  <div className="mt-3">
-                                    <p className="text-sm font-medium text-navy-700 mb-2">Attachments:</p>
-                                    <div className="flex flex-wrap gap-2">
-                                      {submission.file_urls.map((url: string, index: number) => (
-                                        <a key={index} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm text-navy-700 transition-colors">
-                                          <Paperclip className="w-4 h-4" />
-                                          File {index + 1}
-                                          <ExternalLink className="w-3 h-3" />
-                                        </a>
-                                      ))}
-                                    </div>
+                                  <div className="mt-3 space-y-3">
+                                    <p className="text-sm font-medium text-navy-700 mb-2">Submitted Files:</p>
+                                    {submission.file_urls.map((url: string, index: number) => {
+                                      const resolvedUrl = resolveFileUrl(url);
+                                      const fileName = url.split('/').pop()?.split('?')[0] || `File ${index + 1}`;
+                                      const decodedName = decodeURIComponent(fileName);
+                                      const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+                                      const isPdf = /\.pdf$/i.test(url);
+
+                                      return (
+                                        <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
+                                          {/* File Header */}
+                                          <a
+                                            href={resolvedUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-3 p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                                          >
+                                            <div className="w-10 h-10 rounded-lg bg-navy-100 flex items-center justify-center overflow-hidden">
+                                              {isImage ? (
+                                                <img src={resolvedUrl} alt={decodedName} className="w-full h-full object-cover rounded-lg" />
+                                              ) : isPdf ? (
+                                                <FileText className="w-5 h-5 text-red-500" />
+                                              ) : (
+                                                <Paperclip className="w-5 h-5 text-navy-600" />
+                                              )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                              <p className="text-sm font-medium text-navy-800 truncate">{decodedName}</p>
+                                              <p className="text-xs text-gray-500">Click to download</p>
+                                            </div>
+                                            <ExternalLink className="w-4 h-4 text-gray-400" />
+                                          </a>
+
+                                          {/* Image Preview */}
+                                          {isImage && (
+                                            <div className="p-3 bg-gray-50 border-t border-gray-200">
+                                              <img
+                                                src={resolvedUrl}
+                                                alt={decodedName}
+                                                className="max-w-full h-auto max-h-48 mx-auto rounded-lg shadow-sm"
+                                              />
+                                            </div>
+                                          )}
+
+                                          {/* PDF Preview */}
+                                          {isPdf && (
+                                            <div className="p-3 bg-gray-50 border-t border-gray-200">
+                                              <iframe
+                                                src={resolvedUrl}
+                                                className="w-full h-32 rounded-lg"
+                                                title={`PDF Preview ${index + 1}`}
+                                              />
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 )}
                                 {submission.feedback && (
@@ -812,6 +914,7 @@ export default function ActivityDetailsPage() {
                       <p className="text-sm font-medium text-navy-700 mb-3">Submitted Files:</p>
                       <div className="space-y-3">
                         {activity.my_submission.file_urls.map((url: string, index: number) => {
+                          const resolvedUrl = resolveFileUrl(url);
                           const fileName = url.split('/').pop()?.split('?')[0] || `File ${index + 1}`;
                           const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
                           const isPdf = /\.pdf$/i.test(url);
@@ -820,14 +923,14 @@ export default function ActivityDetailsPage() {
                             <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
                               {/* File Header */}
                               <a
-                                href={url}
+                                href={resolvedUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-3 p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
                               >
                                 <div className="w-10 h-10 rounded-lg bg-navy-100 flex items-center justify-center">
                                   {isImage ? (
-                                    <img src={url} alt={fileName} className="w-full h-full object-cover rounded-lg" />
+                                    <img src={resolvedUrl} alt={fileName} className="w-full h-full object-cover rounded-lg" />
                                   ) : isPdf ? (
                                     <FileText className="w-5 h-5 text-red-500" />
                                   ) : (
@@ -845,7 +948,7 @@ export default function ActivityDetailsPage() {
                               {isImage && (
                                 <div className="p-3 bg-gray-50 border-t border-gray-200">
                                   <img
-                                    src={url}
+                                    src={resolvedUrl}
                                     alt={fileName}
                                     className="max-w-full h-auto max-h-64 mx-auto rounded-lg shadow-sm"
                                   />
@@ -856,7 +959,7 @@ export default function ActivityDetailsPage() {
                               {isPdf && (
                                 <div className="p-3 bg-gray-50 border-t border-gray-200">
                                   <iframe
-                                    src={url}
+                                    src={resolvedUrl}
                                     className="w-full h-48 rounded-lg"
                                     title={`PDF Preview ${index + 1}`}
                                   />
