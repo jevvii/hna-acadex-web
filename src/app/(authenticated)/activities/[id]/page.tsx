@@ -58,8 +58,9 @@ function formatDate(dateStr?: string): string {
 
 function getTimeStatus(dueDate?: string): { text: string; color: string; urgent: boolean } {
   if (!dueDate) return { text: 'No due date', color: 'text-gray-500', urgent: false };
-  const due = new Date(dueDate);
+
   const now = new Date();
+  const due = new Date(dueDate);
   const daysLeft = differenceInDays(due, now);
   const hoursLeft = differenceInHours(due, now);
 
@@ -68,14 +69,27 @@ function getTimeStatus(dueDate?: string): { text: string; color: string; urgent:
   }
   if (daysLeft === 0) {
     if (hoursLeft <= 0) {
-      return { text: 'Overdue', color: 'text-red-600', urgent: true };
+      return { text: 'Due now', color: 'text-red-600', urgent: true };
     }
-    return { text: `Due in ${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''}`, color: 'text-amber-600', urgent: hoursLeft <= 6 };
+    return { text: `Due in ${hoursLeft} hour${hoursLeft !== 1 ? 's' : ''}`, color: 'text-amber-600', urgent: true };
   }
-  if (daysLeft === 1) {
-    return { text: 'Due tomorrow', color: 'text-amber-600', urgent: true };
+  if (daysLeft <= 3) {
+    return { text: `Due in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`, color: 'text-amber-600', urgent: true };
   }
   return { text: `Due in ${daysLeft} days`, color: 'text-emerald-600', urgent: false };
+}
+
+// PDF Preview Component - Shows PDF inline using browser's built-in viewer
+function PdfPreview({ url, fileName }: { url: string; fileName: string }) {
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <iframe
+        src={url}
+        className="w-full h-80"
+        title={`PDF Preview - ${fileName}`}
+      />
+    </div>
+  );
 }
 
 function getSubmissionStatus(submission?: { status: SubmissionStatus; graded_at?: string }): { label: string; color: string } {
@@ -684,81 +698,71 @@ export default function ActivityDetailsPage() {
 
                         return (
                           <div key={index} className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50/50">
-                            {/* File Header */}
-                            <div className="flex items-center gap-3 p-4 bg-white">
-                              <div className="w-10 h-10 rounded-lg bg-navy-100 flex items-center justify-center shrink-0">
-                                {isImage ? (
-                                  <img src={resolvedUrl} alt="" className="w-full h-full object-cover rounded-lg" />
-                                ) : isPdf ? (
-                                  <FileText className="w-5 h-5 text-red-500" />
-                                ) : isDocx ? (
-                                  <FileText className="w-5 h-5 text-blue-500" />
-                                ) : (
-                                  <Paperclip className="w-5 h-5 text-navy-600" />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-navy-800 truncate">{decodedName}</p>
-                                <p className="text-xs text-gray-500">
-                                  {isImage ? 'Image' : isPdf ? 'PDF Document' : isDocx ? 'Word Document' : 'File'}
-                                </p>
-                              </div>
-                              <a
-                                href={resolvedUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-navy-700 bg-navy-50 hover:bg-navy-100 rounded-lg transition-colors"
-                              >
-                                <Download className="w-4 h-4" />
-                                Download
-                              </a>
-                            </div>
-
-                            {/* Image Preview */}
-                            {isImage && (
-                              <div className="p-4 bg-gray-50 border-t border-gray-200">
+                            {isImage ? (
+                              <div className="relative group">
+                                <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-3 bg-gradient-to-b from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <p className="text-sm font-medium text-white truncate drop-shadow">{decodedName}</p>
+                                  <a
+                                    href={resolvedUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-white/20 hover:bg-white/30 rounded backdrop-blur-sm transition-colors"
+                                  >
+                                    <Download className="w-3 h-3" />
+                                    Download
+                                  </a>
+                                </div>
                                 <a href={resolvedUrl} target="_blank" rel="noopener noreferrer" className="block">
                                   <img
                                     src={resolvedUrl}
                                     alt={decodedName}
-                                    className="max-w-full h-auto max-h-80 mx-auto rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-zoom-in"
+                                    className="w-full h-auto max-h-96 object-contain bg-gray-100"
                                   />
                                 </a>
                               </div>
-                            )}
-
-                            {/* PDF Preview */}
-                            {isPdf && (
-                              <div className="p-4 bg-gray-50 border-t border-gray-200">
-                                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                                  <iframe
-                                    src={resolvedUrl}
-                                    className="w-full h-80"
-                                    title={`PDF Preview - ${decodedName}`}
-                                  />
-                                </div>
-                              </div>
-                            )}
-
-                            {/* DOCX Preview - Show message */}
-                            {isDocx && (
-                              <div className="p-4 bg-gray-50 border-t border-gray-200">
-                                <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg text-blue-700">
-                                  <FileText className="w-5 h-5" />
-                                  <div className="flex-1">
-                                    <p className="text-sm font-medium">Word Document Preview</p>
-                                    <p className="text-xs text-blue-600">Download to view this document</p>
+                            ) : isPdf ? (
+                              <div>
+                                <div className="flex items-center justify-between p-3 bg-white border-b border-gray-200">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-8 h-8 rounded bg-red-50 flex items-center justify-center shrink-0">
+                                      <FileText className="w-4 h-4 text-red-500" />
+                                    </div>
+                                    <p className="text-sm font-medium text-navy-800 truncate">{decodedName}</p>
                                   </div>
                                   <a
                                     href={resolvedUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-navy-700 bg-navy-50 hover:bg-navy-100 rounded transition-colors shrink-0"
                                   >
-                                    <Download className="w-4 h-4" />
-                                    Open
+                                    <Download className="w-3 h-3" />
+                                    Download
                                   </a>
                                 </div>
+                                <PdfPreview url={resolvedUrl} fileName={decodedName} />
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-3 p-4 bg-white">
+                                <div className="w-10 h-10 rounded-lg bg-navy-100 flex items-center justify-center shrink-0">
+                                  {isDocx ? (
+                                    <FileText className="w-5 h-5 text-blue-500" />
+                                  ) : (
+                                    <Paperclip className="w-5 h-5 text-navy-600" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-navy-800 truncate">{decodedName}</p>
+                                  <p className="text-xs text-gray-500">{isDocx ? 'Word Document' : 'File'}</p>
+                                </div>
+                                <a
+                                  href={resolvedUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-navy-700 bg-navy-50 hover:bg-navy-100 rounded-lg transition-colors"
+                                >
+                                  <Download className="w-4 h-4" />
+                                  Download
+                                </a>
                               </div>
                             )}
                           </div>
@@ -867,11 +871,7 @@ export default function ActivityDetailsPage() {
                                           {/* PDF Preview */}
                                           {isPdf && (
                                             <div className="p-3 bg-gray-50 border-t border-gray-200">
-                                              <iframe
-                                                src={resolvedUrl}
-                                                className="w-full h-32 rounded-lg"
-                                                title={`PDF Preview ${index + 1}`}
-                                              />
+                                              <PdfPreview url={resolvedUrl} fileName={fileName} />
                                             </div>
                                           )}
                                         </div>
