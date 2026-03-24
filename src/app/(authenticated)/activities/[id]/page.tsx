@@ -945,7 +945,7 @@ export default function ActivityDetailsPage() {
                         /* Can resubmit */
                         <button
                           onClick={() => setIsSubmitModalOpen(true)}
-                          className="w-full btn btn-primary flex items-center justify-center gap-2"
+                          className="w-full btn bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-2"
                         >
                           <Upload className="w-4 h-4" /> Resubmit Assignment
                         </button>
