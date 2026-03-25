@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -13,17 +13,26 @@ export default function AuthenticatedLayout({
 }) {
   const router = useRouter();
   const { isAuthenticated, user, fetchProfile } = useAuthStore();
+  const fetchingRef = useRef(false);
 
   useEffect(() => {
+    // Prevent concurrent fetches
+    if (fetchingRef.current) return;
+
     if (!isAuthenticated) {
-      fetchProfile().then(() => {
-        const state = useAuthStore.getState();
-        if (!state.isAuthenticated) {
-          router.push('/login');
-        } else if (state.user?.requires_setup) {
-          router.push('/setup');
-        }
-      });
+      fetchingRef.current = true;
+      fetchProfile()
+        .finally(() => {
+          fetchingRef.current = false;
+        })
+        .then(() => {
+          const state = useAuthStore.getState();
+          if (!state.isAuthenticated) {
+            router.push('/login');
+          } else if (state.user?.requires_setup) {
+            router.push('/setup');
+          }
+        });
     } else if (user?.requires_setup) {
       router.push('/setup');
     }
