@@ -18,9 +18,6 @@ import { cn } from '@/lib/utils';
 import { notificationsApi } from '@/lib/api';
 import { UserNotification, NotificationType } from '@/lib/types';
 
-// Type alias for convenience
-type Notification = UserNotification;
-
 const notificationIcons: Record<NotificationType, React.ReactNode> = {
   new_activity: <FileText className="w-5 h-5" />,
   new_quiz: <FileText className="w-5 h-5" />,
