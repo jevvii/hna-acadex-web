@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -358,39 +358,56 @@ export default function QuizTakingPage() {
     }
   }, [quizData]);
 
-  // Timer effect
+  // Timer ref to avoid recreating interval on every tick
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Timer effect - runs once, starts when timeRemaining is initialized
   useEffect(() => {
     if (timeRemaining === null || timeRemaining <= 0) return;
 
-    const timer = setInterval(() => {
+    // Only start timer if not already running
+    if (timerRef.current) return;
+
+    timerRef.current = setInterval(() => {
       setTimeRemaining((prev) => {
-        if ((prev ?? 0) <= 1) {
-          clearInterval(timer);
+        const newTime = (prev ?? 0) - 1;
+        if (newTime <= 0) {
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
           setIsTimeUp(true);
           setIsSubmitModalOpen(true);
-          return 0;
         }
-        return (prev ?? 0) - 1;
+        return newTime;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
   }, [timeRemaining]);
 
-  // Auto-save every 30 seconds
+  // Auto-save mutation
   const saveProgressMutation = useMutation({
     mutationFn: () => quizzesApi.saveProgress(quizId, answers),
   });
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (Object.keys(answers).length > 0) {
-        saveProgressMutation.mutate();
-      }
-    }, 30000);
+  // Auto-save function using useCallback to avoid stale closure issues
+  const saveProgress = useCallback(() => {
+    if (Object.keys(answers).length > 0) {
+      saveProgressMutation.mutate();
+    }
+  }, [answers, saveProgressMutation]);
 
+  // Auto-save every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(saveProgress, 30000);
     return () => clearInterval(interval);
-  }, [answers, quizId]);
+  }, [saveProgress]);
 
   // Submit quiz
   const submitMutation = useMutation({
