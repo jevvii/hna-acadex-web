@@ -28,6 +28,29 @@ import {
   CheckCircle,
 } from 'lucide-react';
 
+// File validation constants
+const ALLOWED_FILE_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'text/plain',
+];
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+const validateFile = (file: File): string | null => {
+  if (file.size > MAX_FILE_SIZE) {
+    return `File "${file.name}" exceeds maximum size of 10MB`;
+  }
+  if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+    return `File type "${file.type}" is not allowed`;
+  }
+  return null;
+};
+
 // Helper functions
 function formatDate(dateStr?: string): string {
   if (!dateStr) return '';
@@ -395,7 +418,26 @@ export default function ActivitySubmissionPage() {
   });
 
   const handleFilesSelected = (files: FileList) => {
-    setUploadedFiles((prev) => [...prev, ...Array.from(files)]);
+    const validFiles: File[] = [];
+    const errors: string[] = [];
+
+    Array.from(files).forEach((file) => {
+      const error = validateFile(file);
+      if (error) {
+        errors.push(error);
+      } else {
+        validFiles.push(file);
+      }
+    });
+
+    if (errors.length > 0) {
+      // For now, just log errors. In production, show toast notification
+      console.warn('File validation errors:', errors);
+    }
+
+    if (validFiles.length > 0) {
+      setUploadedFiles((prev) => [...prev, ...validFiles]);
+    }
   };
 
   const handleRemoveFile = (index: number) => {

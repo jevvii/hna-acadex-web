@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { motion } from 'framer-motion';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 
 export default function AuthenticatedLayout({
   children,
@@ -52,11 +53,13 @@ export default function AuthenticatedLayout({
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)]">
-      <Sidebar />
-      <main className="ml-64 min-h-screen">
-        {children}
-      </main>
-    </div>
+    <ErrorBoundary>
+      <div className="min-h-screen bg-[var(--bg-primary)]">
+        <Sidebar />
+        <main className="ml-64 min-h-screen">
+          {children}
+        </main>
+      </div>
+    </ErrorBoundary>
   );
 }

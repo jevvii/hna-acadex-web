@@ -260,6 +260,46 @@ function ShortAnswerQuestion({
   );
 }
 
+// Matching Question
+function MatchingQuestion({
+  question,
+  matchingPairs,
+  value,
+  onChange,
+}: {
+  question: string;
+  matchingPairs: { left: string; right: string }[];
+  value?: Record<string, string>;
+  onChange: (pairIndex: number, answer: string) => void;
+}) {
+  const rightOptions = matchingPairs.map((p) => p.right);
+
+  return (
+    <div className="space-y-4">
+      <p className="text-lg text-navy-800">{question}</p>
+      <div className="space-y-3">
+        {matchingPairs.map((pair, idx) => (
+          <div key={idx} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
+            <span className="text-gray-700 font-medium min-w-[200px]">{pair.left}</span>
+            <select
+              value={value?.[idx] || ''}
+              onChange={(e) => onChange(idx, e.target.value)}
+              className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-500 bg-white"
+            >
+              <option value="">Select match...</option>
+              {rightOptions.map((option, optIdx) => (
+                <option key={optIdx} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Question renderer based on type
 function QuestionRenderer({
   question,
@@ -306,6 +346,18 @@ function QuestionRenderer({
           question={question.question_text}
           value={value}
           onChange={onChange}
+        />
+      );
+    case 'matching':
+      return (
+        <MatchingQuestion
+          question={question.question_text}
+          matchingPairs={question.matching_pairs || []}
+          value={value}
+          onChange={(pairIndex, answer) => {
+            const newValue = { ...(value || {}), [pairIndex]: answer };
+            onChange(newValue);
+          }}
         />
       );
     default:
