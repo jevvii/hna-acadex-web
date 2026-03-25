@@ -495,3 +495,53 @@ export interface GradebookData {
     quizzes: GradebookSummary[];
   };
 }
+
+// API Error type for proper error handling
+export interface ApiErrorResponse {
+  message?: string;
+  detail?: string;
+  error?: string;
+  [key: string]: unknown;
+}
+
+// Quiz grading attempt type
+export interface QuizGradingAttempt {
+  student_id: string;
+  student_name: string;
+  student_email: string;
+  score?: number;
+  max_score?: number;
+  submitted_at?: string;
+  time_taken_seconds?: number;
+  status: 'not_submitted' | 'submitted' | 'graded';
+  pending_manual_grading?: boolean;
+  attempt_number?: number;
+}
+
+// Quiz question choice type
+export interface QuizQuestionChoice {
+  id: string;
+  choice_text: string;
+  is_correct: boolean;
+}
+
+// Quiz question with choices (extended type)
+export interface QuizQuestionWithChoices extends QuizQuestion {
+  choices?: QuizQuestionChoice[];
+  blanks?: { id: string; correct_answer: string }[];
+}
+
+// Extended QuizQuestion type for taking quiz
+export interface QuizQuestionWithData extends QuizQuestion {
+  choices?: QuizQuestionChoice[];
+  blanks?: { id: string; correct_answer: string }[];
+}
+
+// Meeting with attendance records
+export interface MeetingWithAttendance extends MeetingSession {
+  attendance_records?: AttendanceRecord[];
+  student_count?: number;
+  present_count?: number;
+  absent_count?: number;
+  late_count?: number;
+}

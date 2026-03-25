@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -11,7 +12,7 @@ interface CircularScoreProps {
   className?: string;
 }
 
-export function CircularScore({
+export const CircularScore = memo(function CircularScore({
   score,
   maxScore = 100,
   size = 120,
@@ -82,7 +83,7 @@ export function CircularScore({
       </div>
     </div>
   );
-}
+});
 
 // Simple score badge variant
 interface ScoreBadgeProps {
@@ -91,7 +92,7 @@ interface ScoreBadgeProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
-export function ScoreBadge({ score, maxScore = 100, size = 'md' }: ScoreBadgeProps) {
+export const ScoreBadge = memo(function ScoreBadge({ score, maxScore = 100, size = 'md' }: ScoreBadgeProps) {
   const percentage = (score / maxScore) * 100;
 
   const sizeClasses = {
@@ -118,4 +119,4 @@ export function ScoreBadge({ score, maxScore = 100, size = 'md' }: ScoreBadgePro
       {Math.round(score)}
     </div>
   );
-}
+});

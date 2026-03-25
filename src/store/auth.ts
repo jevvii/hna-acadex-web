@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Profile, UserRole } from '@/lib/types';
 import { authApi } from '@/lib/api';
+import { logger } from '@/lib/logger';
 
 interface AuthState {
   user: Profile | null;
@@ -59,9 +60,10 @@ export const useAuthStore = create<AuthState>()(
           } else {
             throw new Error('Invalid server response: user data missing');
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Login failed. Please check your credentials.';
           set({
-            error: error.message || 'Login failed. Please check your credentials.',
+            error: errorMessage,
             isAuthenticated: false,
             user: null
           });
@@ -75,8 +77,9 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           await authApi.logout();
-        } catch (e) {
-          // Ignore logout errors
+        } catch (error: unknown) {
+          // Log logout errors but don't throw - user should still be logged out locally
+          logger.error('Logout failed:', error);
         } finally {
           set({ user: null, isAuthenticated: false, isLoading: false });
         }
@@ -86,7 +89,9 @@ export const useAuthStore = create<AuthState>()(
         try {
           const user = await authApi.getProfile();
           set({ user, isAuthenticated: !user?.requires_setup });
-        } catch (error) {
+        } catch (error: unknown) {
+          // Log profile fetch errors but don't throw
+          logger.error('Failed to fetch profile:', error);
           set({ user: null, isAuthenticated: false });
         }
       },

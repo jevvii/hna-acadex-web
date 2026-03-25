@@ -6,10 +6,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as Dialog from '@radix-ui/react-dialog';
-import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { activitiesApi, activityCommentsApi } from '@/lib/api';
 import { Activity, ActivityComment, Submission } from '@/lib/types';
+import { logger } from '@/lib/logger';
+import { formatDateTime } from '@/lib/dateUtils';
 import {
   ChevronLeft,
   Upload,
@@ -54,7 +55,7 @@ const validateFile = (file: File): string | null => {
 // Helper functions
 function formatDate(dateStr?: string): string {
   if (!dateStr) return '';
-  return format(new Date(dateStr), 'MMM d, yyyy h:mm a');
+  return formatDateTime(dateStr);
 }
 
 function formatFileSize(bytes?: number): string {
@@ -258,7 +259,7 @@ function CommentItem({
                 className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
               >
                 {showReplies ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                {comment.replies!.length} {comment.replies!.length === 1 ? 'reply' : 'replies'}
+                {(comment.replies ?? []).length} {(comment.replies ?? []).length === 1 ? 'reply' : 'replies'}
               </button>
             )}
           </div>
@@ -268,7 +269,7 @@ function CommentItem({
       {/* Nested replies */}
       {hasReplies && showReplies && (
         <div className="mt-4">
-          {comment.replies!.map((reply) => (
+          {(comment.replies ?? []).map((reply) => (
             <CommentItem
               key={reply.id}
               comment={reply}
@@ -432,7 +433,7 @@ export default function ActivitySubmissionPage() {
 
     if (errors.length > 0) {
       // For now, just log errors. In production, show toast notification
-      console.warn('File validation errors:', errors);
+      logger.warn('File validation errors:', errors);
     }
 
     if (validFiles.length > 0) {

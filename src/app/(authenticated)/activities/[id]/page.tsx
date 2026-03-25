@@ -6,12 +6,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Popover from '@radix-ui/react-popover';
-import { format, differenceInDays, differenceInHours } from 'date-fns';
+import { differenceInDays, differenceInHours } from 'date-fns';
 import { useIsStudent, useIsTeacher } from '@/store/auth';
 import { cn, resolveFileUrl } from '@/lib/utils';
 import { activitiesApi, reminderApi } from '@/lib/api';
 import { Activity, Submission, SubmissionStatus } from '@/lib/types';
 import { CircularScore } from '@/components/CircularScore';
+import { logger } from '@/lib/logger';
+import { formatDateTime } from '@/lib/dateUtils';
 import {
   ChevronLeft,
   Clock,
@@ -53,7 +55,7 @@ interface SubmissionWithStudent extends Submission {
 // Helper functions
 function formatDate(dateStr?: string): string {
   if (!dateStr) return 'Not set';
-  return format(new Date(dateStr), 'MMM d, yyyy h:mm a');
+  return formatDateTime(dateStr);
 }
 
 function getTimeStatus(dueDate?: string): { text: string; color: string; urgent: boolean } {
@@ -108,7 +110,7 @@ function PdfPreview({ url, fileName }: { url: string; fileName: string }) {
         objectUrl = URL.createObjectURL(blob);
         setBlobUrl(objectUrl);
       } catch (err) {
-        console.error('PDF fetch error:', err);
+        logger.error('PDF fetch error:', err);
         setHasError(true);
       } finally {
         setIsLoading(false);
@@ -386,7 +388,7 @@ function ReminderPicker({ deadline, onSelect, onClose }: { deadline?: string; on
               className={cn('w-full text-left px-4 py-3 rounded-lg transition-colors', isPast ? 'opacity-50 cursor-not-allowed bg-gray-100' : 'hover:bg-navy-50')}
             >
               <p className="font-medium text-navy-800">{preset.label}</p>
-              <p className="text-sm text-gray-500">{format(reminderDate, 'MMM d, yyyy h:mm a')}</p>
+              <p className="text-sm text-gray-500">{formatDateTime(reminderDate)}</p>
             </button>
           );
         })}
@@ -443,7 +445,7 @@ function RemindersSection({ activityId, deadline }: { activityId: string; deadli
             <div key={reminder.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-gray-400" />
-                <span className="text-sm text-navy-700">{format(new Date(reminder.reminder_datetime), 'MMM d, yyyy h:mm a')}</span>
+                <span className="text-sm text-navy-700">{formatDateTime(reminder.reminder_datetime)}</span>
               </div>
               <button onClick={() => deleteMutation.mutate(reminder.id)} disabled={deleteMutation.isPending} className="p-1 text-gray-400 hover:text-red-500 transition-colors">
                 <Trash2 className="w-4 h-4" />
@@ -740,7 +742,7 @@ export default function ActivityDetailsPage() {
                       {selectedSubmission.submitted_at && (
                         <span className="flex items-center gap-1">
                           <Clock className="w-4 h-4" />
-                          {format(new Date(selectedSubmission.submitted_at), 'MMM d, yyyy h:mm a')}
+                          {formatDateTime(selectedSubmission.submitted_at)}
                         </span>
                       )}
                       {selectedSubmission.status === 'graded' && selectedSubmission.score !== undefined && (

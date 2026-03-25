@@ -55,12 +55,17 @@ function formatDuration(minutes?: number): string {
 }
 
 // Calculate class statistics for quiz
-function calculateQuizStats(attempts: any[]) {
+interface QuizAttemptStats {
+  score?: number | null;
+  status?: string;
+}
+
+function calculateQuizStats(attempts: QuizAttemptStats[]) {
   const scoredAttempts = attempts.filter(a => a.score !== null && a.score !== undefined);
   if (scoredAttempts.length === 0) {
     return { average: null, highest: null, lowest: null, totalCount: attempts.length };
   }
-  const scores = scoredAttempts.map(a => a.score!);
+  const scores = scoredAttempts.map(a => a.score as number);
   const total = scores.reduce((sum, score) => sum + score, 0);
   return {
     average: total / scores.length,
@@ -560,11 +565,11 @@ export default function QuizDetailsPage() {
                       <Users className="w-5 h-5 text-navy-600" />
                       Student Attempts
                     </h2>
-                    <span className="text-sm text-gray-500">{gradingData.filter((a: any) => a.score !== undefined).length} of {gradingData.length} graded</span>
+                    <span className="text-sm text-gray-500">{gradingData.filter((a: { score?: number }) => a.score !== undefined).length} of {gradingData.length} graded</span>
                   </div>
                 </div>
                 <div className="divide-y divide-gray-100">
-                  {gradingData.map((attempt: any) => {
+                  {gradingData.map((attempt: { student_id: string; student_name?: string; student_email?: string; score?: number; max_score?: number; submitted_at?: string; time_taken_seconds?: number; pending_manual_grading?: boolean }) => {
                     const isExpanded = expandedStudentId === attempt.student_id;
                     return (
                       <div key={attempt.student_id} className="hover:bg-slate-50/50 transition-colors">
@@ -674,15 +679,15 @@ export default function QuizDetailsPage() {
                   </div>
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <span className="text-gray-600 flex items-center gap-2"><Play className="w-4 h-4" /> Started</span>
-                    <span className="font-semibold text-blue-600">{gradingData.filter((a: any) => a.status !== 'not_submitted').length}</span>
+                    <span className="font-semibold text-blue-600">{gradingData.filter((a: { status?: string }) => a.status !== 'not_submitted').length}</span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <span className="text-gray-600 flex items-center gap-2"><CheckCircle className="w-4 h-4" /> Graded</span>
-                    <span className="font-semibold text-emerald-600">{gradingData.filter((a: any) => a.score !== undefined).length}</span>
+                    <span className="font-semibold text-emerald-600">{gradingData.filter((a: { score?: number }) => a.score !== undefined).length}</span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <span className="text-gray-600 flex items-center gap-2"><AlertCircle className="w-4 h-4" /> Need Grading</span>
-                    <span className="font-semibold text-amber-600">{gradingData.filter((a: any) => a.status !== 'not_submitted' && a.score === undefined).length}</span>
+                    <span className="font-semibold text-amber-600">{gradingData.filter((a: { status?: string; score?: number }) => a.status !== 'not_submitted' && a.score === undefined).length}</span>
                   </div>
                 </div>
               </motion.div>

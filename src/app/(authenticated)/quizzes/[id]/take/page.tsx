@@ -7,7 +7,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import * as Dialog from '@radix-ui/react-dialog';
 import { cn } from '@/lib/utils';
 import { quizzesApi } from '@/lib/api';
-import { QuizQuestion, QuizQuestionType } from '@/lib/types';
+import { QuizQuestion, QuizQuestionType, QuizQuestionChoice } from '@/lib/types';
+import type { QuizQuestionWithChoices } from '@/lib/types';
 import {
   ChevronLeft,
   ChevronRight,
@@ -307,35 +308,36 @@ function QuestionRenderer({
   onChange,
 }: {
   question: QuizQuestion;
-  value: any;
-  onChange: (value: any) => void;
+  value: unknown;
+  onChange: (value: unknown) => void;
 }) {
+  const questionWithChoices = question as QuizQuestionWithChoices;
   switch (question.question_type) {
     case 'multiple_choice':
       return (
         <MultipleChoiceQuestion
           question={question.question_text}
-          choices={(question as any).choices || []}
-          value={value}
-          onChange={onChange}
+          choices={questionWithChoices.choices || []}
+          value={value as string | undefined}
+          onChange={onChange as (choiceId: string) => void}
         />
       );
     case 'true_false':
       return (
         <TrueFalseQuestion
           question={question.question_text}
-          value={value}
-          onChange={onChange}
+          value={value as boolean | undefined}
+          onChange={onChange as (answer: boolean) => void}
         />
       );
     case 'fill_in_the_blank':
       return (
         <FillBlankQuestion
           question={question.question_text}
-          blanks={(question as any).blanks || []}
-          value={value}
+          blanks={questionWithChoices.blanks || []}
+          value={value as Record<string, string> | undefined}
           onChange={(blankId, answer) => {
-            const newValue = { ...(value || {}), [blankId]: answer };
+            const newValue = { ...(value as Record<string, string> | undefined || {}), [blankId]: answer };
             onChange(newValue);
           }}
         />
@@ -344,8 +346,8 @@ function QuestionRenderer({
       return (
         <ShortAnswerQuestion
           question={question.question_text}
-          value={value}
-          onChange={onChange}
+          value={value as string | undefined}
+          onChange={onChange as (answer: string) => void}
         />
       );
     case 'matching':
@@ -353,9 +355,9 @@ function QuestionRenderer({
         <MatchingQuestion
           question={question.question_text}
           matchingPairs={question.matching_pairs || []}
-          value={value}
+          value={value as Record<number, string> | undefined}
           onChange={(pairIndex, answer) => {
-            const newValue = { ...(value || {}), [pairIndex]: answer };
+            const newValue = { ...(value as Record<number, string> | undefined || {}), [pairIndex]: answer };
             onChange(newValue);
           }}
         />
@@ -377,7 +379,7 @@ export default function QuizTakingPage() {
 
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [flaggedQuestions, setFlaggedQuestions] = useState<Set<number>>(new Set());
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
@@ -477,14 +479,14 @@ export default function QuizTakingPage() {
     Object.entries(answers)
       .filter(([_, value]) => {
         if (typeof value === 'string') return value.length > 0;
-        if (typeof value === 'object') return Object.keys(value).length > 0;
+        if (typeof value === 'object' && value !== null) return Object.keys(value).length > 0;
         return value !== undefined && value !== null;
       })
       .map(([key]) => questions.findIndex((q) => q.id === key))
       .filter((idx) => idx !== -1)
   );
 
-  const handleAnswerChange = (value: any) => {
+  const handleAnswerChange = (value: unknown) => {
     if (!currentQuestion) return;
     setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }));
   };

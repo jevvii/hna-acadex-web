@@ -48,8 +48,9 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
       resetForm();
       onClose();
     },
-    onError: (err: any) => {
-      setError(err.message || 'Failed to create quiz');
+    onError: (err: Error | { message?: string }) => {
+      const errorMessage = err instanceof Error ? err.message : (err as { message?: string }).message;
+      setError(errorMessage || 'Failed to create quiz');
     },
   });
 

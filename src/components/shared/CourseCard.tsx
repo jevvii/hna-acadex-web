@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Users, ChevronRight, GraduationCap } from 'lucide-react';
@@ -17,7 +18,7 @@ interface TeacherCourseCardProps {
   index: number;
 }
 
-export function StudentCourseCard({ course, index }: StudentCourseCardProps) {
+export const StudentCourseCard = memo(function StudentCourseCard({ course, index }: StudentCourseCardProps) {
   return (
     <motion.div
       whileHover={{ y: -4 }}
@@ -110,9 +111,9 @@ export function StudentCourseCard({ course, index }: StudentCourseCardProps) {
       </Link>
     </motion.div>
   );
-}
+});
 
-export function TeacherCourseCard({ course, index }: TeacherCourseCardProps) {
+export const TeacherCourseCard = memo(function TeacherCourseCard({ course, index }: TeacherCourseCardProps) {
   return (
     <motion.div
       whileHover={{ y: -4 }}
@@ -175,4 +176,4 @@ export function TeacherCourseCard({ course, index }: TeacherCourseCardProps) {
       </Link>
     </motion.div>
   );
-}
+});

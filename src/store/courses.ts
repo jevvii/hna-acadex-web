@@ -30,8 +30,9 @@ export const useCoursesStore = create<CoursesState>()((set) => ({
         ? await coursesApi.getTeacherCourses()
         : await coursesApi.getStudentCourses();
       set({ courses });
-    } catch (error: any) {
-      set({ error: error.message || 'Failed to fetch courses' });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch courses';
+      set({ error: errorMessage });
     } finally {
       set({ isLoading: false });
     }
@@ -42,8 +43,9 @@ export const useCoursesStore = create<CoursesState>()((set) => ({
     try {
       const course = await coursesApi.getCourse(courseSectionId);
       set({ currentCourse: course });
-    } catch (error: any) {
-      set({ error: error.message || 'Failed to fetch course' });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to fetch course';
+      set({ error: errorMessage });
     } finally {
       set({ isLoading: false });
     }

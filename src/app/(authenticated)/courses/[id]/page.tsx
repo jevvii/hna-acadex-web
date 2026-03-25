@@ -9,6 +9,7 @@ import { useIsStudent, useIsTeacher } from '@/store/auth';
 import { CreateActivityModal } from '@/components/modals/CreateActivityModal';
 import { CreateQuizModal } from '@/components/modals/CreateQuizModal';
 import { cn, getInitials } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import {
   coursesApi,
   attendanceApi,
@@ -1211,7 +1212,7 @@ function AttendanceTab({ courseId }: { courseId: string }) {
 
   const { data: attendance, isLoading: attendanceLoading } = useQuery({
     queryKey: ['attendance', currentMeeting?.id],
-    queryFn: () => attendanceApi.getAttendance(currentMeeting!.id),
+    queryFn: () => attendanceApi.getAttendance(currentMeeting?.id ?? ''),
     enabled: !!currentMeeting?.id && isTeacher,
   });
 
@@ -1346,7 +1347,7 @@ function GradesTab({ courseId }: { courseId: string }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {grades?.items?.map((item: any, index: number) => (
+            {grades?.items?.map((item: { title: string; type: string; due_date?: string; score?: string; percentage?: number }, index: number) => (
               <tr key={index} className="hover:bg-gray-50">
                 <td className="px-6 py-4">
                   <p className="font-medium text-navy-800">{item.title}</p>
@@ -1356,9 +1357,9 @@ function GradesTab({ courseId }: { courseId: string }) {
                 <td className="px-6 py-4">
                   <span className={cn(
                     'font-semibold',
-                    item.percentage >= 90 && 'text-green-600',
-                    item.percentage >= 80 && item.percentage < 90 && 'text-blue-600',
-                    item.percentage < 80 && 'text-yellow-600',
+                    (item.percentage ?? 0) >= 90 && 'text-green-600',
+                    (item.percentage ?? 0) >= 80 && (item.percentage ?? 0) < 90 && 'text-blue-600',
+                    (item.percentage ?? 0) < 80 && 'text-yellow-600',
                   )}>
                     {item.score}
                   </span>
@@ -1395,7 +1396,7 @@ export default function CoursePage() {
       await activitiesApi.toggleActivityPublish(activity.id, !activity.is_published);
       queryClient.invalidateQueries({ queryKey: ['courseContent', courseId] });
     } catch (error) {
-      console.error('Failed to toggle activity publish status:', error);
+      logger.error('Failed to toggle activity publish status:', error);
     }
   };
 
@@ -1405,7 +1406,7 @@ export default function CoursePage() {
       await quizzesApi.toggleQuizPublish(quiz.id, !quiz.is_published);
       queryClient.invalidateQueries({ queryKey: ['courseContent', courseId] });
     } catch (error) {
-      console.error('Failed to toggle quiz publish status:', error);
+      logger.error('Failed to toggle quiz publish status:', error);
     }
   };
 
@@ -1415,7 +1416,7 @@ export default function CoursePage() {
       await filesApi.toggleFileVisibility(file.id, !file.is_visible);
       queryClient.invalidateQueries({ queryKey: ['courseContent', courseId] });
     } catch (error) {
-      console.error('Failed to toggle file visibility:', error);
+      logger.error('Failed to toggle file visibility:', error);
     }
   };
 

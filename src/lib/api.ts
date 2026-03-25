@@ -22,84 +22,38 @@ import type {
   ActivityComment,
   Submission,
 } from './types';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-
-const ACCESS_TOKEN_KEY = 'hna_access_token';
-const REFRESH_TOKEN_KEY = 'hna_refresh_token';
+import { API_BASE_URL } from './config';
+import { logger } from './logger';
 
 export class ApiError extends Error {
   status: number;
-  payload: any;
+  payload: unknown;
 
-  constructor(message: string, status: number, payload: any) {
+  constructor(message: string, status: number, payload: unknown) {
     super(message);
     this.status = status;
     this.payload = payload;
   }
 }
 
-function getAccessToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+/**
+ * Get CSRF token from meta tag for state-changing requests
+ */
+function getCsrfToken(): string | null {
+  if (typeof document === 'undefined') return null;
+  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || null;
 }
 
-function getRefreshToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
-}
-
-export function setAuthTokens(access: string, refresh: string) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(ACCESS_TOKEN_KEY, access);
-  localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
-}
-
-export function clearAuthTokens() {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-}
-
-let refreshPromise: Promise<string | null> | null = null;
-
-async function refreshAccessToken(): Promise<string | null> {
-  // If already refreshing, return existing promise to prevent concurrent refresh requests
-  if (refreshPromise) {
-    return refreshPromise;
-  }
-
-  refreshPromise = (async () => {
-    const refresh = getRefreshToken();
-    if (!refresh) {
-      return null;
-    }
-
-    try {
-      const res = await fetch(`${API_BASE_URL}/auth/refresh/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh }),
-      });
-
-      if (!res.ok) return null;
-
-      const data = await res.json();
-      if (!data?.access) return null;
-
-      localStorage.setItem(ACCESS_TOKEN_KEY, data.access);
-      return data.access as string;
-    } finally {
-      refreshPromise = null;
-    }
-  })();
-
-  return refreshPromise;
+/**
+ * Check if the request is a state-changing method
+ */
+function isStateChangingMethod(method: string): boolean {
+  return ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase());
 }
 
 type RequestOptions = {
   method?: string;
-  body?: any;
+  body?: unknown;
   auth?: boolean;
   isFormData?: boolean;
 };
@@ -108,37 +62,26 @@ async function request(path: string, options: RequestOptions = {}, retry = true)
   const { method = 'GET', body, auth = true, isFormData = false } = options;
   const headers: Record<string, string> = {};
 
-  let token = auth ? getAccessToken() : null;
-  if (auth && token) headers.Authorization = `Bearer ${token}`;
+  // Add CSRF token for state-changing requests
+  if (isStateChangingMethod(method)) {
+    const csrfToken = getCsrfToken();
+    if (csrfToken) {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
+  }
+
   if (!isFormData) headers['Content-Type'] = 'application/json';
 
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method,
     headers,
-    body: body == null ? undefined : (isFormData ? body : JSON.stringify(body)),
+    body: body == null ? undefined : (isFormData ? body as FormData : JSON.stringify(body)),
+    credentials: 'include', // Include HttpOnly cookies for authentication
   });
 
   if (res.status === 401 && auth && retry) {
-    const newToken = await refreshAccessToken();
-    if (!newToken) {
-      clearAuthTokens();
-      throw new ApiError('Session expired. Please sign in again.', 401, null);
-    }
-    // Update headers with new token for retry
-    if (newToken) headers.Authorization = `Bearer ${newToken}`;
-    const retryRes = await fetch(`${API_BASE_URL}${path}`, {
-      method,
-      headers,
-      body: body == null ? undefined : (isFormData ? body : JSON.stringify(body)),
-    });
-    if (!retryRes.ok) {
-      const text = await retryRes.text();
-      const data = text ? JSON.parse(text) : null;
-      const detail = data?.detail || data?.message || JSON.stringify(data) || 'Request failed';
-      throw new ApiError(detail, retryRes.status, data);
-    }
-    const text = await retryRes.text();
-    return text ? JSON.parse(text) : null;
+    // Session expired - throw error to trigger redirect
+    throw new ApiError('Session expired. Please sign in again.', 401, null);
   }
 
   const text = await res.text();
@@ -146,7 +89,6 @@ async function request(path: string, options: RequestOptions = {}, retry = true)
 
   if (!res.ok) {
     const detail = data?.detail || data?.message || JSON.stringify(data) || 'Request failed';
-    console.error('API Error:', res.status, detail);
     throw new ApiError(detail, res.status, data);
   }
 
@@ -155,9 +97,9 @@ async function request(path: string, options: RequestOptions = {}, retry = true)
 
 export const api = {
   get: (path: string, auth = true) => request(path, { method: 'GET', auth }),
-  post: (path: string, body?: any, auth = true) => request(path, { method: 'POST', body, auth }),
-  patch: (path: string, body?: any, auth = true) => request(path, { method: 'PATCH', body, auth }),
-  put: (path: string, body?: any, auth = true) => request(path, { method: 'PUT', body, auth }),
+  post: (path: string, body?: unknown, auth = true) => request(path, { method: 'POST', body, auth }),
+  patch: (path: string, body?: unknown, auth = true) => request(path, { method: 'PATCH', body, auth }),
+  put: (path: string, body?: unknown, auth = true) => request(path, { method: 'PUT', body, auth }),
   delete: (path: string, auth = true) => request(path, { method: 'DELETE', auth }),
   postForm: (path: string, formData: FormData, auth = true) =>
     request(path, { method: 'POST', body: formData, auth, isFormData: true }),
@@ -165,28 +107,22 @@ export const api = {
     request(path, { method: 'PATCH', body: formData, auth, isFormData: true }),
 };
 
-// Auth API
+// Auth API - Uses HttpOnly cookies for authentication
 export const authApi = {
   login: async (email: string, password: string) => {
     const data = await api.post('/auth/login/', { email, password }, false);
-    if (data.access && data.refresh) {
-      setAuthTokens(data.access, data.refresh);
-    }
     return data;
   },
   register: async (email: string, password: string, fullName: string, role: string) => {
     return api.post('/auth/register/', { email, password, full_name: fullName, role }, false);
   },
   logout: async () => {
-    const refresh = getRefreshToken();
-    if (refresh) {
-      try {
-        await api.post('/auth/logout/', { refresh });
-      } catch (e) {
-        // Ignore logout errors
-      }
+    try {
+      await api.post('/auth/logout/');
+    } catch (error: unknown) {
+      // Log logout errors but don't throw - user should still be logged out locally
+      logger.error('Logout API call failed:', error);
     }
-    clearAuthTokens();
   },
   forgotPassword: async (email: string) => {
     return api.post('/auth/forgot-password/', { email }, false);
@@ -240,7 +176,7 @@ export const activitiesApi = {
     return api.postForm(`/activities/${activityId}/submit/`, formData);
   },
   getMySubmission: async (activityId: string): Promise<Submission | null> => {
-    return api.get(`/activities/${activityId}/my-submission/`);
+    return api.get(`/activities/${activityId}/my-submissions/`);
   },
   getAllSubmissions: async (activityId: string) => {
     return api.get(`/activities/${activityId}/submissions/`);
@@ -277,10 +213,10 @@ export const quizzesApi = {
   getLatestAttempt: async (quizId: string): Promise<QuizAttempt | null> => {
     return api.get(`/quizzes/${quizId}/my-latest-attempt/`);
   },
-  saveProgress: async (quizId: string, answers: Record<string, any>) => {
+  saveProgress: async (quizId: string, answers: Record<string, unknown>) => {
     return api.post(`/quizzes/${quizId}/save-progress/`, { answers });
   },
-  submitAttempt: async (quizId: string, answers: Record<string, any>) => {
+  submitAttempt: async (quizId: string, answers: Record<string, unknown>) => {
     return api.post(`/quizzes/${quizId}/submit-attempt/`, { answers });
   },
   getGradingList: async (quizId: string) => {

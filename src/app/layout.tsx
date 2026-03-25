@@ -12,15 +12,24 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Environment-conditional CSP: development allows unsafe-eval for React Refresh/HMR
-  const cspContent = process.env.NODE_ENV === 'development'
-    ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://api.hna-acadex.com http://localhost:8000; object-src 'none'; base-uri 'self'; form-action 'self';"
+  // Note: CSP via meta tag has limitations - some directives like frame-ancestors only work via HTTP headers
+  // frame-ancestors is set via next.config.mjs headers() instead
+  // 'unsafe-inline' for script-src is needed for Next.js inline scripts
+  // 'unsafe-inline' for style-src is needed for Tailwind CSS
+  const isDev = process.env.NODE_ENV === 'development';
+
+  const cspContent = isDev
+    // Development: Allow unsafe-eval for React Refresh/HMR
+    ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://api.hna-acadex.com http://localhost:8000 ws:; object-src 'none'; base-uri 'self'; form-action 'self';"
+    // Production: unsafe-inline needed for Next.js inline scripts, frame-ancestors set via headers
     : "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://api.hna-acadex.com; object-src 'none'; base-uri 'self'; form-action 'self';";
 
   return (
     <html lang="en">
       <head>
         <meta httpEquiv="Content-Security-Policy" content={cspContent} />
+        {/* CSRF token meta tag for API requests */}
+        <meta name="csrf-token" content="" />
       </head>
       <body className="antialiased">
         <Providers>

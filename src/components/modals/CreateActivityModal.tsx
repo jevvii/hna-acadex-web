@@ -55,8 +55,9 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
       resetForm();
       onClose();
     },
-    onError: (err: any) => {
-      setError(err.message || 'Failed to create activity');
+    onError: (err: Error | { message?: string }) => {
+      const errorMessage = err instanceof Error ? err.message : (err as { message?: string }).message;
+      setError(errorMessage || 'Failed to create activity');
     },
   });
 

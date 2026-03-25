@@ -53,8 +53,9 @@ export default function AccountSetupPage() {
       const response = await authApi.uploadAvatar(formData);
       setUser({ ...user!, avatar_url: response.avatar_url });
       return true;
-    } catch (err: any) {
-      setError(err.message || 'Failed to upload avatar');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to upload avatar';
+      setError(errorMessage);
       return false;
     } finally {
       setLoading(false);
@@ -104,8 +105,9 @@ export default function AccountSetupPage() {
       setTimeout(() => {
         router.push('/');
       }, 1500);
-    } catch (err: any) {
-      setError(err.message || 'Failed to change password');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to change password';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
