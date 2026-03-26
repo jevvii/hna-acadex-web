@@ -60,11 +60,20 @@ export default function CalendarPage() {
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
+  // Helper to safely extract events array from potential paginated response
+  const getEventList = (): CalendarEvent[] => {
+    if (!events) return [];
+    if (Array.isArray(events)) return events;
+    // Handle paginated response { results: [...] }
+    const paginated = events as unknown as { results?: CalendarEvent[] };
+    return paginated?.results ?? [];
+  };
+
   const getEventsForDate = (date: string): CalendarEvent[] => {
-    return events?.filter((event: CalendarEvent) => {
+    return getEventList().filter((event: CalendarEvent) => {
       const eventDate = new Date(event.start_at).toISOString().split('T')[0];
       return eventDate === date;
-    }) || [];
+    });
   };
 
   // Get upcoming events (today and future)
@@ -72,22 +81,22 @@ export default function CalendarPage() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    return events
-      ?.filter((event: CalendarEvent) => new Date(event.start_at) >= today)
-      ?.sort((a: CalendarEvent, b: CalendarEvent) =>
+    return getEventList()
+      .filter((event: CalendarEvent) => new Date(event.start_at) >= today)
+      .sort((a: CalendarEvent, b: CalendarEvent) =>
         new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
       )
-      ?.slice(0, 10) || [];
+      .slice(0, 10);
   }, [events]);
 
   // Get events for selected date
   const selectedDateEvents = useMemo(() => {
     if (!selectedDate) return [];
     const dateStr = formatDateForAPI(selectedDate);
-    return events?.filter((event: CalendarEvent) => {
+    return getEventList().filter((event: CalendarEvent) => {
       const eventDate = new Date(event.start_at).toISOString().split('T')[0];
       return eventDate === dateStr;
-    }) || [];
+    });
   }, [selectedDate, events]);
 
   if (isLoading) {

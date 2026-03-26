@@ -870,10 +870,12 @@ export default function ActivityDetailsPage() {
                   </div>
                 </div>
                 <div className="divide-y divide-gray-100">
-                  {(submissions as SubmissionWithStudent[]).map((submission) => {
+                  {(submissions as SubmissionWithStudent[]).map((submission, index) => {
                     const isExpanded = expandedStudentId === submission.student_id;
+                    // Use fallback key if id is null/undefined - prefer student_id as secondary key
+                    const itemKey = submission.id ?? submission.student_id ?? `submission-${index}`;
                     return (
-                      <div key={submission.id} className="hover:bg-slate-50/50 transition-colors">
+                      <div key={itemKey} className="hover:bg-slate-50/50 transition-colors">
                         <button
                           onClick={() => setExpandedStudentId(isExpanded ? null : submission.student_id || null)}
                           className="w-full flex items-center justify-between p-4"
