@@ -79,9 +79,19 @@ async function request(path: string, options: RequestOptions = {}, retry = true)
     credentials: 'include', // Include HttpOnly cookies for authentication
   });
 
-  if (res.status === 401 && auth && retry) {
-    // Session expired - throw error to trigger redirect
-    throw new ApiError('Session expired. Please sign in again.', 401, null);
+  if (res.status === 401 && auth) {
+    // Check if user had a session before (via persisted auth state or cookies)
+    // If not authenticated, this is just "not logged in" not "session expired"
+    const hadSession = typeof window !== 'undefined' &&
+      (document.cookie.includes('access_token') ||
+       localStorage.getItem('auth-storage'));
+
+    if (hadSession && retry) {
+      // User WAS logged in but session expired
+      throw new ApiError('Session expired. Please sign in again.', 401, null);
+    }
+    // User was never logged in - return null silently (caller should handle)
+    return null;
   }
 
   const text = await res.text();

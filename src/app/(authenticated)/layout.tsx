@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -16,47 +16,51 @@ export default function AuthenticatedLayout({
   const pathname = usePathname();
   const { isAuthenticated, user, fetchProfile } = useAuthStore();
   const fetchingRef = useRef(false);
-  const [errorCount, setErrorCount] = useState(0);
-  const MAX_RETRIES = 2;
 
   useEffect(() => {
-    // Prevent concurrent fetches and limit retries
-    if (fetchingRef.current || errorCount >= MAX_RETRIES) return;
+    // Prevent concurrent fetches
+    if (fetchingRef.current) return;
 
-    // Skip auth check on login page
+    // Skip auth check on login page (these routes shouldn't use this layout, but be safe)
     if (pathname === '/login' || pathname === '/setup' || pathname === '/forgot-password') {
       return;
     }
 
     if (!isAuthenticated) {
-      fetchingRef.current = true;
-      fetchProfile()
-        .then(() => {
-          const state = useAuthStore.getState();
-          if (!state.isAuthenticated) {
-            // Only redirect to login if we haven't exceeded retries
-            if (errorCount < MAX_RETRIES) {
+      // Check if there's evidence of a previous session before calling fetchProfile
+      // This prevents unnecessary API calls and console errors for users who were never logged in
+      const hasSessionCookie = document.cookie.includes('access_token');
+      const hasPersistedAuth = localStorage.getItem('auth-storage');
+      const hadSession = hasSessionCookie || hasPersistedAuth;
+
+      if (hadSession) {
+        // User appears to have had a session - verify it with the backend
+        fetchingRef.current = true;
+        fetchProfile()
+          .then(() => {
+            const state = useAuthStore.getState();
+            if (!state.isAuthenticated) {
+              // Session was invalid/expired - redirect to login
               router.push('/login');
+            } else if (state.user?.requires_setup) {
+              router.push('/setup');
             }
-          } else if (state.user?.requires_setup) {
-            router.push('/setup');
-          }
-          // Reset error count on success
-          setErrorCount(0);
-        })
-        .catch((error) => {
-          console.error('Failed to fetch profile:', error);
-          setErrorCount(prev => prev + 1);
-          // Don't redirect on API errors - let the user see the page
-          // This prevents redirect loops on network issues
-        })
-        .finally(() => {
-          fetchingRef.current = false;
-        });
+          })
+          .catch(() => {
+            // Session expired or invalid - redirect to login
+            router.push('/login');
+          })
+          .finally(() => {
+            fetchingRef.current = false;
+          });
+      } else {
+        // No evidence of previous session - redirect to login silently
+        router.push('/login');
+      }
     } else if (user?.requires_setup) {
       router.push('/setup');
     }
-  }, [isAuthenticated, user?.requires_setup, router, fetchProfile, pathname, errorCount]);
+  }, [isAuthenticated, user?.requires_setup, router, fetchProfile, pathname]);
 
   // Show loading spinner while checking auth or if user needs setup
   if (!isAuthenticated || user?.requires_setup) {

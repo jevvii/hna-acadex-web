@@ -88,6 +88,11 @@ export const useAuthStore = create<AuthState>()(
       fetchProfile: async () => {
         try {
           const user = await authApi.getProfile();
+          // Handle null response (user never logged in or session invalid)
+          if (!user) {
+            set({ user: null, isAuthenticated: false });
+            return;
+          }
           set({ user, isAuthenticated: !user?.requires_setup });
         } catch (error: unknown) {
           // Log profile fetch errors but don't throw
