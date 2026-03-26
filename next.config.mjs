@@ -105,6 +105,11 @@ const nextConfig = {
         source: '/api/:path*/',
         destination: `${apiUrl}/api/:path*/`,
       },
+      // Proxy media files to Django backend for PDF/image serving
+      {
+        source: '/media/:path*',
+        destination: `${apiUrl}/media/:path*`,
+      },
     ];
   },
   async headers() {

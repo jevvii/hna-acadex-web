@@ -402,7 +402,9 @@ function ReminderPicker({ deadline, onSelect, onClose }: { deadline?: string; on
 function RemindersSection({ activityId, deadline }: { activityId: string; deadline?: string }) {
   const queryClient = useQueryClient();
   const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const { data: reminders = [], isLoading } = useQuery({ queryKey: ['reminders', 'activity', activityId], queryFn: () => reminderApi.getByActivity(activityId), enabled: !!activityId });
+  const { data: remindersData, isLoading, error } = useQuery({ queryKey: ['reminders', 'activity', activityId], queryFn: () => reminderApi.getByActivity(activityId), enabled: !!activityId });
+  // Ensure reminders is always an array, even if API returns error object
+  const reminders = Array.isArray(remindersData) ? remindersData : [];
   const createMutation = useMutation({
     mutationFn: (data: { reminder_datetime: string; offset_minutes: number }) => reminderApi.create({ reminder_type: 'activity', activity_id: activityId, ...data }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reminders', 'activity', activityId] }),
