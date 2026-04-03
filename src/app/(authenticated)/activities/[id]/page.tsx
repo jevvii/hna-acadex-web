@@ -154,13 +154,11 @@ function PdfPreview({ url, fileName }: { url: string; fileName: string }) {
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <iframe
-        src={blobUrl}
-        className="w-full h-80"
-        title={`PDF Preview - ${fileName}`}
-      />
-    </div>
+    <iframe
+      src={blobUrl}
+      className="w-full h-96"
+      title={`PDF Preview - ${fileName}`}
+    />
   );
 }
 

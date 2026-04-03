@@ -20,9 +20,9 @@ export default function RootLayout({
 
   const cspContent = isDev
     // Development: Allow unsafe-eval for React Refresh/HMR
-    ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://api.hna-acadex.com http://localhost:8000 ws:; object-src 'none'; base-uri 'self'; form-action 'self';"
+    ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://api.hna-acadex.com http://localhost:8000 ws:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'self' blob:;"
     // Production: unsafe-inline needed for Next.js inline scripts, frame-ancestors set via headers
-    : "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://api.hna-acadex.com; object-src 'none'; base-uri 'self'; form-action 'self';";
+    : "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https://api.hna-acadex.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'self' blob:;";
 
   return (
     <html lang="en">
