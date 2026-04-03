@@ -273,6 +273,11 @@ export default function QuizDetailsPage() {
     enabled: !!quizId && isTeacher,
   });
 
+  // Normalize gradingData to array (handle paginated response { results: [...] })
+  const gradingList = Array.isArray(gradingData)
+    ? gradingData
+    : (gradingData as unknown as { results?: unknown[] })?.results ?? [];
+
   const takeQuizMutation = useMutation({
     mutationFn: () => quizzesApi.takeQuiz(quizId),
     onSuccess: (data) => { router.push(`/quizzes/${quizId}/take?attempt=${data.attempt_id}`); },
@@ -557,7 +562,7 @@ export default function QuizDetailsPage() {
             )}
 
             {/* Teacher Student Attempts */}
-            {isTeacher && gradingData && (
+            {isTeacher && gradingList.length > 0 && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6 border-b border-gray-100">
                   <div className="flex items-center justify-between">
@@ -565,11 +570,11 @@ export default function QuizDetailsPage() {
                       <Users className="w-5 h-5 text-navy-600" />
                       Student Attempts
                     </h2>
-                    <span className="text-sm text-gray-500">{gradingData.filter((a: { score?: number }) => a.score !== undefined).length} of {gradingData.length} graded</span>
+                    <span className="text-sm text-gray-500">{gradingList.filter((a: { score?: number }) => a.score !== undefined).length} of {gradingList.length} graded</span>
                   </div>
                 </div>
                 <div className="divide-y divide-gray-100">
-                  {gradingData.map((attempt: { student_id: string; student_name?: string; student_email?: string; score?: number; max_score?: number; submitted_at?: string; time_taken_seconds?: number; pending_manual_grading?: boolean }) => {
+                  {gradingList.map((attempt: { student_id: string; student_name?: string; student_email?: string; score?: number; max_score?: number; submitted_at?: string; time_taken_seconds?: number; pending_manual_grading?: boolean }) => {
                     const isExpanded = expandedStudentId === attempt.student_id;
                     return (
                       <div key={attempt.student_id} className="hover:bg-slate-50/50 transition-colors">
@@ -669,25 +674,25 @@ export default function QuizDetailsPage() {
             </motion.div>
 
             {/* Teacher Submission Summary */}
-            {isTeacher && gradingData && (
+            {isTeacher && gradingList.length > 0 && (
               <motion.div initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h3 className="font-display font-semibold text-navy-800 mb-4">Attempt Summary</h3>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <span className="text-gray-600 flex items-center gap-2"><Users className="w-4 h-4" /> Total Students</span>
-                    <span className="font-semibold text-navy-800">{gradingData.length}</span>
+                    <span className="font-semibold text-navy-800">{gradingList.length}</span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <span className="text-gray-600 flex items-center gap-2"><Play className="w-4 h-4" /> Started</span>
-                    <span className="font-semibold text-blue-600">{gradingData.filter((a: { status?: string }) => a.status !== 'not_submitted').length}</span>
+                    <span className="font-semibold text-blue-600">{gradingList.filter((a: { status?: string }) => a.status !== 'not_submitted').length}</span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <span className="text-gray-600 flex items-center gap-2"><CheckCircle className="w-4 h-4" /> Graded</span>
-                    <span className="font-semibold text-emerald-600">{gradingData.filter((a: { score?: number }) => a.score !== undefined).length}</span>
+                    <span className="font-semibold text-emerald-600">{gradingList.filter((a: { score?: number }) => a.score !== undefined).length}</span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <span className="text-gray-600 flex items-center gap-2"><AlertCircle className="w-4 h-4" /> Need Grading</span>
-                    <span className="font-semibold text-amber-600">{gradingData.filter((a: { status?: string; score?: number }) => a.status !== 'not_submitted' && a.score === undefined).length}</span>
+                    <span className="font-semibold text-amber-600">{gradingList.filter((a: { status?: string; score?: number }) => a.status !== 'not_submitted' && a.score === undefined).length}</span>
                   </div>
                 </div>
               </motion.div>

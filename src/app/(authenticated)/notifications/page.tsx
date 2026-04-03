@@ -84,12 +84,17 @@ export default function NotificationsPage() {
     },
   });
 
-  const filteredNotifications = notifications?.filter((n) => {
+  // Normalize notifications to array (handle paginated response { results: [...] })
+  const notificationList: UserNotification[] = Array.isArray(notifications)
+    ? notifications
+    : (notifications as unknown as { results?: UserNotification[] })?.results ?? [];
+
+  const filteredNotifications = notificationList.filter((n) => {
     if (filter === 'unread') return !n.is_read;
     return true;
   });
 
-  const unreadCount = notifications?.filter((n) => !n.is_read).length || 0;
+  const unreadCount = notificationList.filter((n) => !n.is_read).length;
 
   const handleMarkAsRead = (id: string) => {
     markAsReadMutation.mutate(id);

@@ -70,7 +70,12 @@ export default function TodosPage() {
     },
   });
 
-  const filteredTodos = todos?.filter((todo: TodoItem) => {
+  // Normalize todos to array (handle paginated response { results: [...] })
+  const todoList: TodoItem[] = Array.isArray(todos)
+    ? todos
+    : (todos as unknown as { results?: TodoItem[] })?.results ?? [];
+
+  const filteredTodos = todoList.filter((todo: TodoItem) => {
     if (activeFilter === 'all') return true;
     if (activeFilter === 'pending') return !todo.is_done;
     if (activeFilter === 'completed') return todo.is_done;
