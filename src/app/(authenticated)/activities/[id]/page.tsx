@@ -156,7 +156,7 @@ function PdfPreview({ url, fileName }: { url: string; fileName: string }) {
   return (
     <iframe
       src={blobUrl}
-      className="w-full h-96"
+      className="w-full h-[600px]"
       title={`PDF Preview - ${fileName}`}
     />
   );
