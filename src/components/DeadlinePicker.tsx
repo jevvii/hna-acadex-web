@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { StaticDateTimePicker } from '@mui/x-date-pickers/StaticDateTimePicker';
 import { renderTimeViewClock } from '@mui/x-date-pickers/timeViewRenderers';
+import { DateOrTimeViewWithMeridiem } from '@mui/x-date-pickers/internals/models';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
 import dayjs, { Dayjs } from 'dayjs';
@@ -63,6 +64,9 @@ const muiTheme = createTheme({
   },
 });
 
+// View type for the picker - use MUI's type
+type PickerView = DateOrTimeViewWithMeridiem;
+
 interface DeadlinePickerTriggerProps {
   /** Current confirmed deadline value from parent */
   value: Dayjs | null;
@@ -88,10 +92,11 @@ interface DeadlinePickerTriggerProps {
  * A complete deadline picker UI with:
  * - Checkbox to enable/disable deadline
  * - Clickable date display that opens a modal with analog clock
+ * - Two-step flow: Date first → Next → Time → OK
  * - Optional "Allow Late Submissions" checkbox
  */
 export function DeadlinePickerTrigger({
-  value: confirmedDate, // Renamed for clarity - this is the parent's confirmed value
+  value: confirmedDate,
   onChange,
   hasDeadline,
   onHasDeadlineChange,
@@ -103,13 +108,15 @@ export function DeadlinePickerTrigger({
 }: DeadlinePickerTriggerProps) {
   // Internal state
   const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const [pendingDate, setPendingDate] = useState<Dayjs | null>(null); // In-picker selection (before OK)
+  const [pendingDate, setPendingDate] = useState<Dayjs | null>(null);
+  const [pickerView, setPickerView] = useState<PickerView>('day');
 
   // When checkbox is toggled on, open picker with default date
   const handleCheckboxToggle = useCallback((checked: boolean) => {
     onHasDeadlineChange?.(checked);
     if (checked) {
-      // Pre-select current date/time or existing confirmed date
+      // Always start from date view
+      setPickerView('day');
       setPendingDate(confirmedDate ?? dayjs());
       setIsPickerOpen(true);
     } else {
@@ -123,33 +130,39 @@ export function DeadlinePickerTrigger({
   // Clicking the date display string to re-edit
   const handleDateClick = useCallback(() => {
     if (hasDeadline) {
+      // Always start from date view when re-editing
+      setPickerView('day');
       setPendingDate(confirmedDate ?? dayjs());
       setIsPickerOpen(true);
     }
   }, [hasDeadline, confirmedDate]);
 
-  // While user is browsing dates/times (before OK) - only update pending
+  // While user is browsing dates/times - only update pending
   const handlePickerChange = useCallback((newValue: Dayjs | null) => {
     setPendingDate(newValue);
   }, []);
 
-  // User clicks OK - commit the pending date
+  // Handle view changes from the picker
+  const handleViewChange = useCallback((newView: PickerView) => {
+    setPickerView(newView);
+  }, []);
+
+  // User clicks OK (only on time view) - commit the pending date
   const handleAccept = useCallback(() => {
-    const finalValue = pendingDate ?? dayjs(); // Fallback to now if somehow null
+    const finalValue = pendingDate ?? dayjs();
     onChange(finalValue);
     setIsPickerOpen(false);
-    // Keep hasDeadline true - the date is confirmed
   }, [pendingDate, onChange]);
 
   // User clicks Cancel
   const handleCancel = useCallback(() => {
     setIsPickerOpen(false);
     setPendingDate(null);
+    setPickerView('day');
     // If no date was ever confirmed, uncheck the checkbox
     if (!confirmedDate) {
       onHasDeadlineChange?.(false);
     }
-    // If a date was confirmed, keep it - just close the picker
   }, [confirmedDate, onHasDeadlineChange]);
 
   // Handle backdrop click (same as cancel)
@@ -164,6 +177,9 @@ export function DeadlinePickerTrigger({
     if (!date) return '';
     return date.format('MMM D, YYYY h:mm A');
   };
+
+  // Determine if we're on time view
+  const isTimeView = pickerView === 'hours' || pickerView === 'minutes';
 
   return (
     <ThemeProvider theme={muiTheme}>
@@ -214,37 +230,34 @@ export function DeadlinePickerTrigger({
           )}
         </div>
 
-        {/* Modal overlay for the picker */}
+        {/* Modal overlay for the picker - high z-index to appear above other modals */}
         {isPickerOpen && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60"
             onClick={handleBackdropClick}
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="bg-slate-800 rounded-2xl shadow-2xl overflow-hidden"
+              className="rounded-2xl shadow-2xl overflow-hidden"
+              style={{ backgroundColor: '#1e293b' }}
             >
+              {/* MUI picker with NO built-in action bar */}
               <StaticDateTimePicker
                 value={pendingDate ?? dayjs()}
                 onChange={handlePickerChange}
-                onAccept={handleAccept}
-                onClose={handleCancel}
+                onViewChange={handleViewChange}
+                view={pickerView}
                 minDate={dayjs()}
                 ampm
+                views={['day', 'hours', 'minutes']}
                 viewRenderers={{
                   hours: renderTimeViewClock,
                   minutes: renderTimeViewClock,
                   seconds: renderTimeViewClock,
                 }}
                 slotProps={{
-                  actionBar: {
-                    actions: ['cancel', 'accept'],
-                    sx: {
-                      '& .MuiButton-root': {
-                        color: '#60a5fa',
-                      },
-                    },
-                  },
+                  // Disable MUI's built-in action bar entirely
+                  actionBar: { actions: [] },
                   toolbar: {
                     sx: {
                       '& .MuiTypography-root': {
@@ -254,6 +267,34 @@ export function DeadlinePickerTrigger({
                   },
                 }}
               />
+
+              {/* Custom action bar INSIDE the same card div */}
+              <div className="flex justify-end gap-3 px-4 pb-4 pt-2">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="px-4 py-1.5 text-sm text-slate-400 hover:text-white transition-colors rounded-lg"
+                >
+                  Cancel
+                </button>
+                {isTimeView ? (
+                  <button
+                    type="button"
+                    onClick={handleAccept}
+                    className="px-4 py-1.5 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors rounded-lg"
+                  >
+                    OK
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setPickerView('hours')}
+                    className="px-4 py-1.5 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors rounded-lg"
+                  >
+                    Next
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}
