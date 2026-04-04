@@ -162,13 +162,30 @@ function ModulesTab({
   // Get activity icon config based on status
   const getActivityConfig = (activity: Activity) => {
     const submission = activity.my_submission;
-    const isLate = activity.deadline && new Date(activity.deadline) < new Date() && !submission;
+    const deadlinePassed = activity.deadline && new Date(activity.deadline) < new Date();
+    const allowLate = activity.allow_late_submissions !== false; // Default to true if not set
+    const isMissing = deadlinePassed && !submission && !allowLate;
+    const isOverdue = deadlinePassed && !submission && allowLate;
 
     if (!submission) {
+      if (isMissing) {
+        return {
+          iconColor: 'text-red-600',
+          iconBg: 'bg-red-100',
+          status: 'missing',
+        };
+      }
+      if (isOverdue) {
+        return {
+          iconColor: 'text-amber-500',
+          iconBg: 'bg-amber-50',
+          status: 'overdue',
+        };
+      }
       return {
-        iconColor: isLate ? 'text-red-500' : 'text-emerald-500',
-        iconBg: isLate ? 'bg-red-50' : 'bg-emerald-50',
-        status: isLate ? 'late' : 'not-started',
+        iconColor: 'text-emerald-500',
+        iconBg: 'bg-emerald-50',
+        status: 'not-started',
       };
     }
 
@@ -461,28 +478,62 @@ function AssignmentsTab({
 
   const getAssignmentConfig = (activity: Activity) => {
     const submission = activity.my_submission;
-    const isLate = activity.deadline && new Date(activity.deadline) < new Date() && !submission;
+    const deadlinePassed = activity.deadline && new Date(activity.deadline) < new Date();
+    const allowLate = activity.allow_late_submissions !== false; // Default to true if not set
+    const isMissing = deadlinePassed && !submission && !allowLate;
+    const isOverdue = deadlinePassed && !submission && allowLate;
 
     if (!submission) {
+      if (isMissing) {
+        return {
+          status: 'missing',
+          badge: (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+              <AlertCircle className="w-3.5 h-3.5" />
+              Missing
+            </span>
+          ),
+          iconBg: 'bg-red-100',
+          iconColor: 'text-red-600',
+          barColor: 'bg-red-500',
+          buttonText: 'View Details',
+          buttonVariant: 'btn-secondary' as const,
+          buttonDisabled: false,
+          pointsColor: 'text-red-600',
+        };
+      }
+      if (isOverdue) {
+        return {
+          status: 'overdue',
+          badge: (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-600 border border-amber-100">
+              <Clock className="w-3.5 h-3.5" />
+              Overdue
+            </span>
+          ),
+          iconBg: 'bg-amber-100',
+          iconColor: 'text-amber-600',
+          barColor: 'bg-amber-500',
+          buttonText: 'Submit Now',
+          buttonVariant: 'btn-primary' as const,
+          buttonDisabled: false,
+          pointsColor: 'text-amber-600',
+        };
+      }
       return {
-        status: isLate ? 'late' : 'not-started',
-        badge: isLate ? (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-600 border border-amber-100">
-            <Clock className="w-3.5 h-3.5" />
-            Overdue
-          </span>
-        ) : (
+        status: 'not-started',
+        badge: (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-600 border border-emerald-100">
             Available
           </span>
         ),
-        iconBg: isLate ? 'bg-amber-100' : 'bg-emerald-100',
-        iconColor: isLate ? 'text-amber-600' : 'text-emerald-600',
-        barColor: isLate ? 'bg-amber-500' : 'bg-emerald-500',
-        buttonText: isLate ? 'Submit Now' : 'Start Assignment',
+        iconBg: 'bg-emerald-100',
+        iconColor: 'text-emerald-600',
+        barColor: 'bg-emerald-500',
+        buttonText: 'Start Assignment',
         buttonVariant: 'btn-primary' as const,
         buttonDisabled: false,
-        pointsColor: isLate ? 'text-amber-600' : 'text-navy-800',
+        pointsColor: 'text-navy-800',
       };
     }
 
@@ -566,7 +617,7 @@ function AssignmentsTab({
   const filteredAssignments = assignments.filter((activity) => {
     const config = getAssignmentConfig(activity);
     if (filter === 'all') return true;
-    if (filter === 'pending') return config.status === 'not-started' || config.status === 'late';
+    if (filter === 'pending') return config.status === 'not-started' || config.status === 'overdue' || config.status === 'missing';
     if (filter === 'submitted') return config.status === 'submitted' || config.status === 'late-submitted';
     if (filter === 'graded') return config.status === 'graded';
     return true;
@@ -577,7 +628,7 @@ function AssignmentsTab({
     all: assignments.length,
     pending: assignments.filter(a => {
       const config = getAssignmentConfig(a);
-      return config.status === 'not-started' || config.status === 'late';
+      return config.status === 'not-started' || config.status === 'overdue' || config.status === 'missing';
     }).length,
     submitted: assignments.filter(a => {
       const config = getAssignmentConfig(a);

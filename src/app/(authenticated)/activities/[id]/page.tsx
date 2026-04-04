@@ -586,11 +586,25 @@ export default function ActivityDetailsPage() {
                     <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium flex items-center gap-1">
                       <CheckCircle className="w-4 h-4" /> Submitted
                     </span>
-                  ) : /* Not submitted - show time status */ (
-                    <span className={cn('px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1', timeStatus.urgent ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700')}>
-                      <Clock className="w-4 h-4" /> {timeStatus.text}
-                    </span>
-                  )}
+                  ) : /* Not submitted - show time status or missing */ (() => {
+                    const deadlinePassed = activity.deadline && new Date(activity.deadline) < new Date();
+                    const allowLate = activity.allow_late_submissions !== false;
+                    const isMissing = deadlinePassed && !allowLate;
+
+                    if (isMissing) {
+                      return (
+                        <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-medium flex items-center gap-1">
+                          <AlertCircle className="w-4 h-4" /> Missing
+                        </span>
+                      );
+                    }
+
+                    return (
+                      <span className={cn('px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1', timeStatus.urgent ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700')}>
+                        <Clock className="w-4 h-4" /> {timeStatus.text}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <p className="text-gray-600 max-w-3xl">{activity.description || 'No description provided.'}</p>
               </div>
@@ -694,7 +708,10 @@ export default function ActivityDetailsPage() {
                 <h2 className="font-display font-semibold text-navy-800 mb-4 flex items-center gap-2">
                   <FileText className="w-5 h-5 text-navy-600" /> Instructions
                 </h2>
-                <div className="prose prose-slate max-w-none text-gray-700">{activity.instructions}</div>
+                <div
+                  className="prose prose-slate max-w-none text-gray-700"
+                  dangerouslySetInnerHTML={{ __html: activity.instructions }}
+                />
               </motion.div>
             )}
 
@@ -1026,12 +1043,30 @@ export default function ActivityDetailsPage() {
                       )
                     ) : (
                       /* Not submitted yet */
-                      <button
-                        onClick={() => setIsSubmitModalOpen(true)}
-                        className="w-full btn btn-primary flex items-center justify-center gap-2"
-                      >
-                        <Upload className="w-4 h-4" /> Submit Assignment
-                      </button>
+                      (() => {
+                        const deadlinePassed = activity.deadline && new Date(activity.deadline) < new Date();
+                        const allowLate = activity.allow_late_submissions !== false;
+                        const canSubmit = !deadlinePassed || allowLate;
+
+                        if (!canSubmit) {
+                          return (
+                            <div className="p-4 bg-red-50 rounded-xl text-center">
+                              <AlertCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
+                              <p className="font-medium text-red-800">Submission Closed</p>
+                              <p className="text-sm text-red-600 mt-1">Late submissions are not allowed for this activity</p>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <button
+                            onClick={() => setIsSubmitModalOpen(true)}
+                            className="w-full btn btn-primary flex items-center justify-center gap-2"
+                          >
+                            <Upload className="w-4 h-4" /> Submit Assignment
+                          </button>
+                        );
+                      })()
                     )}
                   </>
                 )}

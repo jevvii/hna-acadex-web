@@ -1,7 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Calendar, Clock, ChevronDown } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
+import { X, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { activitiesApi } from '@/lib/api';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -22,26 +25,64 @@ interface CreateActivityModalProps {
 export function CreateActivityModal({ isOpen, onClose, courseId, modules }: CreateActivityModalProps) {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
   const [points, setPoints] = useState('100');
   const [attemptLimit, setAttemptLimit] = useState('1');
   const [scorePolicy, setScorePolicy] = useState<'highest' | 'latest'>('highest');
   const [selectedModuleId, setSelectedModuleId] = useState<string>('');
   const [hasDeadline, setHasDeadline] = useState(false);
   const [deadline, setDeadline] = useState('');
+  const [allowLateSubmissions, setAllowLateSubmissions] = useState(true);
   const [fileTypes, setFileTypes] = useState<string[]>(['all']);
   const [error, setError] = useState('');
+
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit.configure({
+        heading: false,
+        bulletList: false,
+        orderedList: false,
+        blockquote: false,
+        code: false,
+        codeBlock: false,
+        horizontalRule: false,
+        strike: false,
+        italic: false,
+      }),
+      Placeholder.configure({
+        placeholder: 'Enter activity description...',
+        emptyEditorClass: 'is-editor-empty',
+      }),
+    ],
+    content: '',
+    editorProps: {
+      attributes: {
+        class: 'prose prose-sm max-w-none focus:outline-none min-h-[160px] px-3 py-2',
+      },
+    },
+  });
+
+  const getDescriptionHtml = useCallback(() => {
+    if (!editor) return '';
+    const html = editor.getHTML();
+    // If editor is empty (just <p></p>), return empty string
+    if (html === '<p></p>' || html === '' || editor.isEmpty) {
+      return '';
+    }
+    return html;
+  }, [editor]);
 
   const createMutation = useMutation({
     mutationFn: async () => {
       const formData = new FormData();
       formData.append('title', title);
-      formData.append('instructions', description);
+      formData.append('instructions', getDescriptionHtml());
       formData.append('points', points);
       formData.append('attempt_limit', attemptLimit);
       formData.append('score_selection_policy', scorePolicy);
       formData.append('allowed_file_types', JSON.stringify(fileTypes));
-      formData.append('is_published', 'true'); // Publish immediately
+      formData.append('is_published', 'true');
+      formData.append('allow_late_submissions', String(hasDeadline ? allowLateSubmissions : true));
       if (hasDeadline && deadline) {
         formData.append('deadline', new Date(deadline).toISOString());
       }
@@ -63,15 +104,16 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
 
   const resetForm = () => {
     setTitle('');
-    setDescription('');
     setPoints('100');
     setAttemptLimit('1');
     setScorePolicy('highest');
     setSelectedModuleId('');
     setHasDeadline(false);
     setDeadline('');
+    setAllowLateSubmissions(true);
     setFileTypes(['all']);
     setError('');
+    editor?.commands.clearContent();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -102,6 +144,8 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
   };
 
   if (!isOpen) return null;
+
+  const isBoldActive = editor?.isActive('bold') ?? false;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -144,18 +188,47 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
               />
             </div>
 
-            {/* Description */}
+            {/* Description with Tiptap Editor */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Description
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Enter activity description..."
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors resize-none"
-              />
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-medium text-gray-700">
+                  Description
+                </label>
+                <button
+                  type="button"
+                  onClick={() => editor?.chain().focus().toggleBold().run()}
+                  className={cn(
+                    'px-2 py-1 text-xs font-bold rounded transition-colors',
+                    isBoldActive
+                      ? 'bg-navy-600 text-white'
+                      : 'text-gray-600 hover:text-navy-600 hover:bg-gray-100'
+                  )}
+                  title="Bold (Ctrl+B)"
+                >
+                  B
+                </button>
+              </div>
+              <div className="border border-gray-300 rounded-lg overflow-hidden focus-within:border-navy-500 focus-within:ring-1 focus-within:ring-navy-500">
+                <EditorContent editor={editor} />
+              </div>
+              <style jsx global>{`
+                .tiptap {
+                  outline: none;
+                }
+                .tiptap p {
+                  margin: 0;
+                }
+                .tiptap p.is-editor-empty:first-child::before {
+                  color: #9ca3af;
+                  content: attr(data-placeholder);
+                  float: left;
+                  height: 0;
+                  pointer-events: none;
+                }
+                .tiptap strong {
+                  font-weight: 700;
+                }
+              `}</style>
             </div>
 
             {/* Week Topic */}
@@ -283,15 +356,26 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
               </label>
 
               {hasDeadline && (
-                <div className="mt-3 flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-navy-600" />
-                  <input
-                    type="datetime-local"
-                    value={deadline}
-                    onChange={(e) => setDeadline(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors"
-                  />
-                </div>
+                <>
+                  <div className="mt-3 flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-navy-600" />
+                    <input
+                      type="datetime-local"
+                      value={deadline}
+                      onChange={(e) => setDeadline(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors"
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer mt-3 ml-6">
+                    <input
+                      type="checkbox"
+                      checked={allowLateSubmissions}
+                      onChange={(e) => setAllowLateSubmissions(e.target.checked)}
+                      className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
+                    />
+                    <span className="text-sm text-gray-600">Allow Late Submissions</span>
+                  </label>
+                </>
               )}
             </div>
           </div>

@@ -187,6 +187,7 @@ export interface Activity {
   instructions?: string;
   points: number;
   deadline?: string;
+  allow_late_submissions?: boolean;
   allowed_file_types?: string[];
   support_file_url?: string;
   attempt_limit?: number;
