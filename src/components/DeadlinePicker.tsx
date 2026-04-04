@@ -64,11 +64,11 @@ const muiTheme = createTheme({
 });
 
 interface DeadlinePickerTriggerProps {
-  /** Current deadline value */
+  /** Current confirmed deadline value from parent */
   value: Dayjs | null;
-  /** Called when the deadline changes (after clicking OK) */
+  /** Called when deadline is confirmed (after clicking OK) */
   onChange: (value: Dayjs | null) => void;
-  /** Whether deadline is enabled */
+  /** Whether deadline checkbox is checked */
   hasDeadline: boolean;
   /** Called when hasDeadline checkbox changes */
   onHasDeadlineChange?: (value: boolean) => void;
@@ -91,7 +91,7 @@ interface DeadlinePickerTriggerProps {
  * - Optional "Allow Late Submissions" checkbox
  */
 export function DeadlinePickerTrigger({
-  value,
+  value: confirmedDate, // Renamed for clarity - this is the parent's confirmed value
   onChange,
   hasDeadline,
   onHasDeadlineChange,
@@ -101,60 +101,58 @@ export function DeadlinePickerTrigger({
   onAllowLateChange,
   disabled = false,
 }: DeadlinePickerTriggerProps) {
+  // Internal state
   const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const [tempValue, setTempValue] = useState<Dayjs | null>(null);
+  const [pendingDate, setPendingDate] = useState<Dayjs | null>(null); // In-picker selection (before OK)
 
-  // Open picker when deadline checkbox is newly checked
-  useEffect(() => {
-    if (hasDeadline && !value && !isPickerOpen) {
-      // Small delay to let checkbox animation complete
-      const timer = setTimeout(() => {
-        setTempValue(dayjs()); // Start with current date/time
-        setIsPickerOpen(true);
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [hasDeadline, value, isPickerOpen]);
-
-  // Handle checkbox toggle
-  const handleCheckboxChange = useCallback((checked: boolean) => {
+  // When checkbox is toggled on, open picker with default date
+  const handleCheckboxToggle = useCallback((checked: boolean) => {
     onHasDeadlineChange?.(checked);
-    if (!checked) {
-      // Unchecking: clear deadline and close picker
+    if (checked) {
+      // Pre-select current date/time or existing confirmed date
+      setPendingDate(confirmedDate ?? dayjs());
+      setIsPickerOpen(true);
+    } else {
+      // Unchecking: clear everything
       setIsPickerOpen(false);
+      setPendingDate(null);
       onChange(null);
-      setTempValue(null);
     }
-  }, [onHasDeadlineChange, onChange]);
+  }, [confirmedDate, onChange, onHasDeadlineChange]);
 
-  // Open picker when clicking the date button
+  // Clicking the date display string to re-edit
   const handleDateClick = useCallback(() => {
     if (hasDeadline) {
-      setTempValue(value || dayjs()); // Use existing value or default to now
+      setPendingDate(confirmedDate ?? dayjs());
       setIsPickerOpen(true);
     }
-  }, [hasDeadline, value]);
+  }, [hasDeadline, confirmedDate]);
 
-  // Cancel button: close picker, uncheck if no prior value
+  // While user is browsing dates/times (before OK) - only update pending
+  const handlePickerChange = useCallback((newValue: Dayjs | null) => {
+    setPendingDate(newValue);
+  }, []);
+
+  // User clicks OK - commit the pending date
+  const handleAccept = useCallback(() => {
+    const finalValue = pendingDate ?? dayjs(); // Fallback to now if somehow null
+    onChange(finalValue);
+    setIsPickerOpen(false);
+    // Keep hasDeadline true - the date is confirmed
+  }, [pendingDate, onChange]);
+
+  // User clicks Cancel
   const handleCancel = useCallback(() => {
     setIsPickerOpen(false);
-    if (!value) {
-      // No date was previously selected, uncheck the checkbox
+    setPendingDate(null);
+    // If no date was ever confirmed, uncheck the checkbox
+    if (!confirmedDate) {
       onHasDeadlineChange?.(false);
     }
-    setTempValue(null);
-  }, [value, onHasDeadlineChange]);
+    // If a date was confirmed, keep it - just close the picker
+  }, [confirmedDate, onHasDeadlineChange]);
 
-  // OK/Accept button: save the selected date
-  const handleAccept = useCallback(() => {
-    if (tempValue) {
-      onChange(tempValue);
-    }
-    setIsPickerOpen(false);
-    setTempValue(null);
-  }, [tempValue, onChange]);
-
-  // Handle clicking the backdrop (outside the picker)
+  // Handle backdrop click (same as cancel)
   const handleBackdropClick = useCallback((e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       handleCancel();
@@ -176,7 +174,7 @@ export function DeadlinePickerTrigger({
             <input
               type="checkbox"
               checked={hasDeadline}
-              onChange={(e) => handleCheckboxChange(e.target.checked)}
+              onChange={(e) => handleCheckboxToggle(e.target.checked)}
               disabled={disabled}
               className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
             />
@@ -192,8 +190,8 @@ export function DeadlinePickerTrigger({
                   onClick={handleDateClick}
                   className="flex-1 text-left px-3 py-2 border border-gray-300 rounded-lg hover:border-navy-500 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors bg-white"
                 >
-                  {value ? (
-                    <span className="text-gray-900">{formatDeadline(value)}</span>
+                  {confirmedDate ? (
+                    <span className="text-gray-900">{formatDeadline(confirmedDate)}</span>
                   ) : (
                     <span className="text-gray-400">Click to select deadline...</span>
                   )}
@@ -227,8 +225,8 @@ export function DeadlinePickerTrigger({
               className="bg-slate-800 rounded-2xl shadow-2xl overflow-hidden"
             >
               <StaticDateTimePicker
-                value={tempValue}
-                onChange={(newValue) => setTempValue(newValue)}
+                value={pendingDate ?? dayjs()}
+                onChange={handlePickerChange}
                 onAccept={handleAccept}
                 onClose={handleCancel}
                 minDate={dayjs()}
