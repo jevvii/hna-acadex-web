@@ -760,8 +760,8 @@ export default function ActivityDetailsPage() {
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
           {/* Left Column - Main Content */}
           <div className="xl:col-span-8 space-y-6">
-            {/* Teacher Stats */}
-            {isTeacher && stats && (
+            {/* Teacher Stats - hidden during edit mode */}
+            {isTeacher && !isEditing && stats && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <TrendingUp className="w-5 h-5 text-navy-600" />
@@ -986,18 +986,8 @@ export default function ActivityDetailsPage() {
               )}
             </motion.div>
 
-            {/* Instructions */}
-            {isEditing ? (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h2 className="font-display font-semibold text-navy-800 mb-4 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-navy-600" /> Instructions
-                </h2>
-                <div
-                  className="prose prose-slate max-w-none text-gray-700"
-                  dangerouslySetInnerHTML={{ __html: activity.instructions || '' }}
-                />
-              </motion.div>
-            ) : activity.instructions ? (
+            {/* Instructions - hidden during edit mode */}
+            {!isEditing && activity.instructions && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h2 className="font-display font-semibold text-navy-800 mb-4 flex items-center gap-2">
                   <FileText className="w-5 h-5 text-navy-600" /> Instructions
@@ -1007,7 +997,7 @@ export default function ActivityDetailsPage() {
                   dangerouslySetInnerHTML={{ __html: activity.instructions }}
                 />
               </motion.div>
-            ) : null}
+            )}
 
             {/* Student's Submitted Files - Canvas Style with Attempt History */}
             {isStudent && activity.my_submissions && activity.my_submissions.length > 0 && (() => {
@@ -1167,8 +1157,8 @@ export default function ActivityDetailsPage() {
               );
             })()}
 
-            {/* Student Submission List (Teacher View) */}
-            {isTeacher && submissions.length > 0 && (
+            {/* Student Submission List (Teacher View) - hidden during edit mode */}
+            {isTeacher && !isEditing && submissions.length > 0 && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6 border-b border-gray-100">
                   <div className="flex items-center justify-between">
