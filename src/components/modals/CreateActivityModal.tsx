@@ -4,10 +4,12 @@ import { useState, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
-import { X, Calendar } from 'lucide-react';
+import { X } from 'lucide-react';
+import { Dayjs } from 'dayjs';
 import { cn } from '@/lib/utils';
 import { activitiesApi } from '@/lib/api';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { DeadlinePickerTrigger } from '@/components/DeadlinePicker';
 
 interface WeeklyModule {
   id: string;
@@ -30,7 +32,7 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
   const [scorePolicy, setScorePolicy] = useState<'highest' | 'latest'>('highest');
   const [selectedModuleId, setSelectedModuleId] = useState<string>('');
   const [hasDeadline, setHasDeadline] = useState(false);
-  const [deadline, setDeadline] = useState('');
+  const [deadline, setDeadline] = useState<Dayjs | null>(null);
   const [allowLateSubmissions, setAllowLateSubmissions] = useState(true);
   const [fileTypes, setFileTypes] = useState<string[]>(['all']);
   const [error, setError] = useState('');
@@ -84,7 +86,7 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
       formData.append('is_published', 'true');
       formData.append('allow_late_submissions', String(hasDeadline ? allowLateSubmissions : true));
       if (hasDeadline && deadline) {
-        formData.append('deadline', new Date(deadline).toISOString());
+        formData.append('deadline', deadline.toISOString());
       }
       if (selectedModuleId) {
         formData.append('weekly_module_id', selectedModuleId);
@@ -109,7 +111,7 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
     setScorePolicy('highest');
     setSelectedModuleId('');
     setHasDeadline(false);
-    setDeadline('');
+    setDeadline(null);
     setAllowLateSubmissions(true);
     setFileTypes(['all']);
     setError('');
@@ -345,38 +347,14 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
 
             {/* Deadline Toggle */}
             <div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={hasDeadline}
-                  onChange={(e) => setHasDeadline(e.target.checked)}
-                  className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
-                />
-                <span className="text-sm font-medium text-gray-700">Set Deadline</span>
-              </label>
-
-              {hasDeadline && (
-                <>
-                  <div className="mt-3 flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-navy-600" />
-                    <input
-                      type="datetime-local"
-                      value={deadline}
-                      onChange={(e) => setDeadline(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors"
-                    />
-                  </div>
-                  <label className="flex items-center gap-2 cursor-pointer mt-3 ml-6">
-                    <input
-                      type="checkbox"
-                      checked={allowLateSubmissions}
-                      onChange={(e) => setAllowLateSubmissions(e.target.checked)}
-                      className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
-                    />
-                    <span className="text-sm text-gray-600">Allow Late Submissions</span>
-                  </label>
-                </>
-              )}
+              <DeadlinePickerTrigger
+                value={deadline}
+                onChange={(newValue) => setDeadline(newValue)}
+                hasDeadline={hasDeadline}
+                onHasDeadlineChange={(val) => setHasDeadline(val)}
+                onAllowLateChange={(val) => setAllowLateSubmissions(val)}
+                allowLate={allowLateSubmissions}
+              />
             </div>
           </div>
 

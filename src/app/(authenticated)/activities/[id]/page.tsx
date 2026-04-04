@@ -10,11 +10,13 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { differenceInDays, differenceInHours } from 'date-fns';
+import dayjs, { Dayjs } from 'dayjs';
 import { useIsStudent, useIsTeacher } from '@/store/auth';
 import { cn, resolveFileUrl } from '@/lib/utils';
 import { activitiesApi, reminderApi } from '@/lib/api';
 import { Activity, Submission, SubmissionStatus } from '@/lib/types';
 import { CircularScore } from '@/components/CircularScore';
+import { DeadlinePickerTrigger } from '@/components/DeadlinePicker';
 import { logger } from '@/lib/logger';
 import { formatDateTime } from '@/lib/dateUtils';
 import {
@@ -505,7 +507,7 @@ export default function ActivityDetailsPage() {
     instructions: string;
     points: number;
     attempt_limit: number;
-    deadline: string;
+    deadline: Dayjs | null;
     hasDeadline: boolean;
     allow_late_submissions: boolean;
     allowed_file_types: string[];
@@ -516,7 +518,7 @@ export default function ActivityDetailsPage() {
     instructions: '',
     points: 100,
     attempt_limit: 1,
-    deadline: '',
+    deadline: null,
     hasDeadline: false,
     allow_late_submissions: true,
     allowed_file_types: ['all'],
@@ -589,7 +591,7 @@ export default function ActivityDetailsPage() {
       instructions: activity.instructions || '',
       points: activity.points || 100,
       attempt_limit: activity.attempt_limit || 1,
-      deadline: activity.deadline ? new Date(activity.deadline).toISOString().slice(0, 16) : '',
+      deadline: activity.deadline ? dayjs(activity.deadline) : null,
       hasDeadline: !!activity.deadline,
       allow_late_submissions: activity.allow_late_submissions !== false,
       allowed_file_types: activity.allowed_file_types || ['all'],
@@ -625,7 +627,7 @@ export default function ActivityDetailsPage() {
       formData.append('allowed_file_types', JSON.stringify(editForm.allowed_file_types));
       formData.append('allow_late_submissions', String(editForm.hasDeadline ? editForm.allow_late_submissions : true));
       if (editForm.hasDeadline && editForm.deadline) {
-        formData.append('deadline', new Date(editForm.deadline).toISOString());
+        formData.append('deadline', editForm.deadline.toISOString());
       }
       if (editForm.weekly_module_id) {
         formData.append('weekly_module_id', editForm.weekly_module_id);
@@ -867,37 +869,14 @@ export default function ActivityDetailsPage() {
 
                   {/* Deadline */}
                   <div>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={editForm.hasDeadline}
-                        onChange={(e) => setEditForm({ ...editForm, hasDeadline: e.target.checked })}
-                        className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
-                      />
-                      <span className="text-sm font-medium text-gray-700">Set Deadline</span>
-                    </label>
-                    {editForm.hasDeadline && (
-                      <>
-                        <div className="mt-3 flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-navy-600" />
-                          <input
-                            type="datetime-local"
-                            value={editForm.deadline}
-                            onChange={(e) => setEditForm({ ...editForm, deadline: e.target.value })}
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none"
-                          />
-                        </div>
-                        <label className="flex items-center gap-2 cursor-pointer mt-3 ml-6">
-                          <input
-                            type="checkbox"
-                            checked={editForm.allow_late_submissions}
-                            onChange={(e) => setEditForm({ ...editForm, allow_late_submissions: e.target.checked })}
-                            className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
-                          />
-                          <span className="text-sm text-gray-600">Allow Late Submissions</span>
-                        </label>
-                      </>
-                    )}
+                    <DeadlinePickerTrigger
+                      value={editForm.deadline}
+                      onChange={(newValue) => setEditForm({ ...editForm, deadline: newValue })}
+                      hasDeadline={editForm.hasDeadline}
+                      onHasDeadlineChange={(val) => setEditForm({ ...editForm, hasDeadline: val })}
+                      allowLate={editForm.allow_late_submissions}
+                      onAllowLateChange={(val) => setEditForm({ ...editForm, allow_late_submissions: val })}
+                    />
                   </div>
 
                   {/* Submission Types */}
