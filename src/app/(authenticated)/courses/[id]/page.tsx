@@ -56,6 +56,7 @@ import {
   HelpCircle,
   Plus,
   User,
+  Award,
 } from 'lucide-react';
 
 const tabs = [
@@ -476,6 +477,9 @@ function AssignmentsTab({
   const router = useRouter();
   const [filter, setFilter] = useState<'all' | 'pending' | 'submitted' | 'graded'>('all');
 
+  // Helper to strip HTML tags for preview
+  const stripHtml = (html: string) => html.replace(/<[^>]*>/g, '').trim();
+
   const getAssignmentConfig = (activity: Activity) => {
     const submission = activity.my_submission;
     const deadlinePassed = activity.deadline && new Date(activity.deadline) < new Date();
@@ -693,6 +697,12 @@ function AssignmentsTab({
           const submission = activity.my_submission;
           const isOverdue = activity.deadline && new Date(activity.deadline) < new Date() && !submission;
 
+          // For teachers: get stats from activity (fallback to 0 if not available)
+          const totalStudents = (activity as any).student_count ?? 0;
+          const submittedCount = (activity as any).submission_count ?? 0;
+          const gradedCount = (activity as any).graded_count ?? 0;
+          const hasUngraded = submittedCount > gradedCount;
+
           return (
             <div
               key={activity.id}
@@ -700,14 +710,14 @@ function AssignmentsTab({
               onClick={() => router.push(`/activities/${activity.id}`)}
             >
               {/* Status Bar */}
-              <div className={cn('h-1.5 w-full', activity.is_published ? config.barColor : 'bg-gray-300')} />
+              <div className={cn('h-1.5 w-full', activity.is_published ? (isTeacher ? 'bg-navy-500' : config.barColor) : 'bg-gray-300')} />
 
               <div className="p-6">
                 {/* Header - Icon + Badges */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <div className={cn('w-11 h-11 rounded-full flex items-center justify-center', activity.is_published ? config.iconBg : 'bg-gray-100')}>
-                      <FileText className={cn('w-5 h-5', activity.is_published ? config.iconColor : 'text-gray-400')} />
+                    <div className={cn('w-11 h-11 rounded-full flex items-center justify-center', activity.is_published ? (isTeacher ? 'bg-navy-100' : config.iconBg) : 'bg-gray-100')}>
+                      <FileText className={cn('w-5 h-5', activity.is_published ? (isTeacher ? 'text-navy-600' : config.iconColor) : 'text-gray-400')} />
                     </div>
                     {!activity.is_published && isTeacher && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
@@ -715,7 +725,14 @@ function AssignmentsTab({
                       </span>
                     )}
                   </div>
-                  {config.badge}
+                  {/* Status badge only for students */}
+                  {!isTeacher && config.badge}
+                  {/* Due date badge for teachers */}
+                  {isTeacher && activity.deadline && (
+                    <span className="text-xs text-slate-500">
+                      Due {formatDate(activity.deadline)}
+                    </span>
+                  )}
                 </div>
 
                 {/* Title */}
@@ -723,20 +740,20 @@ function AssignmentsTab({
                   {activity.title}
                 </h3>
 
-                {/* Description */}
+                {/* Description - strip HTML for preview */}
                 {activity.instructions && (
                   <p className="text-sm text-gray-500 line-clamp-2 mb-4 leading-relaxed">
-                    {activity.instructions}
+                    {stripHtml(activity.instructions)}
                   </p>
                 )}
 
                 {/* Meta Row */}
                 <div className="flex items-center gap-6 mb-5">
-                  <div className={cn('flex items-center gap-2 text-sm', isOverdue ? 'text-amber-600' : 'text-gray-500')}>
-                    <Calendar className={cn('w-4 h-4', isOverdue ? 'text-amber-500' : 'text-gray-400')} />
+                  <div className={cn('flex items-center gap-2 text-sm', isOverdue && !isTeacher ? 'text-amber-600' : 'text-gray-500')}>
+                    <Calendar className={cn('w-4 h-4', isOverdue && !isTeacher ? 'text-amber-500' : 'text-gray-400')} />
                     <span>
                       {activity.deadline ? (
-                        isOverdue ? `Due ${formatDate(activity.deadline)}` : `Due ${formatDate(activity.deadline)}`
+                        formatDate(activity.deadline)
                       ) : (
                         'No due date'
                       )}
@@ -744,19 +761,44 @@ function AssignmentsTab({
                   </div>
                   <div className="flex items-center gap-2 text-sm text-gray-500">
                     <Layers className="w-4 h-4 text-gray-400" />
-                    <span>{activity.points} points</span>
+                    <span>{activity.points} pts</span>
                   </div>
                 </div>
 
+                {/* Stats Row for Teachers */}
+                {isTeacher && (
+                  <div className="flex items-center gap-1 mb-3 text-xs text-slate-400">
+                    <Users className="w-3 h-3" />
+                    <span>{totalStudents} students</span>
+                    <span className="mx-1">·</span>
+                    <CheckCircle className="w-3 h-3" />
+                    <span>{submittedCount} submitted</span>
+                    <span className="mx-1">·</span>
+                    <Award className="w-3 h-3" />
+                    <span className={cn(hasUngraded ? 'text-amber-500' : (gradedCount > 0 ? 'text-green-600' : ''))}>
+                      {gradedCount} graded
+                    </span>
+                  </div>
+                )}
+
                 {/* Footer */}
                 <div className="flex items-center justify-between">
-                  <span className={cn('text-sm font-semibold', activity.is_published ? config.pointsColor : 'text-gray-500')}>
-                    {submission?.status === 'graded'
-                      ? `${submission.score}/${activity.points}`
-                      : submission?.status === 'submitted' || submission?.status === 'late'
-                      ? 'Pending Grade'
-                      : `${activity.points} pts`}
-                  </span>
+                  {/* Student view: show points/status */}
+                  {!isTeacher && (
+                    <span className={cn('text-sm font-semibold', activity.is_published ? config.pointsColor : 'text-gray-500')}>
+                      {submission?.status === 'graded'
+                        ? `${submission.score}/${activity.points}`
+                        : submission?.status === 'submitted' || submission?.status === 'late'
+                        ? 'Pending Grade'
+                        : `${activity.points} pts`}
+                    </span>
+                  )}
+                  {/* Teacher view: show points */}
+                  {isTeacher && (
+                    <span className="text-sm font-semibold text-navy-800">
+                      {activity.points} pts
+                    </span>
+                  )}
                   {isTeacher ? (
                     <div className="flex items-center gap-2">
                       {onTogglePublish && (
