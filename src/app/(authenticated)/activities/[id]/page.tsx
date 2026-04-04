@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Popover from '@radix-ui/react-popover';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
 import { differenceInDays, differenceInHours } from 'date-fns';
 import { useIsStudent, useIsTeacher } from '@/store/auth';
 import { cn, resolveFileUrl } from '@/lib/utils';
@@ -44,6 +47,8 @@ import {
   FileCheck,
   AlertTriangle,
   RotateCcw,
+  Save,
+  XCircle,
 } from 'lucide-react';
 
 // Extended submission type with student info
@@ -493,6 +498,68 @@ export default function ActivityDetailsPage() {
   const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
   const [selectedAttemptIndex, setSelectedAttemptIndex] = useState<number>(0);
 
+  // Edit mode state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<{
+    title: string;
+    instructions: string;
+    points: number;
+    attempt_limit: number;
+    deadline: string;
+    hasDeadline: boolean;
+    allow_late_submissions: boolean;
+    allowed_file_types: string[];
+    score_selection_policy: 'highest' | 'latest';
+    weekly_module_id: string;
+  }>({
+    title: '',
+    instructions: '',
+    points: 100,
+    attempt_limit: 1,
+    deadline: '',
+    hasDeadline: false,
+    allow_late_submissions: true,
+    allowed_file_types: ['all'],
+    score_selection_policy: 'highest',
+    weekly_module_id: '',
+  });
+  const [editError, setEditError] = useState('');
+
+  // Tiptap editor for description
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit.configure({
+        heading: false,
+        bulletList: false,
+        orderedList: false,
+        blockquote: false,
+        code: false,
+        codeBlock: false,
+        horizontalRule: false,
+        strike: false,
+        italic: false,
+      }),
+      Placeholder.configure({
+        placeholder: 'Enter activity description...',
+        emptyEditorClass: 'is-editor-empty',
+      }),
+    ],
+    content: '',
+    editorProps: {
+      attributes: {
+        class: 'prose prose-sm max-w-none focus:outline-none min-h-[120px] px-3 py-2',
+      },
+    },
+  });
+
+  // Sync editor content with editForm
+  useEffect(() => {
+    if (editor && editForm.instructions !== editor.getHTML()) {
+      // Only update if the content is different
+    }
+  }, [editor, editForm.instructions]);
+
   const { data: activity, isLoading, error, refetch } = useQuery({
     queryKey: ['activity', activityId],
     queryFn: () => activitiesApi.getActivity(activityId),
@@ -513,6 +580,81 @@ export default function ActivityDetailsPage() {
       router.push('/courses');
     },
   });
+
+  // Initialize edit form when entering edit mode
+  const enterEditMode = useCallback(() => {
+    if (!activity) return;
+    setEditForm({
+      title: activity.title || '',
+      instructions: activity.instructions || '',
+      points: activity.points || 100,
+      attempt_limit: activity.attempt_limit || 1,
+      deadline: activity.deadline ? new Date(activity.deadline).toISOString().slice(0, 16) : '',
+      hasDeadline: !!activity.deadline,
+      allow_late_submissions: activity.allow_late_submissions !== false,
+      allowed_file_types: activity.allowed_file_types || ['all'],
+      score_selection_policy: (activity.score_selection_policy as 'highest' | 'latest') || 'highest',
+      weekly_module_id: activity.weekly_module_id || '',
+    });
+    editor?.commands.setContent(activity.instructions || '');
+    setEditError('');
+    setIsEditing(true);
+  }, [activity, editor]);
+
+  const cancelEdit = useCallback(() => {
+    setIsEditing(false);
+    setEditError('');
+    editor?.commands.clearContent();
+  }, [editor]);
+
+  const getEditorHtml = useCallback(() => {
+    if (!editor) return '';
+    const html = editor.getHTML();
+    if (html === '<p></p>' || html === '' || editor.isEmpty) return '';
+    return html;
+  }, [editor]);
+
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      const formData = new FormData();
+      formData.append('title', editForm.title);
+      formData.append('instructions', getEditorHtml());
+      formData.append('points', String(editForm.points));
+      formData.append('attempt_limit', String(editForm.attempt_limit));
+      formData.append('score_selection_policy', editForm.score_selection_policy);
+      formData.append('allowed_file_types', JSON.stringify(editForm.allowed_file_types));
+      formData.append('allow_late_submissions', String(editForm.hasDeadline ? editForm.allow_late_submissions : true));
+      if (editForm.hasDeadline && editForm.deadline) {
+        formData.append('deadline', new Date(editForm.deadline).toISOString());
+      }
+      if (editForm.weekly_module_id) {
+        formData.append('weekly_module_id', editForm.weekly_module_id);
+      }
+      return activitiesApi.updateActivity(activityId, formData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['activity', activityId] });
+      queryClient.invalidateQueries({ queryKey: ['course-activities'] });
+      setIsEditing(false);
+      setEditError('');
+    },
+    onError: (err: Error | { message?: string }) => {
+      const errorMessage = err instanceof Error ? err.message : (err as { message?: string }).message;
+      setEditError(errorMessage || 'Failed to update activity');
+    },
+  });
+
+  const handleSaveEdit = () => {
+    if (!editForm.title.trim()) {
+      setEditError('Title is required');
+      return;
+    }
+    if (!editForm.points || editForm.points <= 0) {
+      setEditError('Points must be greater than 0');
+      return;
+    }
+    updateMutation.mutate();
+  };
 
   const timeStatus = activity?.deadline ? getTimeStatus(activity.deadline) : { text: '', color: '', urgent: false };
   const submissionStatus = activity?.my_submission
@@ -608,14 +750,6 @@ export default function ActivityDetailsPage() {
                 </div>
                 <p className="text-gray-600 max-w-3xl">{activity.description || 'No description provided.'}</p>
               </div>
-              <div className="flex items-center gap-3">
-                {/* Teacher Edit button only */}
-                {isTeacher && (
-                  <button onClick={() => router.push(`/activities/${activityId}/edit`)} className="btn btn-outline text-sm">
-                    <Edit3 className="w-4 h-4 mr-1" /> Edit
-                  </button>
-                )}
-              </div>
             </div>
           </motion.div>
         </div>
@@ -648,62 +782,222 @@ export default function ActivityDetailsPage() {
                 <h2 className="font-display font-semibold text-navy-800 flex items-center gap-2">
                   <FileText className="w-5 h-5 text-navy-600" /> Assignment Details
                 </h2>
-                {isTeacher && (
-                  <button onClick={() => router.push(`/activities/${activityId}/edit`)} className="btn btn-outline text-sm">
-                    <Edit3 className="w-4 h-4 mr-1" /> Edit
-                  </button>
-                )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+              {isEditing ? (
+                /* Edit Mode */
                 <div className="space-y-4">
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <Clock className="w-5 h-5 text-navy-500" />
-                    <div>
-                      <p className="text-sm text-gray-500">Due Date</p>
-                      <p className="font-medium text-navy-800">{formatDate(activity.deadline)}</p>
-                    </div>
+                  {/* Title */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Title</label>
+                    <input
+                      type="text"
+                      value={editForm.title}
+                      onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none"
+                    />
                   </div>
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <Award className="w-5 h-5 text-navy-500" />
-                    <div>
-                      <p className="text-sm text-gray-500">Points</p>
-                      <p className="font-medium text-navy-800">{activity.points || 'Not graded'}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <RotateCcw className="w-5 h-5 text-navy-500" />
-                    <div>
-                      <p className="text-sm text-gray-500">Attempts Allowed</p>
-                      <p className="font-medium text-navy-800">
-                        {attemptLimit === 1 ? '1 attempt' : `${attemptLimit} attempts`}
-                        {hasSubmitted && attemptsRemaining > 0 && (
-                          <span className="text-sm text-emerald-600 ml-2">({attemptsRemaining} remaining)</span>
+
+                  {/* Description/Instructions */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-sm font-medium text-gray-700">Description</label>
+                      <button
+                        type="button"
+                        onClick={() => editor?.chain().focus().toggleBold().run()}
+                        className={cn(
+                          'px-2 py-1 text-xs font-bold rounded transition-colors',
+                          editor?.isActive('bold') ? 'bg-navy-600 text-white' : 'text-gray-600 hover:text-navy-600 hover:bg-gray-100'
                         )}
-                      </p>
+                        title="Bold (Ctrl+B)"
+                      >
+                        B
+                      </button>
+                    </div>
+                    <div className="border border-gray-300 rounded-lg overflow-hidden focus-within:border-navy-500 focus-within:ring-1 focus-within:ring-navy-500">
+                      <EditorContent editor={editor} />
+                    </div>
+                  </div>
+
+                  {/* Points and Attempts */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Points</label>
+                      <input
+                        type="number"
+                        value={editForm.points}
+                        onChange={(e) => setEditForm({ ...editForm, points: parseInt(e.target.value) || 0 })}
+                        min="1"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Attempts Allowed</label>
+                      <input
+                        type="number"
+                        value={editForm.attempt_limit}
+                        onChange={(e) => setEditForm({ ...editForm, attempt_limit: parseInt(e.target.value) || 1 })}
+                        min="1"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Score Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Score Selection</label>
+                    <div className="flex gap-2">
+                      {(['highest', 'latest'] as const).map((policy) => (
+                        <button
+                          key={policy}
+                          type="button"
+                          onClick={() => setEditForm({ ...editForm, score_selection_policy: policy })}
+                          className={cn(
+                            'px-4 py-2 rounded-lg text-sm font-medium transition-colors capitalize',
+                            editForm.score_selection_policy === policy
+                              ? 'bg-navy-600 text-white'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          )}
+                        >
+                          {policy}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Deadline */}
+                  <div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editForm.hasDeadline}
+                        onChange={(e) => setEditForm({ ...editForm, hasDeadline: e.target.checked })}
+                        className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700">Set Deadline</span>
+                    </label>
+                    {editForm.hasDeadline && (
+                      <>
+                        <div className="mt-3 flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-navy-600" />
+                          <input
+                            type="datetime-local"
+                            value={editForm.deadline}
+                            onChange={(e) => setEditForm({ ...editForm, deadline: e.target.value })}
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none"
+                          />
+                        </div>
+                        <label className="flex items-center gap-2 cursor-pointer mt-3 ml-6">
+                          <input
+                            type="checkbox"
+                            checked={editForm.allow_late_submissions}
+                            onChange={(e) => setEditForm({ ...editForm, allow_late_submissions: e.target.checked })}
+                            className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
+                          />
+                          <span className="text-sm text-gray-600">Allow Late Submissions</span>
+                        </label>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Submission Types */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Accepted Submission Types</label>
+                    <div className="flex flex-wrap gap-2">
+                      {['all', 'text', 'image', 'pdf'].map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => {
+                            if (type === 'all') {
+                              setEditForm({ ...editForm, allowed_file_types: ['all'] });
+                            } else {
+                              setEditForm({
+                                ...editForm,
+                                allowed_file_types: editForm.allowed_file_types.includes(type)
+                                  ? editForm.allowed_file_types.filter((t) => t !== type && t !== 'all')
+                                  : [...editForm.allowed_file_types.filter((t) => t !== 'all'), type],
+                              });
+                            }
+                          }}
+                          className={cn(
+                            'px-3 py-1.5 rounded-full text-sm font-medium transition-colors uppercase',
+                            editForm.allowed_file_types.includes(type) || (type !== 'all' && editForm.allowed_file_types.includes('all'))
+                              ? 'bg-navy-600 text-white'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          )}
+                        >
+                          {type}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <CheckCircle className="w-5 h-5 text-navy-500" />
-                    <div>
-                      <p className="text-sm text-gray-500">Submission Type</p>
-                      <p className="font-medium text-navy-800">File Upload</p>
+              ) : (
+                /* View Mode */
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                      <Clock className="w-5 h-5 text-navy-500" />
+                      <div>
+                        <p className="text-sm text-gray-500">Due Date</p>
+                        <p className="font-medium text-navy-800">{formatDate(activity.deadline)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                      <Award className="w-5 h-5 text-navy-500" />
+                      <div>
+                        <p className="text-sm text-gray-500">Points</p>
+                        <p className="font-medium text-navy-800">{activity.points || 'Not graded'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                      <RotateCcw className="w-5 h-5 text-navy-500" />
+                      <div>
+                        <p className="text-sm text-gray-500">Attempts Allowed</p>
+                        <p className="font-medium text-navy-800">
+                          {attemptLimit === 1 ? '1 attempt' : `${attemptLimit} attempts`}
+                          {hasSubmitted && attemptsRemaining > 0 && (
+                            <span className="text-sm text-emerald-600 ml-2">({attemptsRemaining} remaining)</span>
+                          )}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <AlertCircle className="w-5 h-5 text-navy-500" />
-                    <div>
-                      <p className="text-sm text-gray-500">Late Submissions</p>
-                      <p className="font-medium text-navy-800">Allowed</p>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                      <CheckCircle className="w-5 h-5 text-navy-500" />
+                      <div>
+                        <p className="text-sm text-gray-500">Submission Type</p>
+                        <p className="font-medium text-navy-800">File Upload</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                      <AlertCircle className="w-5 h-5 text-navy-500" />
+                      <div>
+                        <p className="text-sm text-gray-500">Late Submissions</p>
+                        <p className="font-medium text-navy-800">
+                          {activity.allow_late_submissions !== false ? 'Allowed' : 'Not Allowed'}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
             </motion.div>
 
             {/* Instructions */}
-            {activity.instructions && (
+            {isEditing ? (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 className="font-display font-semibold text-navy-800 mb-4 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-navy-600" /> Instructions
+                </h2>
+                <div
+                  className="prose prose-slate max-w-none text-gray-700"
+                  dangerouslySetInnerHTML={{ __html: activity.instructions || '' }}
+                />
+              </motion.div>
+            ) : activity.instructions ? (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h2 className="font-display font-semibold text-navy-800 mb-4 flex items-center gap-2">
                   <FileText className="w-5 h-5 text-navy-600" /> Instructions
@@ -713,7 +1007,7 @@ export default function ActivityDetailsPage() {
                   dangerouslySetInnerHTML={{ __html: activity.instructions }}
                 />
               </motion.div>
-            )}
+            ) : null}
 
             {/* Student's Submitted Files - Canvas Style with Attempt History */}
             {isStudent && activity.my_submissions && activity.my_submissions.length > 0 && (() => {
@@ -1001,9 +1295,44 @@ export default function ActivityDetailsPage() {
               <div className="space-y-3">
                 {isTeacher ? (
                   <>
-                    <button onClick={() => router.push(`/activities/${activityId}/edit`)} className="w-full btn btn-primary flex items-center justify-center gap-2">
-                      <Edit3 className="w-4 h-4" /> Edit Activity
-                    </button>
+                    {isEditing ? (
+                      <>
+                        {editError && (
+                          <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm mb-3">
+                            {editError}
+                          </div>
+                        )}
+                        <button
+                          onClick={handleSaveEdit}
+                          disabled={updateMutation.isPending}
+                          className="w-full btn btn-primary flex items-center justify-center gap-2"
+                        >
+                          {updateMutation.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" /> Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-4 h-4" /> Save Changes
+                            </>
+                          )}
+                        </button>
+                        <button
+                          onClick={cancelEdit}
+                          disabled={updateMutation.isPending}
+                          className="w-full btn btn-outline flex items-center justify-center gap-2"
+                        >
+                          <XCircle className="w-4 h-4" /> Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={enterEditMode}
+                        className="w-full btn btn-primary flex items-center justify-center gap-2"
+                      >
+                        <Edit3 className="w-4 h-4" /> Edit Activity
+                      </button>
+                    )}
                     <button onClick={() => { if (confirm('Are you sure you want to delete this activity?')) deleteMutation.mutate(); }} className="w-full btn btn-outline text-red-600 border-red-200 hover:bg-red-50 flex items-center justify-center gap-2">
                       <Trash2 className="w-4 h-4" /> Delete Activity
                     </button>
@@ -1106,6 +1435,26 @@ export default function ActivityDetailsPage() {
 
       {/* Submission Modal */}
       <SubmissionModal activity={activity} isOpen={isSubmitModalOpen} onClose={() => setIsSubmitModalOpen(false)} />
+
+      {/* Tiptap Editor Styles */}
+      <style jsx global>{`
+        .tiptap {
+          outline: none;
+        }
+        .tiptap p {
+          margin: 0;
+        }
+        .tiptap p.is-editor-empty:first-child::before {
+          color: #9ca3af;
+          content: attr(data-placeholder);
+          float: left;
+          height: 0;
+          pointer-events: none;
+        }
+        .tiptap strong {
+          font-weight: 700;
+        }
+      `}</style>
     </div>
   );
 }
