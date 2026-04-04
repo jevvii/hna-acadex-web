@@ -719,8 +719,8 @@ export default function ActivityDetailsPage() {
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
                   <h1 className="font-display text-2xl lg:text-3xl font-bold text-navy-900">{activity.title}</h1>
-                  {/* Graded status */}
-                  {isGraded && activity.my_submission ? (
+                  {/* Status badge - only show for students */}
+                  {isStudent && (isGraded && activity.my_submission ? (
                     <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium flex items-center gap-1">
                       <Award className="w-4 h-4" /> Graded
                     </span>
@@ -746,7 +746,7 @@ export default function ActivityDetailsPage() {
                         <Clock className="w-4 h-4" /> {timeStatus.text}
                       </span>
                     );
-                  })()}
+                  })())}
                 </div>
                 <p className="text-gray-600 max-w-3xl">{activity.description || 'No description provided.'}</p>
               </div>

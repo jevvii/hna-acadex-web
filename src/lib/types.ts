@@ -213,6 +213,10 @@ export interface Activity {
     highest_score?: number | null;
     average_score?: number | null;
   };
+  // Teacher stats
+  student_count?: number;
+  submission_count?: number;
+  graded_count?: number;
 }
 
 export interface Submission {

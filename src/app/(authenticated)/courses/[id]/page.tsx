@@ -698,9 +698,9 @@ function AssignmentsTab({
           const isOverdue = activity.deadline && new Date(activity.deadline) < new Date() && !submission;
 
           // For teachers: get stats from activity (fallback to 0 if not available)
-          const totalStudents = (activity as any).student_count ?? 0;
-          const submittedCount = (activity as any).submission_count ?? 0;
-          const gradedCount = (activity as any).graded_count ?? 0;
+          const totalStudents = activity.student_count ?? 0;
+          const submittedCount = activity.submission_count ?? 0;
+          const gradedCount = activity.graded_count ?? 0;
           const hasUngraded = submittedCount > gradedCount;
 
           return (
