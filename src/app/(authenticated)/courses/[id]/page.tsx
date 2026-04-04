@@ -701,7 +701,42 @@ function AssignmentsTab({
           const totalStudents = activity.student_count ?? 0;
           const submittedCount = activity.submission_count ?? 0;
           const gradedCount = activity.graded_count ?? 0;
-          const hasUngraded = submittedCount > gradedCount;
+
+          // Progress-aware coloring for teacher stats
+          const getStatsColors = (studentCount: number, submissionCount: number, gradedCount: number) => {
+            // State 1: No submissions yet
+            if (submissionCount === 0) {
+              return {
+                students: 'text-slate-400',
+                submitted: 'text-slate-400',
+                graded: 'text-slate-400',
+              };
+            }
+            // State 5: All submitted AND all graded
+            if (submissionCount === studentCount && gradedCount === studentCount) {
+              return {
+                students: 'text-green-600',
+                submitted: 'text-green-600',
+                graded: 'text-green-600',
+              };
+            }
+            // State 4: All submitted are graded (but not all students submitted)
+            if (gradedCount === submissionCount) {
+              return {
+                students: 'text-slate-400',
+                submitted: 'text-green-600',
+                graded: 'text-green-600',
+              };
+            }
+            // State 2 & 3: Some submitted, need grading (gradedCount < submissionCount)
+            return {
+              students: 'text-slate-400',
+              submitted: 'text-blue-500',
+              graded: 'text-amber-500',
+            };
+          };
+
+          const statsColors = getStatsColors(totalStudents, submittedCount, gradedCount);
 
           return (
             <div
@@ -767,17 +802,27 @@ function AssignmentsTab({
 
                 {/* Stats Row for Teachers */}
                 {isTeacher && (
-                  <div className="flex items-center gap-1 mb-3 text-xs text-slate-400">
-                    <Users className="w-3 h-3" />
-                    <span>{totalStudents} students</span>
-                    <span className="mx-1">·</span>
-                    <CheckCircle className="w-3 h-3" />
-                    <span>{submittedCount} submitted</span>
-                    <span className="mx-1">·</span>
-                    <Award className="w-3 h-3" />
-                    <span className={cn(hasUngraded ? 'text-amber-500' : (gradedCount > 0 ? 'text-green-600' : ''))}>
-                      {gradedCount} graded
-                    </span>
+                  <div className="flex items-center gap-2 mb-3">
+                    {/* Students stat */}
+                    <div className="flex items-center gap-1">
+                      <Users className={cn('w-3.5 h-3.5', statsColors.students)} />
+                      <span className={cn('text-sm font-medium', statsColors.students)}>{totalStudents}</span>
+                      <span className="text-xs text-slate-400">students</span>
+                    </div>
+                    <span className="text-slate-300">·</span>
+                    {/* Submitted stat */}
+                    <div className="flex items-center gap-1">
+                      <CheckCircle className={cn('w-3.5 h-3.5', statsColors.submitted)} />
+                      <span className={cn('text-sm font-medium', statsColors.submitted)}>{submittedCount}</span>
+                      <span className="text-xs text-slate-400">submitted</span>
+                    </div>
+                    <span className="text-slate-300">·</span>
+                    {/* Graded stat */}
+                    <div className="flex items-center gap-1">
+                      <Award className={cn('w-3.5 h-3.5', statsColors.graded)} />
+                      <span className={cn('text-sm font-medium', statsColors.graded)}>{gradedCount}</span>
+                      <span className="text-xs text-slate-400">graded</span>
+                    </div>
                   </div>
                 )}
 
