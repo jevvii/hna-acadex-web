@@ -81,6 +81,8 @@ export default function QuizManualGradingPage() {
   const [answerScores, setAnswerScores] = useState<Record<string, string>>({});
   // Track which answers are being saved
   const [savingAnswers, setSavingAnswers] = useState<Set<string>>(new Set());
+  // Track grading errors
+  const [gradingError, setGradingError] = useState<{ answerId: string; message: string } | null>(null);
 
   // Fetch quiz data
   const { data: quiz, isLoading: quizLoading, error: quizError, refetch } = useQuery({
@@ -132,11 +134,15 @@ export default function QuizManualGradingPage() {
       });
       queryClient.invalidateQueries({ queryKey: ['quiz-grading', quizId] });
     },
-    onError: (_, { answerId }) => {
+    onError: (error, { answerId }) => {
       setSavingAnswers((prev) => {
         const next = new Set(prev);
         next.delete(answerId);
         return next;
+      });
+      setGradingError({
+        answerId,
+        message: error instanceof Error ? error.message : 'Failed to save grade',
       });
     },
   });
@@ -150,6 +156,7 @@ export default function QuizManualGradingPage() {
       return;
     }
 
+    setGradingError(null);
     setSavingAnswers((prev) => new Set(prev).add(answerId));
     gradeMutation.mutate({ answerId, pointsAwarded: score });
   };
@@ -194,12 +201,9 @@ export default function QuizManualGradingPage() {
     );
   }
 
-  // Get answers sorted by question order
+  // Get answers
   const answers = attempt.answers || [];
-  const sortedAnswers = [...answers].sort((a, b) => {
-    // Sort by question order if available
-    return 0;
-  });
+  const sortedAnswers = [...answers];
 
   // Calculate total score
   const autoGradedScore = sortedAnswers
@@ -414,7 +418,14 @@ export default function QuizManualGradingPage() {
                         </div>
                       ) : (
                         /* Manual grading - Show input */
-                        <div className="flex items-center gap-4">
+                        <>
+                          {gradingError?.answerId === answer.answer_id && (
+                            <div className="mb-3 p-3 bg-red-50 text-red-600 rounded-lg text-sm flex items-center gap-2">
+                              <AlertCircle className="w-4 h-4 shrink-0" />
+                              {gradingError.message}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-4">
                           <div className="flex items-center gap-2">
                             <label className="text-sm font-medium text-gray-700">Score:</label>
                             <input
@@ -456,6 +467,7 @@ export default function QuizManualGradingPage() {
                             )}
                           </button>
                         </div>
+                        </>
                       )}
                     </div>
                   );
