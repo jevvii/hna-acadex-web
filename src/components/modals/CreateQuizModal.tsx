@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { quizzesApi } from '@/lib/api';
@@ -8,6 +8,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { DeadlinePicker } from '@/components/DeadlinePicker';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
+import Underline from '@tiptap/extension-underline';
 
 interface WeeklyModule {
   id: string;
@@ -25,7 +29,6 @@ interface CreateQuizModalProps {
 export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQuizModalProps) {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
-  const [instructions, setInstructions] = useState('');
   const [attemptLimit, setAttemptLimit] = useState('1');
   const [timeLimit, setTimeLimit] = useState('');
   const [scorePolicy, setScorePolicy] = useState<'highest' | 'latest'>('highest');
@@ -34,11 +37,45 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
   const [closeDate, setCloseDate] = useState<Dayjs | null>(null);
   const [error, setError] = useState('');
 
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit.configure({
+        heading: false,
+        bulletList: false,
+        orderedList: false,
+        blockquote: false,
+        code: false,
+        codeBlock: false,
+        horizontalRule: false,
+        strike: false,
+      }),
+      Placeholder.configure({
+        placeholder: 'Enter quiz instructions...',
+        emptyEditorClass: 'is-editor-empty',
+      }),
+      Underline,
+    ],
+    content: '',
+    editorProps: {
+      attributes: {
+        class: 'prose prose-sm max-w-none focus:outline-none min-h-[120px] px-3 py-2',
+      },
+    },
+  });
+
+  const getInstructionsHtml = useCallback(() => {
+    if (!editor) return '';
+    const html = editor.getHTML();
+    if (html === '<p></p>' || html === '' || editor.isEmpty) return '';
+    return html;
+  }, [editor]);
+
   const createMutation = useMutation({
     mutationFn: async () => {
       return quizzesApi.quickCreate(courseId, {
         title,
-        instructions,
+        instructions: getInstructionsHtml(),
         attempt_limit: parseInt(attemptLimit),
         time_limit_minutes: timeLimit ? parseInt(timeLimit) : undefined,
         questions: [],
@@ -57,7 +94,6 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
 
   const resetForm = () => {
     setTitle('');
-    setInstructions('');
     setAttemptLimit('1');
     setTimeLimit('');
     setScorePolicy('highest');
@@ -65,6 +101,7 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
     setOpenDate(null);
     setCloseDate(null);
     setError('');
+    editor?.commands.clearContent();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -128,13 +165,90 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Instructions
               </label>
-              <textarea
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
-                placeholder="Enter quiz instructions..."
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors resize-none"
-              />
+              <div className="border border-slate-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
+                {/* Toolbar */}
+                <div className="flex items-center gap-1 px-2 py-1 bg-slate-50 border-b border-slate-200">
+                  {/* Bold */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      editor?.chain().focus().toggleBold().run();
+                    }}
+                    className={cn(
+                      'w-7 h-7 flex items-center justify-center rounded text-sm font-bold transition-colors',
+                      editor?.isActive('bold')
+                        ? 'bg-slate-200 text-slate-900'
+                        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                    )}
+                    title="Bold (Ctrl+B)"
+                  >
+                    B
+                  </button>
+                  {/* Italic */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      editor?.chain().focus().toggleItalic().run();
+                    }}
+                    className={cn(
+                      'w-7 h-7 flex items-center justify-center rounded text-sm italic transition-colors',
+                      editor?.isActive('italic')
+                        ? 'bg-slate-200 text-slate-900'
+                        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                    )}
+                    title="Italic (Ctrl+I)"
+                  >
+                    I
+                  </button>
+                  {/* Underline */}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      editor?.chain().focus().toggleUnderline().run();
+                    }}
+                    className={cn(
+                      'w-7 h-7 flex items-center justify-center rounded text-sm underline transition-colors',
+                      editor?.isActive('underline')
+                        ? 'bg-slate-200 text-slate-900'
+                        : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                    )}
+                    title="Underline (Ctrl+U)"
+                  >
+                    U
+                  </button>
+                </div>
+                {/* Editor */}
+                <EditorContent editor={editor} />
+              </div>
+              <style jsx global>{`
+                .tiptap {
+                  outline: none;
+                  color: #1e293b; /* slate-800 - dark text for light background */
+                  background: white;
+                }
+                .tiptap p {
+                  margin: 0;
+                }
+                .tiptap p.is-editor-empty:first-child::before {
+                  color: #94a3b8; /* slate-400 */
+                  content: attr(data-placeholder);
+                  float: left;
+                  height: 0;
+                  pointer-events: none;
+                }
+                .tiptap strong {
+                  font-weight: 700;
+                }
+                .tiptap em {
+                  font-style: italic;
+                }
+                .tiptap u {
+                  text-decoration: underline;
+                }
+              `}</style>
             </div>
 
             {/* Week Topic */}

@@ -9,6 +9,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
+import Underline from '@tiptap/extension-underline';
 import { differenceInDays, differenceInHours } from 'date-fns';
 import dayjs, { Dayjs } from 'dayjs';
 import { useIsStudent, useIsTeacher } from '@/store/auth';
@@ -540,12 +541,12 @@ export default function ActivityDetailsPage() {
         codeBlock: false,
         horizontalRule: false,
         strike: false,
-        italic: false,
       }),
       Placeholder.configure({
         placeholder: 'Enter activity description...',
         emptyEditorClass: 'is-editor-empty',
       }),
+      Underline,
     ],
     content: '',
     editorProps: {
@@ -809,21 +810,63 @@ export default function ActivityDetailsPage() {
 
                   {/* Description/Instructions */}
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-sm font-medium text-gray-700">Description</label>
-                      <button
-                        type="button"
-                        onClick={() => editor?.chain().focus().toggleBold().run()}
-                        className={cn(
-                          'px-2 py-1 text-xs font-bold rounded transition-colors',
-                          editor?.isActive('bold') ? 'bg-navy-600 text-white' : 'text-gray-600 hover:text-navy-600 hover:bg-gray-100'
-                        )}
-                        title="Bold (Ctrl+B)"
-                      >
-                        B
-                      </button>
-                    </div>
-                    <div className="border border-gray-300 rounded-lg overflow-hidden focus-within:border-navy-500 focus-within:ring-1 focus-within:ring-navy-500">
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
+                    <div className="border border-slate-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500">
+                      {/* Toolbar */}
+                      <div className="flex items-center gap-1 px-2 py-1 bg-slate-50 border-b border-slate-200">
+                        {/* Bold */}
+                        <button
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            editor?.chain().focus().toggleBold().run();
+                          }}
+                          className={cn(
+                            'w-7 h-7 flex items-center justify-center rounded text-sm font-bold transition-colors',
+                            editor?.isActive('bold')
+                              ? 'bg-slate-200 text-slate-900'
+                              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                          )}
+                          title="Bold (Ctrl+B)"
+                        >
+                          B
+                        </button>
+                        {/* Italic */}
+                        <button
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            editor?.chain().focus().toggleItalic().run();
+                          }}
+                          className={cn(
+                            'w-7 h-7 flex items-center justify-center rounded text-sm italic transition-colors',
+                            editor?.isActive('italic')
+                              ? 'bg-slate-200 text-slate-900'
+                              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                          )}
+                          title="Italic (Ctrl+I)"
+                        >
+                          I
+                        </button>
+                        {/* Underline */}
+                        <button
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            editor?.chain().focus().toggleUnderline().run();
+                          }}
+                          className={cn(
+                            'w-7 h-7 flex items-center justify-center rounded text-sm underline transition-colors',
+                            editor?.isActive('underline')
+                              ? 'bg-slate-200 text-slate-900'
+                              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                          )}
+                          title="Underline (Ctrl+U)"
+                        >
+                          U
+                        </button>
+                      </div>
+                      {/* Editor */}
                       <EditorContent editor={editor} />
                     </div>
                   </div>
