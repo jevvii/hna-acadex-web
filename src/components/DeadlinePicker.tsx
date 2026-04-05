@@ -294,14 +294,14 @@ export function DeadlinePickerTrigger({
               className="rounded-2xl shadow-2xl overflow-hidden"
               style={{ backgroundColor: '#1e293b' }}
             >
-              {/* MUI picker with NO built-in action bar, using 24-hour format internally */}
+              {/* MUI picker with NO built-in action bar, using 12-hour format with custom AM/PM toggle */}
               <StaticDateTimePicker
                 value={pendingDate ?? dayjs()}
                 onChange={handlePickerChange}
                 onViewChange={handleViewChange}
                 view={pickerView}
                 minDate={dayjs()}
-                ampm={false}
+                ampm={true}
                 views={['day', 'hours', 'minutes']}
                 viewRenderers={{
                   hours: renderTimeViewClock,

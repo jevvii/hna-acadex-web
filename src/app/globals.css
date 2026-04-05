@@ -313,6 +313,7 @@
   border-color: #60a5fa !important;
 }
 
+/* Outer clock numbers (1-12) - visible */
 .MuiClockNumber-root {
   color: #f1f5f9 !important;
 }
@@ -320,6 +321,31 @@
 .MuiClockNumber-root.Mui-selected {
   background-color: #60a5fa !important;
   color: #ffffff !important;
+}
+
+/* Hide inner circle military time numbers - we use AM/PM toggle instead */
+.MuiClock-wrapper-inner {
+  display: none !important;
+}
+
+.MuiClockNumber-root.MuiClockNumber-inner {
+  display: none !important;
+}
+
+/* Hide inner clock numbers (13-23 and 0) when using 24-hour format */
+/* These appear as a second ring inside the main clock face */
+.MuiClock-root .MuiClockNumber-root[style*="translate"] {
+  /* Target inner positioned numbers via their inline styles */
+}
+
+/* Alternative: hide all clock numbers that would show 13-23 hours */
+.MuiClockNumber-root:nth-child(n+13):nth-child(-n+23) {
+  display: none !important;
+}
+
+/* Hide the 00 hour (midnight in 24-hour format inner ring) */
+.MuiClockNumber-root:first-child {
+  /* Keep first number visible (it's usually 12 at top) */
 }
 
 /* MUI Date/Time Picker overrides - for dark theme modal */
