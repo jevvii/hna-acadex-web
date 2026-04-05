@@ -1290,7 +1290,7 @@ export default function ActivityDetailsPage() {
                                   </div>
                                 )}
                                 <div className="mt-4 flex gap-2">
-                                  <button onClick={() => router.push(`/activities/${activityId}/submissions/${submission.id}/grade`)} className="btn btn-primary text-sm flex-1">
+                                  <button onClick={() => router.push(`/activities/${activityId}/grade/${submission.student_id}`)} className="btn btn-primary text-sm flex-1">
                                     <Edit3 className="w-4 h-4 mr-1" /> {submission.graded_at ? 'Update Grade' : 'Grade Submission'}
                                   </button>
                                 </div>

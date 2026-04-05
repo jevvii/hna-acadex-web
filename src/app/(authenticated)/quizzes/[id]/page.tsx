@@ -928,7 +928,7 @@ export default function QuizDetailsPage() {
                   </div>
                 </div>
                 <div className="divide-y divide-gray-100">
-                  {gradingList.map((attempt: { student_id: string; student_name?: string; student_email?: string; score?: number; max_score?: number; submitted_at?: string; time_taken_seconds?: number; pending_manual_grading?: boolean }) => {
+                  {gradingList.map((attempt: { attempt_id: string; student_id: string; student_name?: string; student_email?: string; score?: number; max_score?: number; submitted_at?: string; time_taken_seconds?: number; pending_manual_grading?: boolean }) => {
                     const isExpanded = expandedStudentId === attempt.student_id;
                     return (
                       <div key={attempt.student_id} className="hover:bg-slate-50/50 transition-colors">
@@ -969,7 +969,7 @@ export default function QuizDetailsPage() {
                                     <p className="text-sm text-amber-800"><AlertCircle className="w-4 h-4 inline mr-1" />Requires manual grading</p>
                                   </div>
                                 )}
-                                <button onClick={() => router.push(`/quizzes/${quizId}/grade/${attempt.student_id}`)} className="mt-3 w-full flex items-center justify-center gap-2 btn btn-primary">
+                                <button onClick={() => router.push(`/quizzes/${quizId}/grade/${attempt.attempt_id}`)} className="mt-3 w-full flex items-center justify-center gap-2 btn btn-primary">
                                   <Edit3 className="w-4 h-4" />{attempt.score !== undefined ? 'Update Grade' : 'Grade Submission'}
                                 </button>
                               </div>
