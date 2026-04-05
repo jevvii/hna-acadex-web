@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { StaticDateTimePicker } from '@mui/x-date-pickers/StaticDateTimePicker';
@@ -94,6 +94,7 @@ interface DeadlinePickerTriggerProps {
  * - Checkbox to enable/disable deadline
  * - Clickable date display that opens a modal with analog clock
  * - Two-step flow: Date first → Next → Time → OK
+ * - Custom AM/PM toggle (MUI's is unreliable)
  * - Optional "Allow Late Submissions" checkbox
  */
 export function DeadlinePickerTrigger({
@@ -111,19 +112,47 @@ export function DeadlinePickerTrigger({
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [pendingDate, setPendingDate] = useState<Dayjs | null>(null);
   const [pickerView, setPickerView] = useState<PickerView>('day');
+  const [ampm, setAmpm] = useState<'AM' | 'PM'>('AM');
+  const [hourSelected, setHourSelected] = useState(false); // Track if hour was selected
+
+  // Sync AM/PM state when pendingDate changes (from clock interaction)
+  useEffect(() => {
+    if (pendingDate) {
+      setAmpm(pendingDate.hour() >= 12 ? 'PM' : 'AM');
+    }
+  }, [pendingDate]);
+
+  // Handle AM/PM toggle click - adjust the hour accordingly
+  const handleAmpmChange = useCallback((value: 'AM' | 'PM') => {
+    setAmpm(value);
+    if (!pendingDate) return;
+
+    const hour = pendingDate.hour();
+    if (value === 'AM' && hour >= 12) {
+      // Converting from PM to AM: subtract 12 hours
+      setPendingDate(pendingDate.subtract(12, 'hour'));
+    } else if (value === 'PM' && hour < 12) {
+      // Converting from AM to PM: add 12 hours
+      setPendingDate(pendingDate.add(12, 'hour'));
+    }
+  }, [pendingDate]);
 
   // When checkbox is toggled on, open picker with default date
   const handleCheckboxToggle = useCallback((checked: boolean) => {
     onHasDeadlineChange?.(checked);
     if (checked) {
       // Always start from date view
+      const base = confirmedDate ?? dayjs();
+      setAmpm(base.hour() >= 12 ? 'PM' : 'AM');
       setPickerView('day');
-      setPendingDate(confirmedDate ?? dayjs());
+      setHourSelected(false); // Reset hour selection
+      setPendingDate(base);
       setIsPickerOpen(true);
     } else {
       // Unchecking: clear everything
       setIsPickerOpen(false);
       setPendingDate(null);
+      setHourSelected(false);
       onChange(null);
     }
   }, [confirmedDate, onChange, onHasDeadlineChange]);
@@ -132,8 +161,11 @@ export function DeadlinePickerTrigger({
   const handleDateClick = useCallback(() => {
     if (hasDeadline) {
       // Always start from date view when re-editing
+      const base = confirmedDate ?? dayjs();
+      setAmpm(base.hour() >= 12 ? 'PM' : 'AM');
       setPickerView('day');
-      setPendingDate(confirmedDate ?? dayjs());
+      setHourSelected(false); // Reset hour selection
+      setPendingDate(base);
       setIsPickerOpen(true);
     }
   }, [hasDeadline, confirmedDate]);
@@ -145,6 +177,14 @@ export function DeadlinePickerTrigger({
 
   // Handle view changes from the picker
   const handleViewChange = useCallback((newView: PickerView) => {
+    // When view changes to 'minutes', user has selected an hour
+    if (newView === 'minutes') {
+      setHourSelected(true);
+    }
+    // Reset hourSelected when going back to day view
+    if (newView === 'day') {
+      setHourSelected(false);
+    }
     setPickerView(newView);
   }, []);
 
@@ -153,6 +193,7 @@ export function DeadlinePickerTrigger({
     const finalValue = pendingDate ?? dayjs();
     onChange(finalValue);
     setIsPickerOpen(false);
+    setHourSelected(false);
   }, [pendingDate, onChange]);
 
   // User clicks Cancel
@@ -160,6 +201,7 @@ export function DeadlinePickerTrigger({
     setIsPickerOpen(false);
     setPendingDate(null);
     setPickerView('day');
+    setHourSelected(false); // Reset hour selection
     // If no date was ever confirmed, uncheck the checkbox
     if (!confirmedDate) {
       onHasDeadlineChange?.(false);
@@ -181,6 +223,16 @@ export function DeadlinePickerTrigger({
 
   // Determine if we're on time view
   const isTimeView = pickerView === 'hours' || pickerView === 'minutes';
+
+  // Format time for display in toolbar (12-hour format)
+  const formatTimeDisplay = (date: Dayjs | null): string => {
+    if (!date) return '--:--';
+    const hours = date.hour();
+    const minutes = date.minute();
+    const h = hours % 12 || 12; // Convert 0 to 12 for display
+    const m = minutes.toString().padStart(2, '0');
+    return `${h}:${m}`;
+  };
 
   return (
     <ThemeProvider theme={muiTheme}>
@@ -242,14 +294,14 @@ export function DeadlinePickerTrigger({
               className="rounded-2xl shadow-2xl overflow-hidden"
               style={{ backgroundColor: '#1e293b' }}
             >
-              {/* MUI picker with NO built-in action bar */}
+              {/* MUI picker with NO built-in action bar, using 24-hour format internally */}
               <StaticDateTimePicker
                 value={pendingDate ?? dayjs()}
                 onChange={handlePickerChange}
                 onViewChange={handleViewChange}
                 view={pickerView}
                 minDate={dayjs()}
-                ampm
+                ampm={false}
                 views={['day', 'hours', 'minutes']}
                 viewRenderers={{
                   hours: renderTimeViewClock,
@@ -260,11 +312,7 @@ export function DeadlinePickerTrigger({
                   // Disable MUI's built-in action bar entirely
                   actionBar: { actions: [] },
                   toolbar: {
-                    sx: {
-                      '& .MuiTypography-root': {
-                        color: '#f1f5f9',
-                      },
-                    },
+                    hidden: true, // Hide toolbar - we show time + AM/PM ourselves
                   },
                   // Style the day picker elements
                   day: {
@@ -298,27 +346,49 @@ export function DeadlinePickerTrigger({
                   },
                 }}
                 sx={{
-                  // AM/PM selector styling
-                  '& .MuiTimePickerToolbar-ampmLabel': {
-                    color: '#475569', // slate-600 — unselected, muted
-                    fontSize: '0.9rem',
-                    fontWeight: 400,
+                  // Hide MUI's AM/PM selector (unreliable styling)
+                  '& .MuiTimePickerToolbar-ampmSelection': {
+                    display: 'none !important',
                   },
-                  '& .MuiTimePickerToolbar-ampmLabel.Mui-selected': {
-                    color: '#60a5fa', // blue-400 — selected
-                    fontWeight: 700,
-                    fontSize: '0.9rem',
-                  },
-                  '& .MuiToggleButtonGroup-root .MuiToggleButton-root': {
-                    color: '#475569', // unselected AM/PM
-                    '&.Mui-selected': {
-                      color: '#f1f5f9', // selected AM/PM
-                      backgroundColor: '#334155', // slate-700
-                      fontWeight: 700,
-                    },
+                  '& .MuiToggleButtonGroup-root': {
+                    display: 'none !important',
                   },
                 }}
               />
+
+              {/* Custom time display with AM/PM toggle - shown only in time view */}
+              {isTimeView && (
+                <div className="flex items-center justify-center gap-3 px-4 py-2 bg-slate-800/50">
+                  <span className="text-2xl font-light text-white">
+                    {formatTimeDisplay(pendingDate)}
+                  </span>
+                  {/* Custom AM/PM toggle */}
+                  <div className="flex flex-col gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => handleAmpmChange('AM')}
+                      className={`px-2 py-0.5 text-xs font-semibold rounded transition-all ${
+                        ampm === 'AM'
+                          ? 'text-white bg-slate-600'
+                          : 'text-slate-500 hover:text-slate-300 hover:bg-slate-700/50'
+                      }`}
+                    >
+                      AM
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAmpmChange('PM')}
+                      className={`px-2 py-0.5 text-xs font-semibold rounded transition-all ${
+                        ampm === 'PM'
+                          ? 'text-white bg-slate-600'
+                          : 'text-slate-500 hover:text-slate-300 hover:bg-slate-700/50'
+                      }`}
+                    >
+                      PM
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Custom action bar INSIDE the same card div */}
               <div className="flex justify-end gap-3 px-4 pb-4 pt-2">

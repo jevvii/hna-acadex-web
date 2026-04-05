@@ -254,6 +254,15 @@
 
 /* MUI Date/Time Picker overrides */
 
+/* Hide MUI's built-in AM/PM selector - we use our own custom toggle */
+.MuiTimePickerToolbar-ampmSelection {
+  display: none !important;
+}
+
+.MuiToggleButtonGroup-root {
+  display: none !important;
+}
+
 /* Unselected AM/PM — muted, no background */
 .MuiTimePickerToolbar-ampmLabel {
   color: #475569 !important;
