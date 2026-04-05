@@ -251,3 +251,102 @@
     font-family: var(--font-source-sans);
   }
 }
+
+/* MUI Date/Time Picker overrides */
+
+/* Unselected AM/PM — muted, no background */
+.MuiTimePickerToolbar-ampmLabel {
+  color: #475569 !important;
+  background-color: transparent !important;
+  border-radius: 6px !important;
+  padding: 2px 6px !important;
+  transition: background-color 0.15s ease !important;
+  opacity: 0.5 !important;
+}
+
+/* Hovered AM/PM — subtle highlight */
+.MuiTimePickerToolbar-ampmLabel:hover {
+  background-color: #334155 !important;
+  opacity: 0.8 !important;
+}
+
+/* Selected AM/PM — persistent filled highlight like a hover that stays */
+.MuiTimePickerToolbar-ampmLabel.Mui-selected {
+  background-color: #334155 !important; /* slate-700 pill background */
+  color: #60a5fa !important;            /* blue text */
+  font-weight: 700 !important;
+  opacity: 1 !important;
+  border-radius: 6px !important;
+  padding: 2px 6px !important;
+}
+
+/* Remove hover on already-selected */
+.MuiTimePickerToolbar-ampmLabel.Mui-selected:hover {
+  background-color: #334155 !important;
+}
+
+/* Also target the toolbar date/time display text for contrast */
+.MuiPickersToolbar-content .MuiTypography-root {
+  color: #f1f5f9 !important;
+}
+
+/* Ensure the analog clock numbers are visible */
+.MuiClock-pin {
+  background-color: #60a5fa !important;
+}
+
+.MuiClockPointer-root {
+  background-color: #60a5fa !important;
+}
+
+.MuiClockPointer-thumb {
+  background-color: #60a5fa !important;
+  border-color: #60a5fa !important;
+}
+
+.MuiClockNumber-root {
+  color: #f1f5f9 !important;
+}
+
+.MuiClockNumber-root.Mui-selected {
+  background-color: #60a5fa !important;
+  color: #ffffff !important;
+}
+
+/* MUI Date/Time Picker overrides - for dark theme modal */
+.MuiTimePickerToolbar-ampmLabel {
+  color: #475569 !important; /* slate-600 — muted gray when unselected */
+  font-weight: 400 !important;
+  opacity: 0.6;
+}
+
+.MuiTimePickerToolbar-ampmLabel.Mui-selected {
+  color: #f1f5f9 !important; /* slate-100 — bright white when selected */
+  font-weight: 700 !important;
+  opacity: 1;
+}
+
+/* Toolbar date/time display text for contrast */
+.MuiPickersToolbar-content .MuiTypography-root {
+  color: #f1f5f9 !important;
+}
+
+/* Analog clock styling */
+.MuiClock-pin,
+.MuiClockPointer-root {
+  background-color: #60a5fa !important;
+}
+
+.MuiClockPointer-thumb {
+  background-color: #60a5fa !important;
+  border-color: #60a5fa !important;
+}
+
+.MuiClockNumber-root {
+  color: #f1f5f9 !important;
+}
+
+.MuiClockNumber-root.Mui-selected {
+  background-color: #60a5fa !important;
+  color: #ffffff !important;
+}
