@@ -192,8 +192,8 @@ export const activitiesApi = {
   getAllSubmissions: async (activityId: string) => {
     return api.get(`/activities/${activityId}/submissions/`);
   },
-  gradeSubmission: async (submissionId: string, data: { score: number; feedback?: string; status?: string }) => {
-    return api.post(`/activity-submissions/${submissionId}/grade/`, data);
+  gradeSubmission: async (submissionId: string, data: { score: number; feedback?: string }) => {
+    return api.patch(`/activity-submissions/${submissionId}/grade/`, data);
   },
   createActivity: async (courseSectionId: string, formData: FormData) => {
     formData.append('course_section_id', courseSectionId);
@@ -236,6 +236,9 @@ export const quizzesApi = {
   },
   getGradingList: async (quizId: string) => {
     return api.get(`/quizzes/${quizId}/grading/`);
+  },
+  gradeAnswer: async (answerId: string, data: { points_awarded: number; is_correct?: boolean }) => {
+    return api.patch(`/quiz-answers/${answerId}/grade/`, data);
   },
   quickCreate: async (courseSectionId: string, data: {
     title: string;
