@@ -21,6 +21,7 @@ import type {
   UserNotification,
   ActivityComment,
   Submission,
+  Question,
 } from './types';
 import { API_BASE_URL } from './config';
 import { logger } from './logger';
@@ -237,6 +238,9 @@ export const quizzesApi = {
     instructions?: string;
     time_limit_minutes?: number;
     attempt_limit: number;
+    weekly_module_id?: string;
+    open_at?: string;
+    close_at?: string;
     questions: QuizQuestion[];
   }) => {
     return api.post('/quizzes/quick-create/', { course_section_id: courseSectionId, ...data });
@@ -252,6 +256,46 @@ export const quizzesApi = {
   },
   toggleQuizPublish: async (quizId: string, isPublished: boolean) => {
     return api.patch(`/quizzes/${quizId}/`, { is_published: isPublished });
+  },
+  getQuestions: async (quizId: string): Promise<Question[]> => {
+    const data = await api.get(`/quizzes/${quizId}/questions/`);
+    // Map backend 'choices' to frontend 'options'
+    return data.map((q: Record<string, unknown>) => ({
+      ...q,
+      options: (q.choices as Array<Record<string, unknown>>)?.map((c: Record<string, unknown>) => ({
+        id: c.id,
+        text: c.choice_text,
+        is_correct: c.is_correct,
+        sort_order: c.sort_order,
+      })),
+    }));
+  },
+  bulkUpdateQuestions: async (quizId: string, questions: Question[]): Promise<Question[]> => {
+    // Map frontend 'options' to backend 'choices'
+    const payload = {
+      questions: questions.map((q, idx) => ({
+        ...q,
+        id: q.id.startsWith('new-') ? undefined : q.id,
+        sort_order: idx,
+        choices: q.options?.map((o) => ({
+          id: o.id.startsWith('new-') ? undefined : o.id,
+          choice_text: o.text,
+          is_correct: o.is_correct,
+          sort_order: o.sort_order,
+        })),
+      })),
+    };
+    const data = await api.post(`/quizzes/${quizId}/questions/bulk/`, payload);
+    // Map response back to frontend format
+    return data.map((q: Record<string, unknown>) => ({
+      ...q,
+      options: (q.choices as Array<Record<string, unknown>>)?.map((c: Record<string, unknown>) => ({
+        id: c.id,
+        text: c.choice_text,
+        is_correct: c.is_correct,
+        sort_order: c.sort_order,
+      })),
+    }));
   },
 };
 

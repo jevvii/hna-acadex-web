@@ -24,8 +24,29 @@ export type AnnouncementAudience = 'teachers_only' | 'all';
 export type EventType = 'deadline' | 'exam' | 'personal' | 'holiday' | 'school_event';
 export type AttendanceStatus = 'Present' | 'Absent' | 'Late' | 'Excused';
 export type QuizQuestionType =
-  | 'multiple_choice' | 'fill_in_the_blank' | 'true_false'
-  | 'short_answer' | 'matching';
+  | 'multiple_choice' | 'multi_select' | 'true_false'
+  | 'identification' | 'essay';
+
+// Frontend state types for quiz builder
+export interface QuestionOption {
+  id: string;
+  text: string;  // Maps to 'choice_text' in API
+  is_correct: boolean;
+  sort_order: number;
+}
+
+export interface Question {
+  id: string;  // 'new-{uuid}' for new questions, UUID string for existing
+  type: QuizQuestionType;
+  text: string;  // HTML from Tiptap
+  points: number;
+  sort_order: number;
+  options?: QuestionOption[];  // For mcq, multi_select, true_false
+  correct_answer?: string;  // For identification
+  alternate_answers?: string[];  // For identification
+  case_sensitive?: boolean;  // For identification
+  word_limit?: number;  // For essay
+}
 
 export interface Profile {
   id: string;
@@ -543,6 +564,27 @@ export interface QuizQuestionWithData extends QuizQuestion {
   blanks?: { id: string; correct_answer: string }[];
 }
 
+// Builder question types (frontend state)
+export interface QuestionOption {
+  id: string;
+  text: string;  // Maps to 'choice_text' in API
+  is_correct: boolean;
+  sort_order: number;
+}
+
+export interface Question {
+  id: string;  // 'new-${uuid}' for new, uuid string for existing
+  type: QuizQuestionType;
+  text: string;  // HTML from Tiptap
+  points: number;
+  sort_order: number;
+  options?: QuestionOption[];  // Maps to 'choices' in API
+  correct_answer?: string;  // For identification type
+  alternate_answers?: string[];  // For identification type
+  case_sensitive?: boolean;  // For identification type
+  word_limit?: number;  // For essay type
+}
+
 // Meeting with attendance records
 export interface MeetingWithAttendance extends MeetingSession {
   attendance_records?: AttendanceRecord[];
@@ -550,4 +592,46 @@ export interface MeetingWithAttendance extends MeetingSession {
   present_count?: number;
   absent_count?: number;
   late_count?: number;
+}
+
+// Quiz builder types
+export interface QuestionOption {
+  id: string;
+  text: string;
+  is_correct: boolean;
+  sort_order: number;
+}
+
+export interface Question {
+  id: string;
+  type: QuizQuestionType;
+  text: string;
+  points: number;
+  sort_order: number;
+  options?: QuestionOption[];
+  correct_answer?: string;
+  alternate_answers?: string[];
+  case_sensitive?: boolean;
+  word_limit?: number;
+}
+
+// Quiz Builder types (frontend state)
+export interface QuestionOption {
+  id: string;
+  text: string;
+  is_correct: boolean;
+  sort_order: number;
+}
+
+export interface Question {
+  id: string;
+  type: QuizQuestionType;
+  text: string;
+  points: number;
+  sort_order: number;
+  options?: QuestionOption[];
+  correct_answer?: string;
+  alternate_answers?: string[];
+  case_sensitive?: boolean;
+  word_limit?: number;
 }

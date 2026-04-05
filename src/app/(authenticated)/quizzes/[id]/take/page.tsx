@@ -322,6 +322,17 @@ function QuestionRenderer({
           onChange={onChange as (choiceId: string) => void}
         />
       );
+    case 'multi_select':
+      // Multi-select uses the same component but allows multiple selections
+      // For now, treat same as multiple_choice (student selects one option at a time)
+      return (
+        <MultipleChoiceQuestion
+          question={question.question_text}
+          choices={questionWithChoices.choices || []}
+          value={value as string | undefined}
+          onChange={onChange as (choiceId: string) => void}
+        />
+      );
     case 'true_false':
       return (
         <TrueFalseQuestion
@@ -330,19 +341,7 @@ function QuestionRenderer({
           onChange={onChange as (answer: boolean) => void}
         />
       );
-    case 'fill_in_the_blank':
-      return (
-        <FillBlankQuestion
-          question={question.question_text}
-          blanks={questionWithChoices.blanks || []}
-          value={value as Record<string, string> | undefined}
-          onChange={(blankId, answer) => {
-            const newValue = { ...(value as Record<string, string> | undefined || {}), [blankId]: answer };
-            onChange(newValue);
-          }}
-        />
-      );
-    case 'short_answer':
+    case 'identification':
       return (
         <ShortAnswerQuestion
           question={question.question_text}
@@ -350,16 +349,12 @@ function QuestionRenderer({
           onChange={onChange as (answer: string) => void}
         />
       );
-    case 'matching':
+    case 'essay':
       return (
-        <MatchingQuestion
+        <ShortAnswerQuestion
           question={question.question_text}
-          matchingPairs={question.matching_pairs || []}
-          value={value as Record<number, string> | undefined}
-          onChange={(pairIndex, answer) => {
-            const newValue = { ...(value as Record<number, string> | undefined || {}), [pairIndex]: answer };
-            onChange(newValue);
-          }}
+          value={value as string | undefined}
+          onChange={onChange as (answer: string) => void}
         />
       );
     default:

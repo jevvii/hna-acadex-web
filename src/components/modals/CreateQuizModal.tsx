@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { X, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { quizzesApi } from '@/lib/api';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -28,6 +29,7 @@ interface CreateQuizModalProps {
 
 export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQuizModalProps) {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [title, setTitle] = useState('');
   const [attemptLimit, setAttemptLimit] = useState('1');
   const [timeLimit, setTimeLimit] = useState('');
@@ -78,13 +80,18 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
         instructions: getInstructionsHtml(),
         attempt_limit: parseInt(attemptLimit),
         time_limit_minutes: timeLimit ? parseInt(timeLimit) : undefined,
+        weekly_module_id: selectedModuleId || undefined,
+        open_at: openDate?.toISOString(),
+        close_at: closeDate?.toISOString(),
         questions: [],
       });
     },
-    onSuccess: () => {
+    onSuccess: (quiz) => {
       queryClient.invalidateQueries({ queryKey: ['courseContent', courseId] });
       resetForm();
       onClose();
+      // Redirect to quiz builder
+      router.push(`/quizzes/${quiz.id}/build`);
     },
     onError: (err: Error | { message?: string }) => {
       const errorMessage = err instanceof Error ? err.message : (err as { message?: string }).message;
@@ -367,9 +374,10 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
             <button
               type="submit"
               disabled={createMutation.isPending}
-              className="px-4 py-2 text-sm font-medium text-white bg-navy-600 hover:bg-navy-700 rounded-lg transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-sm font-medium text-white bg-navy-600 hover:bg-navy-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
             >
-              {createMutation.isPending ? 'Creating...' : 'Create Quiz'}
+              {createMutation.isPending ? 'Creating...' : 'Continue to Builder'}
+              {!createMutation.isPending && <ArrowRight className="w-4 h-4" />}
             </button>
           </div>
         </form>
