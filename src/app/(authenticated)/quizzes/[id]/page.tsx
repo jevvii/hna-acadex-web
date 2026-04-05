@@ -151,7 +151,12 @@ function ReminderPicker({ deadline, onSelect, onClose }: { deadline?: string; on
 function RemindersSection({ quizId, deadline }: { quizId: string; deadline?: string }) {
   const queryClient = useQueryClient();
   const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const { data: reminders = [], isLoading } = useQuery({ queryKey: ['reminders', 'quiz', quizId], queryFn: () => reminderApi.getByQuiz(quizId), enabled: !!quizId });
+  const { data: remindersData, isLoading } = useQuery({
+    queryKey: ['reminders', 'quiz', quizId],
+    queryFn: () => reminderApi.getByQuiz(quizId) as Promise<{ id: string; reminder_datetime: string }[] | { results: { id: string; reminder_datetime: string }[] }>,
+    enabled: !!quizId
+  });
+  const reminders: { id: string; reminder_datetime: string }[] = Array.isArray(remindersData) ? remindersData : (remindersData?.results ?? []);
   const createMutation = useMutation({
     mutationFn: (data: { reminder_datetime: string; offset_minutes: number }) => reminderApi.create({ reminder_type: 'quiz', quiz_id: quizId, ...data }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reminders', 'quiz', quizId] }),
@@ -838,7 +843,10 @@ export default function QuizDetailsPage() {
                   <AlertCircle className="w-5 h-5 text-navy-600" />
                   Instructions
                 </h2>
-                <div className="prose prose-slate max-w-none text-gray-700">{quiz.instructions}</div>
+                <div
+                  className="prose prose-slate max-w-none text-gray-700"
+                  dangerouslySetInnerHTML={{ __html: quiz.instructions }}
+                />
               </motion.div>
             )}
 

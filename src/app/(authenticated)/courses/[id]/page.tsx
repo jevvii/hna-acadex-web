@@ -89,6 +89,10 @@ function formatTime(dateStr?: string): string {
   return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, '').trim();
+}
+
 function LoadingState() {
   return (
     <div className="flex items-center justify-center py-12">
@@ -476,9 +480,6 @@ function AssignmentsTab({
 }) {
   const router = useRouter();
   const [filter, setFilter] = useState<'all' | 'pending' | 'submitted' | 'graded'>('all');
-
-  // Helper to strip HTML tags for preview
-  const stripHtml = (html: string) => html.replace(/<[^>]*>/g, '').trim();
 
   const getAssignmentConfig = (activity: Activity) => {
     const submission = activity.my_submission;
@@ -1066,7 +1067,7 @@ function QuizzesTab({ quizzes, isTeacher, onAddQuiz, onTogglePublish }: { quizze
                   !quiz.is_published ? 'text-gray-400' :
                   config.status === 'not-open' || config.status === 'closed' ? 'text-gray-400' : 'text-gray-500'
                 )}>
-                  {quiz.instructions}
+                  {stripHtml(quiz.instructions)}
                 </p>
               )}
               <div className="flex items-center gap-5 mt-2.5 text-xs text-gray-400">
