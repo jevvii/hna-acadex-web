@@ -1,15 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as Popover from '@radix-ui/react-popover';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
 import { format, isBefore, isAfter, differenceInMinutes } from 'date-fns';
+import dayjs, { Dayjs } from 'dayjs';
 import { cn } from '@/lib/utils';
 import { quizzesApi, reminderApi } from '@/lib/api';
 import { Quiz, SubmissionStatus } from '@/lib/types';
 import { CircularScore } from '@/components/CircularScore';
+import { DeadlinePicker } from '@/components/DeadlinePicker';
 import { useIsTeacher } from '@/store/auth';
 import {
   ChevronLeft,
@@ -38,6 +43,8 @@ import {
   BarChart3,
   Timer,
   RotateCcw,
+  Save,
+  XCircle as XIcon,
 } from 'lucide-react';
 
 // Helper functions
@@ -60,10 +67,10 @@ interface QuizAttemptStats {
   status?: string;
 }
 
-function calculateQuizStats(attempts: QuizAttemptStats[]) {
+function calculateQuizStats(attempts: QuizAttemptStats[], studentCount?: number) {
   const scoredAttempts = attempts.filter(a => a.score !== null && a.score !== undefined);
   if (scoredAttempts.length === 0) {
-    return { average: null, highest: null, lowest: null, totalCount: attempts.length };
+    return { average: null, highest: null, lowest: null, studentCount: studentCount ?? 0 };
   }
   const scores = scoredAttempts.map(a => a.score as number);
   const total = scores.reduce((sum, score) => sum + score, 0);
@@ -71,7 +78,7 @@ function calculateQuizStats(attempts: QuizAttemptStats[]) {
     average: total / scores.length,
     highest: Math.max(...scores),
     lowest: Math.min(...scores),
-    totalCount: attempts.length,
+    studentCount: studentCount ?? 0,
   };
 }
 
@@ -261,6 +268,55 @@ export default function QuizDetailsPage() {
   const [isStartingQuiz, setIsStartingQuiz] = useState(false);
   const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
 
+  // Edit mode state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<{
+    title: string;
+    instructions: string;
+    time_limit_minutes: number | null;
+    attempt_limit: number;
+    score_selection_policy: 'highest' | 'latest';
+    open_date: Dayjs | null;
+    close_date: Dayjs | null;
+  }>({
+    title: '',
+    instructions: '',
+    time_limit_minutes: null,
+    attempt_limit: 1,
+    score_selection_policy: 'highest',
+    open_date: null,
+    close_date: null,
+  });
+  const [editError, setEditError] = useState('');
+
+  // Tiptap editor for instructions
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit.configure({
+        heading: false,
+        bulletList: false,
+        orderedList: false,
+        blockquote: false,
+        code: false,
+        codeBlock: false,
+        horizontalRule: false,
+        strike: false,
+        italic: false,
+      }),
+      Placeholder.configure({
+        placeholder: 'Enter quiz instructions...',
+        emptyEditorClass: 'is-editor-empty',
+      }),
+    ],
+    content: '',
+    editorProps: {
+      attributes: {
+        class: 'prose prose-sm max-w-none focus:outline-none min-h-[120px] px-3 py-2 text-slate-900',
+      },
+    },
+  });
+
   const { data: quiz, isLoading, error, refetch } = useQuery({
     queryKey: ['quiz', quizId],
     queryFn: () => quizzesApi.getQuiz(quizId),
@@ -290,6 +346,84 @@ export default function QuizDetailsPage() {
       router.push('/courses');
     },
   });
+
+  // Initialize edit form when entering edit mode
+  const enterEditMode = useCallback(() => {
+    if (!quiz) return;
+
+    setEditForm({
+      title: quiz.title || '',
+      instructions: quiz.instructions || '',
+      time_limit_minutes: quiz.time_limit_minutes ?? null,
+      attempt_limit: quiz.attempt_limit ?? 1,
+      score_selection_policy: (quiz.score_selection_policy as 'highest' | 'latest') || 'highest',
+      open_date: quiz.open_at ? dayjs(quiz.open_at) : null,
+      close_date: quiz.close_at ? dayjs(quiz.close_at) : null,
+    });
+
+    // Initialize Tiptap editor content
+    if (editor) {
+      editor.commands.setContent(quiz.instructions || '');
+    }
+
+    setEditError('');
+    setIsEditing(true);
+  }, [quiz, editor]);
+
+  const cancelEdit = useCallback(() => {
+    setIsEditing(false);
+    setEditError('');
+    editor?.commands.clearContent();
+  }, [editor]);
+
+  const getEditorHtml = useCallback(() => {
+    if (!editor) return '';
+    const html = editor.getHTML();
+    if (html === '<p></p>' || html === '' || editor.isEmpty) return '';
+    return html;
+  }, [editor]);
+
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      return quizzesApi.updateQuiz(quizId, {
+        title: editForm.title,
+        instructions: getEditorHtml() || undefined,
+        time_limit_minutes: editForm.time_limit_minutes || undefined,
+        attempt_limit: editForm.attempt_limit,
+        score_selection_policy: editForm.score_selection_policy,
+        open_at: editForm.open_date?.toISOString() || undefined,
+        close_at: editForm.close_date?.toISOString() || undefined,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['quiz', quizId] });
+      setIsEditing(false);
+      setEditError('');
+    },
+    onError: (err: Error | { message?: string }) => {
+      const errorMessage = err instanceof Error ? err.message : (err as { message?: string }).message;
+      setEditError(errorMessage || 'Failed to update quiz');
+    },
+  });
+
+  const handleSaveEdit = () => {
+    if (!editForm.title.trim()) {
+      setEditError('Title is required');
+      return;
+    }
+    if (!editForm.attempt_limit || editForm.attempt_limit < 1) {
+      setEditError('Attempt limit must be at least 1');
+      return;
+    }
+    updateMutation.mutate();
+  };
+
+  // Sync editor content when entering edit mode
+  useEffect(() => {
+    if (isEditing && quiz && editor) {
+      editor.commands.setContent(quiz.instructions || '');
+    }
+  }, [isEditing, quiz, editor]);
 
   const getQuizStatus = () => {
     if (!quiz) return 'loading';
@@ -348,7 +482,7 @@ export default function QuizDetailsPage() {
     ? [{ attempt_number: quiz.my_attempt.attempt_number, score: quiz.my_attempt.score, max_score: quiz.my_attempt.max_score }]
     : [];
 
-  const stats = gradingData ? calculateQuizStats(gradingData) : null;
+  const stats = gradingData ? calculateQuizStats(gradingData, quiz?.student_count) : null;
 
   if (isLoading) return <LoadingState />;
   if (error || !quiz) return <ErrorState message="Failed to load quiz details" onRetry={refetch} />;
@@ -444,7 +578,7 @@ export default function QuizDetailsPage() {
                   <StatsCard label="Average" value={stats.average !== null ? stats.average.toFixed(1) : '-'} colorClass="text-navy-700" icon={TrendingUp} />
                   <StatsCard label="Highest" value={stats.highest !== null ? stats.highest.toFixed(1) : '-'} colorClass="text-emerald-600" icon={Award} />
                   <StatsCard label="Lowest" value={stats.lowest !== null ? stats.lowest.toFixed(1) : '-'} colorClass="text-red-600" icon={TrendingUp} />
-                  <StatsCard label="Students" value={stats.totalCount} colorClass="text-navy-700" icon={Users} />
+                  <StatsCard label="Students" value={stats.studentCount} colorClass="text-navy-700" icon={Users} />
                 </div>
               </motion.div>
             )}
@@ -482,76 +616,167 @@ export default function QuizDetailsPage() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-display font-semibold text-navy-800 flex items-center gap-2">
                   <FileText className="w-5 h-5 text-navy-600" />
-                  Quiz Details
+                  {isEditing ? 'Edit Quiz Details' : 'Quiz Details'}
                 </h2>
-                {isTeacher && (
-                  <button onClick={() => router.push(`/quizzes/${quizId}/edit`)} className="btn btn-outline text-sm">
-                    <Edit3 className="w-4 h-4 mr-1" /> Edit
-                  </button>
-                )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <HelpCircle className="w-5 h-5 text-navy-500" />
-                    <div>
-                      <p className="text-sm text-gray-500">Questions</p>
-                      <p className="font-medium text-navy-800">{quiz.question_count || 0}</p>
+
+              {isEditing ? (
+                <div className="space-y-5">
+                  {/* Title */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Title <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editForm.title}
+                      onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                      placeholder="Quiz title"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors text-slate-900"
+                    />
+                  </div>
+
+                  {/* Instructions */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Instructions</label>
+                    <div className="border border-gray-300 rounded-lg overflow-hidden focus-within:border-navy-500 focus-within:ring-1 focus-within:ring-navy-500">
+                      <EditorContent editor={editor} />
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <Award className="w-5 h-5 text-navy-500" />
+
+                  {/* Time Limit and Attempts */}
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-gray-500">Points</p>
-                      <p className="font-medium text-navy-800">{quiz.points || quiz.question_count || 0}</p>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Time Limit (minutes)
+                      </label>
+                      <input
+                        type="number"
+                        value={editForm.time_limit_minutes ?? ''}
+                        onChange={(e) => setEditForm({ ...editForm, time_limit_minutes: e.target.value ? parseInt(e.target.value) : null })}
+                        min="1"
+                        placeholder="No limit"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Attempts Allowed <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        value={editForm.attempt_limit}
+                        onChange={(e) => setEditForm({ ...editForm, attempt_limit: parseInt(e.target.value) || 1 })}
+                        min="1"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors text-slate-900"
+                      />
                     </div>
                   </div>
-                </div>
-                <div className="space-y-4">
-                  {quiz.time_limit_minutes && (
-                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                      <Timer className="w-5 h-5 text-navy-500" />
-                      <div>
-                        <p className="text-sm text-gray-500">Time Limit</p>
-                        <p className="font-medium text-navy-800">{formatDuration(quiz.time_limit_minutes)}</p>
-                      </div>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                    <RotateCcw className="w-5 h-5 text-navy-500" />
-                    <div>
-                      <p className="text-sm text-gray-500">Attempts Allowed</p>
-                      <p className="font-medium text-navy-800">{quiz.attempt_limit || 1}</p>
+
+                  {/* Score Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Score Selection
+                    </label>
+                    <div className="flex gap-2">
+                      {(['highest', 'latest'] as const).map((policy) => (
+                        <button
+                          key={policy}
+                          type="button"
+                          onClick={() => setEditForm({ ...editForm, score_selection_policy: policy })}
+                          className={cn(
+                            'px-4 py-2 rounded-lg text-sm font-medium transition-colors capitalize',
+                            editForm.score_selection_policy === policy
+                              ? 'bg-navy-600 text-white'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          )}
+                        >
+                          {policy}
+                        </button>
+                      ))}
                     </div>
                   </div>
+
+                  {/* Open/Close Dates */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <DeadlinePicker
+                      label="Set Open Date"
+                      value={editForm.open_date}
+                      onChange={(date) => setEditForm({ ...editForm, open_date: date })}
+                    />
+                    <DeadlinePicker
+                      label="Set Close Date"
+                      value={editForm.close_date}
+                      onChange={(date) => setEditForm({ ...editForm, close_date: date })}
+                    />
+                  </div>
                 </div>
-              </div>
-              {(quiz.open_at || quiz.close_at) && (
-                <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {quiz.open_at && (
-                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                      <Calendar className="w-5 h-5 text-navy-500" />
-                      <div>
-                        <p className="text-sm text-gray-500">Opens</p>
-                        <p className="font-medium text-navy-800">{formatDate(quiz.open_at)}</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                        <HelpCircle className="w-5 h-5 text-navy-500" />
+                        <div>
+                          <p className="text-sm text-gray-500">Questions</p>
+                          <p className="font-medium text-navy-800">{quiz.question_count || 0}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                        <Award className="w-5 h-5 text-navy-500" />
+                        <div>
+                          <p className="text-sm text-gray-500">Points</p>
+                          <p className="font-medium text-navy-800">{quiz.points || quiz.question_count || 0}</p>
+                        </div>
                       </div>
                     </div>
-                  )}
-                  {quiz.close_at && (
-                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                      <Lock className="w-5 h-5 text-navy-500" />
-                      <div>
-                        <p className="text-sm text-gray-500">Closes</p>
-                        <p className="font-medium text-navy-800">{formatDate(quiz.close_at)}</p>
+                    <div className="space-y-4">
+                      {quiz.time_limit_minutes && (
+                        <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                          <Timer className="w-5 h-5 text-navy-500" />
+                          <div>
+                            <p className="text-sm text-gray-500">Time Limit</p>
+                            <p className="font-medium text-navy-800">{formatDuration(quiz.time_limit_minutes)}</p>
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                        <RotateCcw className="w-5 h-5 text-navy-500" />
+                        <div>
+                          <p className="text-sm text-gray-500">Attempts Allowed</p>
+                          <p className="font-medium text-navy-800">{quiz.attempt_limit || 1}</p>
+                        </div>
                       </div>
                     </div>
+                  </div>
+                  {(quiz.open_at || quiz.close_at) && (
+                    <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {quiz.open_at && (
+                        <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                          <Calendar className="w-5 h-5 text-navy-500" />
+                          <div>
+                            <p className="text-sm text-gray-500">Opens</p>
+                            <p className="font-medium text-navy-800">{formatDate(quiz.open_at)}</p>
+                          </div>
+                        </div>
+                      )}
+                      {quiz.close_at && (
+                        <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                          <Lock className="w-5 h-5 text-navy-500" />
+                          <div>
+                            <p className="text-sm text-gray-500">Closes</p>
+                            <p className="font-medium text-navy-800">{formatDate(quiz.close_at)}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
-                </div>
+                </>
               )}
             </motion.div>
 
-            {/* Instructions */}
-            {quiz.instructions && (
+            {/* Instructions - only show when not editing */}
+            {!isEditing && quiz.instructions && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h2 className="font-display font-semibold text-navy-800 mb-4 flex items-center gap-2">
                   <AlertCircle className="w-5 h-5 text-navy-600" />
@@ -561,8 +786,8 @@ export default function QuizDetailsPage() {
               </motion.div>
             )}
 
-            {/* Teacher Student Attempts */}
-            {isTeacher && gradingList.length > 0 && (
+            {/* Teacher Student Attempts - only show when not editing */}
+            {isTeacher && !isEditing && gradingList.length > 0 && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6 border-b border-gray-100">
                   <div className="flex items-center justify-between">
@@ -653,10 +878,48 @@ export default function QuizDetailsPage() {
               <div className="space-y-3">
                 {isTeacher ? (
                   <>
-                    <button onClick={() => router.push(`/quizzes/${quizId}/edit`)} className="w-full btn btn-primary flex items-center justify-center gap-2">
-                      <Edit3 className="w-4 h-4" /> Edit Quiz
-                    </button>
-                    <button onClick={() => { if (confirm('Are you sure you want to delete this quiz?')) deleteMutation.mutate(); }} className="w-full btn btn-outline text-red-600 border-red-200 hover:bg-red-50 flex items-center justify-center gap-2">
+                    {isEditing ? (
+                      <>
+                        {editError && (
+                          <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm mb-3">
+                            {editError}
+                          </div>
+                        )}
+                        <button
+                          onClick={handleSaveEdit}
+                          disabled={updateMutation.isPending}
+                          className="w-full btn btn-primary flex items-center justify-center gap-2"
+                        >
+                          {updateMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Save className="w-4 h-4" />
+                          )}
+                          Save Changes
+                        </button>
+                        <button
+                          onClick={cancelEdit}
+                          disabled={updateMutation.isPending}
+                          className="w-full btn btn-outline flex items-center justify-center gap-2"
+                        >
+                          <XIcon className="w-4 h-4" /> Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={enterEditMode}
+                        className="w-full btn btn-primary flex items-center justify-center gap-2"
+                      >
+                        <Edit3 className="w-4 h-4" /> Edit Quiz
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (confirm('Are you sure you want to delete this quiz?')) deleteMutation.mutate();
+                      }}
+                      disabled={updateMutation.isPending && isEditing}
+                      className="w-full btn btn-outline text-red-600 border-red-200 hover:bg-red-50 flex items-center justify-center gap-2"
+                    >
                       <Trash2 className="w-4 h-4" /> Delete Quiz
                     </button>
                   </>
@@ -680,7 +943,7 @@ export default function QuizDetailsPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <span className="text-gray-600 flex items-center gap-2"><Users className="w-4 h-4" /> Total Students</span>
-                    <span className="font-semibold text-navy-800">{gradingList.length}</span>
+                    <span className="font-semibold text-navy-800">{quiz.student_count ?? 0}</span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <span className="text-gray-600 flex items-center gap-2"><Play className="w-4 h-4" /> Started</span>

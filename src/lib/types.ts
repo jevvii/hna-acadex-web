@@ -194,6 +194,7 @@ export interface Activity {
   score_selection_policy?: ScoreSelectionPolicy;
   is_published: boolean;
   created_by?: string;
+  student_count?: number;
   created_at: string;
   my_submission?: {
     id: string;
@@ -214,7 +215,6 @@ export interface Activity {
     average_score?: number | null;
   };
   // Teacher stats
-  student_count?: number;
   submission_count?: number;
   graded_count?: number;
 }
@@ -268,6 +268,7 @@ export interface Quiz {
   shuffle_choices: boolean;
   show_results: boolean;
   created_at: string;
+  student_count?: number;
   my_attempt?: {
     id: string;
     score?: number;

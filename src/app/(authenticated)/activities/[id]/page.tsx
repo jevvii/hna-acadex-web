@@ -671,16 +671,16 @@ export default function ActivityDetailsPage() {
     : getSubmissionStatus(undefined);
 
   // Calculate stats for teacher view
-  const calculateStats = (subs: SubmissionWithStudent[]) => {
+  const calculateStats = (subs: SubmissionWithStudent[], studentCount?: number) => {
     const gradedSubs = subs.filter((s) => s.graded_at);
     const scores = gradedSubs.map((s) => s.score || 0).filter((s) => s > 0);
     const average = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
     const highest = scores.length > 0 ? Math.max(...scores) : null;
     const lowest = scores.length > 0 ? Math.min(...scores) : null;
-    return { average, highest, lowest, total: subs.length };
+    return { average, highest, lowest, studentCount: studentCount ?? 0 };
   };
 
-  const stats = isTeacher && submissions.length > 0 ? calculateStats(submissions as SubmissionWithStudent[]) : null;
+  const stats = isTeacher && submissions.length > 0 ? calculateStats(submissions as SubmissionWithStudent[], activity?.student_count) : null;
 
   if (isLoading) {
     return (
@@ -780,7 +780,7 @@ export default function ActivityDetailsPage() {
                   <StatsCard label="Average" value={stats.average !== null ? stats.average.toFixed(1) : '-'} colorClass="text-navy-700" icon={Award} />
                   <StatsCard label="Highest" value={stats.highest !== null ? stats.highest.toFixed(1) : '-'} colorClass="text-emerald-600" icon={TrendingUp} />
                   <StatsCard label="Lowest" value={stats.lowest !== null ? stats.lowest.toFixed(1) : '-'} colorClass="text-red-600" icon={TrendingUp} />
-                  <StatsCard label="Students" value={stats.total} colorClass="text-navy-700" icon={Users} />
+                  <StatsCard label="Students" value={stats.studentCount} colorClass="text-navy-700" icon={Users} />
                 </div>
               </motion.div>
             )}
@@ -1385,7 +1385,7 @@ export default function ActivityDetailsPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <span className="text-gray-600 flex items-center gap-2"><Users className="w-4 h-4" /> Total Students</span>
-                    <span className="font-semibold text-navy-800">{submissions.length}</span>
+                    <span className="font-semibold text-navy-800">{activity.student_count ?? 0}</span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                     <span className="text-gray-600 flex items-center gap-2"><Upload className="w-4 h-4" /> Submitted</span>
