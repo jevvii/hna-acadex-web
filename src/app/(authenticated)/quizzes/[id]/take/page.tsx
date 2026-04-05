@@ -135,7 +135,7 @@ function MultipleChoiceQuestion({
 }) {
   return (
     <div className="space-y-4">
-      <p className="text-lg text-navy-800">{question}</p>
+      <div className="prose prose-slate max-w-none text-lg text-navy-800" dangerouslySetInnerHTML={{ __html: question }} />
       <div className="space-y-2">
         {choices.map((choice) => (
           <button
@@ -180,7 +180,7 @@ function TrueFalseQuestion({
 }) {
   return (
     <div className="space-y-4">
-      <p className="text-lg text-navy-800">{question}</p>
+      <div className="prose prose-slate max-w-none text-lg text-navy-800" dangerouslySetInnerHTML={{ __html: question }} />
       <div className="flex gap-4">
         {[
           { label: 'True', value: true },
@@ -218,7 +218,7 @@ function FillBlankQuestion({
 }) {
   return (
     <div className="space-y-4">
-      <p className="text-lg text-navy-800">{question}</p>
+      <div className="prose prose-slate max-w-none text-lg text-navy-800" dangerouslySetInnerHTML={{ __html: question }} />
       <div className="space-y-4">
         {blanks.map((blank, idx) => (
           <div key={blank.id} className="flex items-center gap-3">
@@ -249,7 +249,7 @@ function ShortAnswerQuestion({
 }) {
   return (
     <div className="space-y-4">
-      <p className="text-lg text-navy-800">{question}</p>
+      <div className="prose prose-slate max-w-none text-lg text-navy-800" dangerouslySetInnerHTML={{ __html: question }} />
       <textarea
         value={value || ''}
         onChange={(e) => onChange(e.target.value)}
@@ -277,7 +277,7 @@ function MatchingQuestion({
 
   return (
     <div className="space-y-4">
-      <p className="text-lg text-navy-800">{question}</p>
+      <div className="prose prose-slate max-w-none text-lg text-navy-800" dangerouslySetInnerHTML={{ __html: question }} />
       <div className="space-y-3">
         {matchingPairs.map((pair, idx) => (
           <div key={idx} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
@@ -375,6 +375,7 @@ export default function QuizTakingPage() {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
+  const [serverAttemptId, setServerAttemptId] = useState<string | null>(null);
   const [flaggedQuestions, setFlaggedQuestions] = useState<Set<number>>(new Set());
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
@@ -401,8 +402,27 @@ export default function QuizTakingPage() {
   useEffect(() => {
     if (quizData) {
       setQuestions(quizData.questions || []);
+      if (quizData.attempt_id) {
+        setServerAttemptId(quizData.attempt_id);
+      }
       if (quizData.time_remaining_seconds) {
         setTimeRemaining(quizData.time_remaining_seconds);
+      }
+      // Restore any existing answers from server
+      if (quizData.answers && Array.isArray(quizData.answers)) {
+        const restoredAnswers: Record<string, unknown> = {};
+        for (const ans of quizData.answers) {
+          if (ans.question_id) {
+            if (ans.selected_choice_id) {
+              restoredAnswers[ans.question_id] = ans.selected_choice_id;
+            } else if (ans.text_answer) {
+              restoredAnswers[ans.question_id] = ans.text_answer;
+            }
+          }
+        }
+        if (Object.keys(restoredAnswers).length > 0) {
+          setAnswers(restoredAnswers);
+        }
       }
     }
   }, [quizData]);
@@ -442,15 +462,21 @@ export default function QuizTakingPage() {
 
   // Auto-save mutation
   const saveProgressMutation = useMutation({
-    mutationFn: () => quizzesApi.saveProgress(quizId, answers),
+    mutationFn: () => {
+      if (!serverAttemptId) {
+        throw new Error('No attempt ID available');
+      }
+      const answersArray = transformAnswersForApi();
+      return quizzesApi.saveProgress(quizId, serverAttemptId, answersArray);
+    },
   });
 
   // Auto-save function using useCallback to avoid stale closure issues
   const saveProgress = useCallback(() => {
-    if (Object.keys(answers).length > 0) {
+    if (Object.keys(answers).length > 0 && serverAttemptId) {
       saveProgressMutation.mutate();
     }
-  }, [answers, saveProgressMutation]);
+  }, [answers, serverAttemptId, saveProgressMutation]);
 
   // Auto-save every 30 seconds
   useEffect(() => {
@@ -460,7 +486,10 @@ export default function QuizTakingPage() {
 
   // Submit quiz
   const submitMutation = useMutation({
-    mutationFn: () => quizzesApi.submitAttempt(quizId, answers),
+    mutationFn: () => {
+      const answersArray = transformAnswersForApi();
+      return quizzesApi.submitAttempt(quizId, serverAttemptId, answersArray);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quiz', quizId] });
       router.push(`/quizzes/${quizId}`);
@@ -485,6 +514,46 @@ export default function QuizTakingPage() {
     if (!currentQuestion) return;
     setAnswers((prev) => ({ ...prev, [currentQuestion.id]: value }));
   };
+
+  // Transform answers from internal format to API format
+  const transformAnswersForApi = useCallback(() => {
+    const questionsMap = new Map(questions.map(q => [q.id, q]));
+    const answersArray: Array<{ question_id: string; selected_choice_id?: string; text_answer?: string }> = [];
+
+    for (const [questionId, value] of Object.entries(answers)) {
+      const question = questionsMap.get(questionId);
+      if (!question) continue;
+
+      if (question.question_type === 'true_false') {
+        // True/False: value is boolean, need to find the correct choice ID
+        const boolValue = value as boolean;
+        const choices = (question as QuizQuestionWithChoices).choices || [];
+        const targetChoice = choices.find(c =>
+          c.choice_text.toLowerCase() === (boolValue ? 'true' : 'false')
+        );
+        if (targetChoice) {
+          answersArray.push({
+            question_id: questionId,
+            selected_choice_id: targetChoice.id,
+          });
+        }
+      } else if (question.question_type === 'identification' || question.question_type === 'essay') {
+        // Identification/Essay: value is text answer
+        answersArray.push({
+          question_id: questionId,
+          text_answer: value as string,
+        });
+      } else {
+        // MCQ and Multi-select: value is choice ID
+        answersArray.push({
+          question_id: questionId,
+          selected_choice_id: value as string,
+        });
+      }
+    }
+
+    return answersArray;
+  }, [answers, questions]);
 
   const handlePrevious = () => {
     if (currentIndex > 0) setCurrentIndex(currentIndex - 1);

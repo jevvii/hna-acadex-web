@@ -218,17 +218,21 @@ export const quizzesApi = {
   getQuiz: async (quizId: string): Promise<Quiz> => {
     return api.get(`/quizzes/${quizId}/`);
   },
-  takeQuiz: async (quizId: string): Promise<{ attempt_id: string; attempt_number: number; questions: QuizQuestion[]; time_remaining_seconds?: number }> => {
+  takeQuiz: async (quizId: string): Promise<{ attempt_id: string; attempt_number: number; questions: QuizQuestion[]; time_remaining_seconds?: number; answers?: Array<{ question_id: string; selected_choice_id?: string; text_answer?: string }> }> => {
     return api.get(`/quizzes/${quizId}/take/`);
   },
   getLatestAttempt: async (quizId: string): Promise<QuizAttempt | null> => {
     return api.get(`/quizzes/${quizId}/my-latest-attempt/`);
   },
-  saveProgress: async (quizId: string, answers: Record<string, unknown>) => {
-    return api.post(`/quizzes/${quizId}/save-progress/`, { answers });
+  saveProgress: async (quizId: string, attemptId: string, answers: Array<{ question_id: string; selected_choice_id?: string; text_answer?: string }>) => {
+    return api.post(`/quizzes/${quizId}/save-progress/`, { attempt_id: attemptId, answers });
   },
-  submitAttempt: async (quizId: string, answers: Record<string, unknown>) => {
-    return api.post(`/quizzes/${quizId}/submit-attempt/`, { answers });
+  submitAttempt: async (quizId: string, attemptId: string | null, answers: Array<{ question_id: string; selected_choice_id?: string; text_answer?: string }>) => {
+    const payload: Record<string, unknown> = { answers };
+    if (attemptId) {
+      payload.attempt_id = attemptId;
+    }
+    return api.post(`/quizzes/${quizId}/submit-attempt/`, payload);
   },
   getGradingList: async (quizId: string) => {
     return api.get(`/quizzes/${quizId}/grading/`);

@@ -327,6 +327,8 @@ export default function QuizDetailsPage() {
     queryKey: ['quiz', quizId],
     queryFn: () => quizzesApi.getQuiz(quizId),
     enabled: !!quizId,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
   });
 
   const { data: gradingData } = useQuery({
