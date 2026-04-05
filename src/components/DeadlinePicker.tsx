@@ -23,15 +23,16 @@ const muiTheme = createTheme({
       default: '#1e293b',
     },
     text: {
-      primary: '#ffffff',
-      secondary: '#94a3b8', // slate-400
+      primary: '#f1f5f9', // slate-100 - bright white for day numbers
+      secondary: '#94a3b8', // slate-400 - muted for day-of-week headers
+      disabled: '#475569', // slate-600 - for days outside current month
     },
   },
   components: {
     MuiTypography: {
       styleOverrides: {
         root: {
-          color: '#ffffff',
+          color: '#f1f5f9',
         },
       },
     },
@@ -54,7 +55,7 @@ const muiTheme = createTheme({
     MuiIconButton: {
       styleOverrides: {
         root: {
-          color: '#94a3b8',
+          color: '#f1f5f9', // bright white for prev/next arrows
           '&:hover': {
             backgroundColor: 'rgba(255, 255, 255, 0.1)',
           },
@@ -261,7 +262,37 @@ export function DeadlinePickerTrigger({
                   toolbar: {
                     sx: {
                       '& .MuiTypography-root': {
+                        color: '#f1f5f9',
+                      },
+                    },
+                  },
+                  // Style the day picker elements
+                  day: {
+                    sx: {
+                      color: '#f1f5f9', // bright white for day numbers
+                      '&:hover': {
+                        backgroundColor: '#334155', // slate-700 on hover
+                      },
+                      '&.Mui-selected': {
+                        backgroundColor: '#60a5fa !important', // blue for selected day
                         color: '#ffffff',
+                      },
+                      '&.MuiPickersDay-today': {
+                        border: '1px solid #60a5fa', // blue ring for today
+                        color: '#60a5fa',
+                      },
+                    },
+                  },
+                  calendarHeader: {
+                    sx: {
+                      '& .MuiPickersCalendarHeader-label': {
+                        color: '#f1f5f9', // bright white for month label
+                      },
+                      '& .MuiPickersCalendarHeader-switchViewButton': {
+                        color: '#f1f5f9',
+                      },
+                      '& .MuiIconButton-root': {
+                        color: '#f1f5f9', // prev/next arrows
                       },
                     },
                   },
