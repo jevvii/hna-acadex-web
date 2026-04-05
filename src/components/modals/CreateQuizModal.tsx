@@ -86,12 +86,15 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
         questions: [],
       });
     },
-    onSuccess: (quiz) => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['courseContent', courseId] });
       resetForm();
       onClose();
-      // Redirect to quiz builder
-      router.push(`/quizzes/${quiz.id}/build`);
+      // Redirect to quiz builder - response is { quiz: {...}, questions: [...] }
+      const quizId = response.quiz?.id || response.id;
+      if (quizId) {
+        router.push(`/quizzes/${quizId}/build`);
+      }
     },
     onError: (err: Error | { message?: string }) => {
       const errorMessage = err instanceof Error ? err.message : (err as { message?: string }).message;

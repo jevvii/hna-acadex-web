@@ -271,24 +271,35 @@ export const quizzesApi = {
     }));
   },
   bulkUpdateQuestions: async (quizId: string, questions: Question[]): Promise<Question[]> => {
-    // Map frontend 'options' to backend 'choices'
+    // Map frontend field names to backend field names
     const payload = {
       questions: questions.map((q, idx) => ({
-        ...q,
         id: q.id.startsWith('new-') ? undefined : q.id,
+        quiz_id: quizId,
+        question_text: q.text,
+        question_type: q.type,
+        points: q.points,
         sort_order: idx,
-        choices: q.options?.map((o) => ({
+        choices: q.options?.map((o, oidx) => ({
           id: o.id.startsWith('new-') ? undefined : o.id,
           choice_text: o.text,
           is_correct: o.is_correct,
-          sort_order: o.sort_order,
+          sort_order: oidx,
         })),
+        correct_answer: q.correct_answer || '',
+        alternate_answers: q.alternate_answers || [],
+        case_sensitive: q.case_sensitive ?? false,
+        word_limit: q.word_limit || null,
       })),
     };
-    const data = await api.post(`/quizzes/${quizId}/questions/bulk/`, payload);
+    // Remove undefined values from payload
+    const cleanPayload = JSON.parse(JSON.stringify(payload));
+    const data = await api.post(`/quizzes/${quizId}/questions/bulk/`, cleanPayload);
     // Map response back to frontend format
     return data.map((q: Record<string, unknown>) => ({
       ...q,
+      text: q.question_text,
+      type: q.question_type,
       options: (q.choices as Array<Record<string, unknown>>)?.map((c: Record<string, unknown>) => ({
         id: c.id,
         text: c.choice_text,

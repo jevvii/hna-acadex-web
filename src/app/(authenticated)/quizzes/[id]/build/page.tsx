@@ -101,16 +101,18 @@ export default function QuizBuilderPage() {
     })
   );
 
-  // Fetch quiz info
+  // Fetch quiz info - only run when quizId is available
   const { data: quiz } = useQuery({
     queryKey: ['quiz', quizId],
     queryFn: () => quizzesApi.getQuiz(quizId),
+    enabled: !!quizId,
   });
 
-  // Fetch existing questions
+  // Fetch existing questions - only run when quizId is available
   const { data: existingQuestions, isLoading } = useQuery({
     queryKey: ['quizQuestions', quizId],
     queryFn: () => quizzesApi.getQuestions(quizId),
+    enabled: !!quizId,
   });
 
   // Initialize questions from server
@@ -192,6 +194,13 @@ export default function QuizBuilderPage() {
   const handleSave = useCallback(async (redirect: boolean) => {
     if (isSaving) return;
 
+    // Validate that all questions have text
+    const invalidQuestions = questions.filter(q => !q.text || q.text.trim() === '' || q.text === '<p></p>');
+    if (invalidQuestions.length > 0) {
+      setSaveError(`Please add text to all questions. ${invalidQuestions.length} question(s) are empty.`);
+      return;
+    }
+
     setIsSaving(true);
     setSaveError(null);
 
@@ -210,6 +219,15 @@ export default function QuizBuilderPage() {
       setIsSaving(false);
     }
   }, [quizId, questions, isSaving, router, queryClient]);
+
+  // Guard against undefined quizId
+  if (!quizId) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <p className="text-slate-500">Quiz not found</p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
