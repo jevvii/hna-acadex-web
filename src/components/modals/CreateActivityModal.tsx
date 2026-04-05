@@ -216,12 +216,14 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
               <style jsx global>{`
                 .tiptap {
                   outline: none;
+                  color: #1e293b; /* slate-800 - dark text for light background */
+                  background: white;
                 }
                 .tiptap p {
                   margin: 0;
                 }
                 .tiptap p.is-editor-empty:first-child::before {
-                  color: #9ca3af;
+                  color: #94a3b8; /* slate-400 */
                   content: attr(data-placeholder);
                   float: left;
                   height: 0;

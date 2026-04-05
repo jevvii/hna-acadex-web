@@ -586,11 +586,13 @@ export default function ActivityDetailsPage() {
   // Initialize edit form when entering edit mode
   const enterEditMode = useCallback(() => {
     if (!activity) return;
+
+    // Initialize form state with activity data
     setEditForm({
       title: activity.title || '',
       instructions: activity.instructions || '',
-      points: activity.points || 100,
-      attempt_limit: activity.attempt_limit || 1,
+      points: activity.points ?? 100,
+      attempt_limit: activity.attempt_limit ?? 1,
       deadline: activity.deadline ? dayjs(activity.deadline) : null,
       hasDeadline: !!activity.deadline,
       allow_late_submissions: activity.allow_late_submissions !== false,
@@ -598,7 +600,12 @@ export default function ActivityDetailsPage() {
       score_selection_policy: (activity.score_selection_policy as 'highest' | 'latest') || 'highest',
       weekly_module_id: activity.weekly_module_id || '',
     });
-    editor?.commands.setContent(activity.instructions || '');
+
+    // Initialize Tiptap editor content
+    if (editor) {
+      editor.commands.setContent(activity.instructions || '');
+    }
+
     setEditError('');
     setIsEditing(true);
   }, [activity, editor]);
@@ -788,7 +795,7 @@ export default function ActivityDetailsPage() {
 
               {isEditing ? (
                 /* Edit Mode */
-                <div className="space-y-4">
+                <div className="space-y-4 text-slate-900">
                   {/* Title */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Title</label>
@@ -1409,12 +1416,14 @@ export default function ActivityDetailsPage() {
       <style jsx global>{`
         .tiptap {
           outline: none;
+          color: #1e293b; /* slate-800 - dark text for light background */
+          background: white;
         }
         .tiptap p {
           margin: 0;
         }
         .tiptap p.is-editor-empty:first-child::before {
-          color: #9ca3af;
+          color: #94a3b8; /* slate-400 */
           content: attr(data-placeholder);
           float: left;
           height: 0;
