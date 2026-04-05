@@ -156,7 +156,7 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g., Week 1 Quiz"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors text-slate-900 placeholder-slate-400"
               />
             </div>
 
@@ -298,7 +298,7 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
                   value={attemptLimit}
                   onChange={(e) => setAttemptLimit(e.target.value)}
                   min="1"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors text-slate-900 placeholder-slate-400"
                 />
               </div>
               <div>
@@ -311,7 +311,7 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
                   onChange={(e) => setTimeLimit(e.target.value)}
                   min="1"
                   placeholder="No limit"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors text-slate-900 placeholder-slate-400"
                 />
               </div>
             </div>
