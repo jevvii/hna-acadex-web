@@ -236,29 +236,78 @@ function QuizStudentStatusBadge({ status, score, maxScore }: { status: Submissio
 }
 
 // Quiz Attempt history item
-function AttemptHistoryItem({ attempt, isBest }: { attempt: { attempt_number: number; score?: number; max_score?: number; submitted_at?: string }; isBest?: boolean }) {
+function AttemptHistoryItem({
+  attempt,
+  isBest,
+  maxPoints,
+}: {
+  attempt: {
+    id: string;
+    attempt_number: number;
+    score?: number;
+    max_score?: number;
+    pending_manual_grading: boolean;
+    is_submitted: boolean;
+    submitted_at?: string;
+  };
+  isBest?: boolean;
+  maxPoints?: number;
+}) {
+  // Determine status
+  let status: 'graded' | 'pending' | 'in_progress' = 'in_progress';
+  if (attempt.is_submitted) {
+    status = attempt.pending_manual_grading ? 'pending' : 'graded';
+  }
+
+  const statusConfig = {
+    graded: { label: 'Graded', className: 'bg-blue-100 text-blue-700' },
+    pending: { label: 'Pending Review', className: 'bg-amber-100 text-amber-700' },
+    in_progress: { label: 'In Progress', className: 'bg-slate-100 text-slate-600' },
+  };
+
+  const statusBadge = statusConfig[status];
+
   return (
-    <div className={cn('flex items-center justify-between p-4 rounded-lg', isBest ? 'bg-emerald-50 border border-emerald-200' : 'bg-slate-50')}>
-      <div className="flex items-center gap-3">
+    <div className={cn('flex items-center justify-between p-4 rounded-lg gap-4', isBest ? 'bg-emerald-50 border border-emerald-200' : 'bg-slate-50')}>
+      <div className="flex items-center gap-3 flex-shrink-0">
         <div className={cn('w-10 h-10 rounded-full flex items-center justify-center font-semibold', isBest ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-600')}>
           {attempt.attempt_number}
         </div>
         <div>
-          <p className="font-medium text-navy-800">
-            Attempt {attempt.attempt_number}
-            {isBest && <span className="ml-2 text-xs text-emerald-600 font-semibold">BEST</span>}
-          </p>
-          {attempt.submitted_at && <p className="text-sm text-gray-500">{formatDate(attempt.submitted_at)}</p>}
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-navy-800">
+              Attempt {attempt.attempt_number}
+            </p>
+            {isBest && (
+              <span className="px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700 rounded-full">
+                BEST
+              </span>
+            )}
+          </div>
+          {attempt.submitted_at && (
+            <p className="text-xs text-slate-400">{formatDate(attempt.submitted_at)}</p>
+          )}
         </div>
       </div>
-      {attempt.score !== undefined ? (
-        <div className="text-right">
-          <p className={cn('font-bold text-lg', isBest ? 'text-emerald-600' : 'text-navy-800')}>{attempt.score}</p>
-          <p className="text-sm text-gray-500">/ {attempt.max_score || '—'}</p>
+
+      <div className="flex items-center gap-4 flex-1 justify-end">
+        <span className={cn('px-2 py-1 rounded-full text-xs font-medium', statusBadge.className)}>
+          {statusBadge.label}
+        </span>
+
+        <div className="text-right min-w-[60px]">
+          {attempt.score !== undefined && attempt.score !== null ? (
+            <>
+              <p className={cn('font-bold text-lg', isBest ? 'text-emerald-600' : 'text-navy-800')}>
+                {attempt.score}
+              </p>
+              <p className="text-xs text-slate-400">/ {attempt.max_score || maxPoints || '—'}</p>
+            </>
+          ) : (
+            <p className="text-slate-400 font-medium">— / {attempt.max_score || maxPoints || '—'}</p>
+          )}
         </div>
-      ) : (
-        <span className="badge badge-info">In Progress</span>
-      )}
+      </div>
     </div>
   );
 }
@@ -486,9 +535,18 @@ export default function QuizDetailsPage() {
   const actionConfig = getActionConfig();
   const ActionIcon = actionConfig.icon;
 
-  const attemptHistory = quiz?.my_attempt
-    ? [{ attempt_number: quiz.my_attempt.attempt_number, score: quiz.my_attempt.score, max_score: quiz.my_attempt.max_score }]
+  // All attempts for history display (sorted by attempt number ascending)
+  const attemptHistory = quiz?.attempts
+    ? [...quiz.attempts].sort((a, b) => a.attempt_number - b.attempt_number)
     : [];
+
+  // Find the best attempt (highest score among graded attempts)
+  const bestAttemptId = attemptHistory
+    .filter(a => a.is_submitted && !a.pending_manual_grading && a.score !== undefined && a.score !== null)
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0]?.id;
+
+  // Calculate max points for display
+  const maxPoints = quiz?.points ?? quiz?.my_attempt?.max_score;
 
   const stats = gradingData ? calculateQuizStats(gradingData, quiz?.student_count) : null;
 
@@ -928,8 +986,13 @@ export default function QuizDetailsPage() {
                   Attempt History
                 </h2>
                 <div className="space-y-3">
-                  {attemptHistory.map((attempt, index) => (
-                    <AttemptHistoryItem key={index} attempt={attempt} isBest={quiz.score_selection_policy === 'highest'} />
+                  {attemptHistory.map((attempt) => (
+                    <AttemptHistoryItem
+                      key={attempt.id}
+                      attempt={attempt}
+                      isBest={attempt.id === bestAttemptId}
+                      maxPoints={maxPoints}
+                    />
                   ))}
                 </div>
               </motion.div>

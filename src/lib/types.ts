@@ -306,6 +306,15 @@ export interface Quiz {
     attempt_number: number;
     time_remaining_seconds?: number | null;
   } | null;
+  attempts?: Array<{
+    id: string;
+    attempt_number: number;
+    score?: number;
+    max_score?: number;
+    pending_manual_grading: boolean;
+    is_submitted: boolean;
+    submitted_at?: string;
+  }>;
 }
 
 export interface QuizQuestion {
