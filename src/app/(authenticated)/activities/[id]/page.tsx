@@ -878,11 +878,11 @@ export default function ActivityDetailsPage() {
                   <div>
                     <DeadlinePickerTrigger
                       value={editForm.deadline}
-                      onChange={(newValue) => setEditForm({ ...editForm, deadline: newValue })}
+                      onChange={(newValue: Dayjs | null) => setEditForm({ ...editForm, deadline: newValue })}
                       hasDeadline={editForm.hasDeadline}
-                      onHasDeadlineChange={(val) => setEditForm({ ...editForm, hasDeadline: val })}
+                      onHasDeadlineChange={(val: boolean) => setEditForm({ ...editForm, hasDeadline: val })}
                       allowLate={editForm.allow_late_submissions}
-                      onAllowLateChange={(val) => setEditForm({ ...editForm, allow_late_submissions: val })}
+                      onAllowLateChange={(val: boolean) => setEditForm({ ...editForm, allow_late_submissions: val })}
                     />
                   </div>
 

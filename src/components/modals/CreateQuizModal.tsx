@@ -1,10 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Calendar, Clock } from 'lucide-react';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { quizzesApi } from '@/lib/api';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { DeadlinePicker } from '@/components/DeadlinePicker';
+import dayjs from 'dayjs';
+import type { Dayjs } from 'dayjs';
 
 interface WeeklyModule {
   id: string;
@@ -27,10 +30,8 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
   const [timeLimit, setTimeLimit] = useState('');
   const [scorePolicy, setScorePolicy] = useState<'highest' | 'latest'>('highest');
   const [selectedModuleId, setSelectedModuleId] = useState<string>('');
-  const [hasOpenDate, setHasOpenDate] = useState(false);
-  const [openDate, setOpenDate] = useState('');
-  const [hasCloseDate, setHasCloseDate] = useState(false);
-  const [closeDate, setCloseDate] = useState('');
+  const [openDate, setOpenDate] = useState<Dayjs | null>(null);
+  const [closeDate, setCloseDate] = useState<Dayjs | null>(null);
   const [error, setError] = useState('');
 
   const createMutation = useMutation({
@@ -61,10 +62,8 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
     setTimeLimit('');
     setScorePolicy('highest');
     setSelectedModuleId('');
-    setHasOpenDate(false);
-    setOpenDate('');
-    setHasCloseDate(false);
-    setCloseDate('');
+    setOpenDate(null);
+    setCloseDate(null);
     setError('');
   };
 
@@ -228,54 +227,18 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
             </div>
 
             {/* Open Date */}
-            <div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={hasOpenDate}
-                  onChange={(e) => setHasOpenDate(e.target.checked)}
-                  className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
-                />
-                <span className="text-sm font-medium text-gray-700">Set Open Date</span>
-              </label>
-
-              {hasOpenDate && (
-                <div className="mt-3 flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-navy-600" />
-                  <input
-                    type="datetime-local"
-                    value={openDate}
-                    onChange={(e) => setOpenDate(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors"
-                  />
-                </div>
-              )}
-            </div>
+            <DeadlinePicker
+              label="Set Open Date"
+              value={openDate}
+              onChange={(date) => setOpenDate(date)}
+            />
 
             {/* Close Date */}
-            <div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={hasCloseDate}
-                  onChange={(e) => setHasCloseDate(e.target.checked)}
-                  className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
-                />
-                <span className="text-sm font-medium text-gray-700">Set Close Date</span>
-              </label>
-
-              {hasCloseDate && (
-                <div className="mt-3 flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-navy-600" />
-                  <input
-                    type="datetime-local"
-                    value={closeDate}
-                    onChange={(e) => setCloseDate(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors"
-                  />
-                </div>
-              )}
-            </div>
+            <DeadlinePicker
+              label="Set Close Date"
+              value={closeDate}
+              onChange={(date) => setCloseDate(date)}
+            />
           </div>
 
           {/* Actions */}

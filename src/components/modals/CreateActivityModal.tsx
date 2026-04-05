@@ -351,10 +351,10 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
             <div>
               <DeadlinePickerTrigger
                 value={deadline}
-                onChange={(newValue) => setDeadline(newValue)}
+                onChange={(newValue: Dayjs | null) => setDeadline(newValue)}
                 hasDeadline={hasDeadline}
-                onHasDeadlineChange={(val) => setHasDeadline(val)}
-                onAllowLateChange={(val) => setAllowLateSubmissions(val)}
+                onHasDeadlineChange={(val: boolean) => setHasDeadline(val)}
+                onAllowLateChange={(val: boolean) => setAllowLateSubmissions(val)}
                 allowLate={allowLateSubmissions}
               />
             </div>
