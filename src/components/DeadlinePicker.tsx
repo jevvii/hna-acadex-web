@@ -297,6 +297,27 @@ export function DeadlinePickerTrigger({
                     },
                   },
                 }}
+                sx={{
+                  // AM/PM selector styling
+                  '& .MuiTimePickerToolbar-ampmLabel': {
+                    color: '#475569', // slate-600 — unselected, muted
+                    fontSize: '0.9rem',
+                    fontWeight: 400,
+                  },
+                  '& .MuiTimePickerToolbar-ampmLabel.Mui-selected': {
+                    color: '#60a5fa', // blue-400 — selected
+                    fontWeight: 700,
+                    fontSize: '0.9rem',
+                  },
+                  '& .MuiToggleButtonGroup-root .MuiToggleButton-root': {
+                    color: '#475569', // unselected AM/PM
+                    '&.Mui-selected': {
+                      color: '#f1f5f9', // selected AM/PM
+                      backgroundColor: '#334155', // slate-700
+                      fontWeight: 700,
+                    },
+                  },
+                }}
               />
 
               {/* Custom action bar INSIDE the same card div */}
