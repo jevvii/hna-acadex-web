@@ -254,18 +254,21 @@ function AttemptHistoryItem({
   maxPoints?: number;
 }) {
   // Determine status
-  let status: 'graded' | 'pending' | 'in_progress' = 'in_progress';
+  let status: 'graded' | 'pending' | 'in_progress' | null = 'in_progress';
   if (attempt.is_submitted) {
     status = attempt.pending_manual_grading ? 'pending' : 'graded';
   }
+
+  // Only show "Graded" badge on the best attempt
+  // Other graded attempts don't show a status badge
+  // "Pending Review" and "In Progress" badges show for all attempts
+  const showStatusBadge = status === 'pending' || status === 'in_progress' || (status === 'graded' && isBest);
 
   const statusConfig = {
     graded: { label: 'Graded', className: 'bg-blue-100 text-blue-700' },
     pending: { label: 'Pending Review', className: 'bg-amber-100 text-amber-700' },
     in_progress: { label: 'In Progress', className: 'bg-slate-100 text-slate-600' },
   };
-
-  const statusBadge = statusConfig[status];
 
   return (
     <div className={cn('flex items-center justify-between p-4 rounded-lg gap-4', isBest ? 'bg-emerald-50 border border-emerald-200' : 'bg-slate-50')}>
@@ -291,9 +294,11 @@ function AttemptHistoryItem({
       </div>
 
       <div className="flex items-center gap-4 flex-1 justify-end">
-        <span className={cn('px-2 py-1 rounded-full text-xs font-medium', statusBadge.className)}>
-          {statusBadge.label}
-        </span>
+        {showStatusBadge && status && (
+          <span className={cn('px-2 py-1 rounded-full text-xs font-medium', statusConfig[status].className)}>
+            {statusConfig[status].label}
+          </span>
+        )}
 
         <div className="text-right min-w-[60px]">
           {attempt.score !== undefined && attempt.score !== null ? (
