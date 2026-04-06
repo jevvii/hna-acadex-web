@@ -329,6 +329,23 @@ export const filesApi = {
   toggleFileVisibility: async (fileId: string, isVisible: boolean) => {
     return api.patch(`/course-files/${fileId}/`, { is_visible: isVisible });
   },
+  deleteFile: async (fileId: string) => {
+    return api.delete(`/course-files/${fileId}/`);
+  },
+  downloadFile: async (fileUrl: string, fileName: string) => {
+    // Use credentials: 'include' for HttpOnly cookie auth (same pattern as existing api.ts)
+    const response = await fetch(fileUrl, {
+      credentials: 'include',
+    });
+    if (!response.ok) throw new Error('Download failed');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 };
 
 // Announcements API - uses announcements endpoint with course_section filter
