@@ -9,7 +9,7 @@ import { useCoursesStore } from '@/store/courses';
 import { useIsStudent, useIsTeacher } from '@/store/auth';
 import { CreateActivityModal } from '@/components/modals/CreateActivityModal';
 import { CreateQuizModal } from '@/components/modals/CreateQuizModal';
-import { cn, getInitials } from '@/lib/utils';
+import { cn, getInitials, toMediaProxyUrl } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import {
   coursesApi,
@@ -1232,8 +1232,9 @@ function FilePreviewModal({
         setIsLoading(true);
         setHasError(false);
 
-        // Use credentials: 'include' for HttpOnly cookie auth
-        const response = await fetch(file.file_url, {
+        // Convert absolute URL to relative for Next.js proxy (avoids CSP issues with different IPs)
+        const proxyUrl = toMediaProxyUrl(file.file_url);
+        const response = await fetch(proxyUrl, {
           credentials: 'include',
           signal: controller.signal,
         });

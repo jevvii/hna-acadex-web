@@ -25,6 +25,7 @@ import type {
 } from './types';
 import { API_BASE_URL } from './config';
 import { logger } from './logger';
+import { toMediaProxyUrl } from './utils';
 
 export class ApiError extends Error {
   status: number;
@@ -333,8 +334,9 @@ export const filesApi = {
     return api.delete(`/course-files/${fileId}/`);
   },
   downloadFile: async (fileUrl: string, fileName: string) => {
-    // Use credentials: 'include' for HttpOnly cookie auth (same pattern as existing api.ts)
-    const response = await fetch(fileUrl, {
+    // Convert absolute URL to relative for Next.js proxy (avoids CSP issues with different IPs)
+    const proxyUrl = toMediaProxyUrl(fileUrl);
+    const response = await fetch(proxyUrl, {
       credentials: 'include',
     });
     if (!response.ok) throw new Error('Download failed');

@@ -24,6 +24,31 @@ export function resolveFileUrl(rawUrl: string | undefined | null): string {
   return `${API_ORIGIN}/${rawUrl.replace(/^\.?\//, '')}`;
 }
 
+/**
+ * Convert an absolute media URL to a relative path for the Next.js proxy
+ * This allows media files to be fetched through the proxy, avoiding CSP issues
+ * when the backend is accessed via different IPs (localhost vs LAN IP)
+ */
+export function toMediaProxyUrl(fileUrl: string | undefined | null): string {
+  if (!fileUrl) return '';
+  if (/^(file:|data:|blob:)/i.test(fileUrl)) return fileUrl;
+
+  // Already a relative path - return as-is
+  if (fileUrl.startsWith('/')) return fileUrl;
+
+  // Absolute URL - extract the path portion for /media/ files
+  if (/^https?:\/\//i.test(fileUrl)) {
+    // Match /media/ or /course_files/ or similar media paths
+    const mediaMatch = fileUrl.match(/^https?:\/\/[^/]+(\/(?:media|course_files)\/.*)$/i);
+    if (mediaMatch) {
+      return mediaMatch[1];
+    }
+  }
+
+  // Fallback - return as-is
+  return fileUrl;
+}
+
 export function formatDate(date: string | Date): string {
   const d = new Date(date);
   return d.toLocaleDateString("en-US", {
