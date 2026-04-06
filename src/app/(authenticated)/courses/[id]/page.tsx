@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
+import * as Dialog from '@radix-ui/react-dialog';
 import { useCoursesStore } from '@/store/courses';
 import { useIsStudent, useIsTeacher } from '@/store/auth';
 import { CreateActivityModal } from '@/components/modals/CreateActivityModal';
@@ -57,6 +58,7 @@ import {
   Plus,
   User,
   Award,
+  X,
 } from 'lucide-react';
 
 const tabs = [
@@ -1198,6 +1200,139 @@ function QuizzesTab({ quizzes, isTeacher, onAddQuiz, onTogglePublish }: { quizze
 }
 
 
+// File Preview Modal - Fetches file with auth and displays via blob URL
+function FilePreviewModal({
+  file,
+  isOpen,
+  onClose,
+}: {
+  file: CourseFile | null;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !file) {
+      setBlobUrl(null);
+      setIsLoading(true);
+      setHasError(false);
+      return;
+    }
+
+    let objectUrl: string | null = null;
+    const controller = new AbortController();
+
+    const fetchFile = async () => {
+      try {
+        setIsLoading(true);
+        setHasError(false);
+
+        // Use credentials: 'include' for HttpOnly cookie auth
+        const response = await fetch(file.file_url, {
+          credentials: 'include',
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch file: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        objectUrl = URL.createObjectURL(blob);
+        setBlobUrl(objectUrl);
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+          logger.error('File fetch error:', err);
+          setHasError(true);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchFile();
+
+    return () => {
+      controller.abort();
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [isOpen, file]);
+
+  if (!file) return null;
+
+  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(
+    file.file_type?.toLowerCase() || ''
+  );
+  const isPdf = file.file_type?.toLowerCase() === 'pdf';
+
+  return (
+    <Dialog.Root open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
+        <Dialog.Content className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 bg-white rounded-2xl shadow-2xl z-50 md:w-full md:max-w-4xl md:max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+            <Dialog.Title className="text-lg font-semibold text-navy-900 truncate">
+              {file.file_name}
+            </Dialog.Title>
+            <Dialog.Close className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+              <X className="w-5 h-5 text-gray-500" />
+            </Dialog.Close>
+          </div>
+
+          <div className="flex-1 overflow-auto p-4">
+            {isLoading && (
+              <div className="flex items-center justify-center h-[400px]">
+                <Loader2 className="w-8 h-8 text-navy-600 animate-spin" />
+              </div>
+            )}
+
+            {hasError && (
+              <div className="flex flex-col items-center justify-center h-[400px] text-gray-500">
+                <AlertCircle className="w-12 h-12 mb-3 text-red-400" />
+                <p>Failed to load file preview</p>
+              </div>
+            )}
+
+            {!isLoading && !hasError && blobUrl && isImage && (
+              <img
+                src={blobUrl}
+                alt={file.file_name}
+                className="max-w-full max-h-[70vh] mx-auto object-contain"
+              />
+            )}
+
+            {!isLoading && !hasError && blobUrl && isPdf && (
+              <iframe
+                src={blobUrl}
+                className="w-full h-[70vh]"
+                title={`PDF Preview - ${file.file_name}`}
+              />
+            )}
+
+            {!isLoading && !hasError && blobUrl && !isImage && !isPdf && (
+              <div className="flex flex-col items-center justify-center h-[400px] text-gray-500">
+                <FileText className="w-16 h-16 mb-4 text-gray-400" />
+                <p className="text-lg font-medium text-gray-700 mb-2">
+                  Preview not available for this file type
+                </p>
+                <p className="text-sm text-gray-500">
+                  Download the file to view it
+                </p>
+              </div>
+            )}
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+
 // Files Tab
 function FilesTab({ files, isTeacher, onTogglePublish }: { files: CourseFile[]; isTeacher?: boolean; onTogglePublish?: (file: CourseFile) => void }) {
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
@@ -1570,6 +1705,8 @@ export default function CoursePage() {
     queryKey: ['courseContent', courseId],
     queryFn: () => coursesApi.getCourseContent(courseId),
     enabled: !!courseId,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
   // Fetch courses if not loaded (safeguard for direct navigation)
