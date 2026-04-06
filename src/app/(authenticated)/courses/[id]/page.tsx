@@ -60,6 +60,7 @@ import {
   Award,
   X,
   Upload,
+  Trash2,
 } from 'lucide-react';
 
 const tabs = [
@@ -1346,7 +1347,7 @@ function UploadModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  courseSectionId: string;
+  courseSectionId?: string;
   onUploadComplete: () => void;
 }) {
   const [files, setFiles] = useState<File[]>([]);
@@ -1369,7 +1370,7 @@ function UploadModal({
   };
 
   const handleUpload = async () => {
-    if (files.length === 0) return;
+    if (files.length === 0 || !courseSectionId) return;
 
     setUploading(true);
     const progress: Record<string, number> = {};
@@ -1477,6 +1478,7 @@ function UploadModal({
                 disabled={uploading}
               />
               <button
+                type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
                 className="w-full p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-navy-500 hover:bg-navy-50/50 transition-colors flex flex-col items-center gap-2"
@@ -1534,6 +1536,7 @@ function UploadModal({
           {/* Actions */}
           <div className="p-4 border-t border-gray-100 flex gap-3 justify-end">
             <button
+              type="button"
               onClick={handleClose}
               disabled={uploading}
               className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
@@ -1541,6 +1544,7 @@ function UploadModal({
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleUpload}
               disabled={uploading || files.length === 0}
               className="px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition-colors disabled:opacity-50 flex items-center gap-2"
@@ -1557,8 +1561,23 @@ function UploadModal({
 
 
 // Files Tab
-function FilesTab({ files, isTeacher, onTogglePublish }: { files: CourseFile[]; isTeacher?: boolean; onTogglePublish?: (file: CourseFile) => void }) {
+function FilesTab({
+  files,
+  isTeacher,
+  courseSectionId,
+  onTogglePublish,
+  onDelete,
+}: {
+  files: CourseFile[];
+  isTeacher?: boolean;
+  courseSectionId?: string;
+  onTogglePublish?: (file: CourseFile) => void;
+  onDelete?: (file: CourseFile) => void;
+}) {
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
+  const [previewFile, setPreviewFile] = useState<CourseFile | null>(null);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   const getFileIcon = (type?: string) => {
     switch (type?.toLowerCase()) {
@@ -1573,83 +1592,219 @@ function FilesTab({ files, isTeacher, onTogglePublish }: { files: CourseFile[]; 
       case 'xlsx':
       case 'xls':
         return <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center"><span className="text-green-600 font-bold text-xs">XLS</span></div>;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+      case 'webp':
+      case 'svg':
+        return <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center"><span className="text-emerald-600 font-bold text-xs">IMG</span></div>;
       default:
         return <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center"><span className="text-gray-600 font-bold text-xs">FILE</span></div>;
     }
   };
 
-  const categories = ['All', 'Module', 'Assignment', 'Quiz', 'General'];
+  const getCategoryBadge = (category: string) => {
+    const colors: Record<string, string> = {
+      module: 'bg-purple-50 text-purple-700 border-purple-200',
+      assignment: 'bg-blue-50 text-blue-700 border-blue-200',
+      quiz: 'bg-orange-50 text-orange-700 border-orange-200',
+      general: 'bg-gray-50 text-gray-600 border-gray-200',
+    };
+    return (
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${colors[category] || colors.general}`}>
+        {category.charAt(0).toUpperCase() + category.slice(1)}
+      </span>
+    );
+  };
+
+  const categories = ['All', 'Module', 'Assignment', 'Quiz', 'General'] as const;
 
   // Teachers see all files, students only see visible files
   const visibleFiles = isTeacher ? files : files?.filter((f) => f.is_visible);
+
+  // Count files per category
+  const categoryCounts = categories.reduce((acc, cat) => {
+    if (cat === 'All') {
+      acc[cat] = visibleFiles?.length || 0;
+    } else {
+      acc[cat] = visibleFiles?.filter((f) => f.category === cat.toLowerCase())?.length || 0;
+    }
+    return acc;
+  }, {} as Record<string, number>);
+
   const filteredFiles = categoryFilter === 'All'
     ? visibleFiles
     : visibleFiles?.filter((f) => f.category === categoryFilter.toLowerCase());
 
-  if (!files?.length) return <EmptyState message="No files available" />;
+  const handleDownload = async (file: CourseFile) => {
+    try {
+      await filesApi.downloadFile(file.file_url, file.file_name);
+    } catch (err) {
+      logger.error('Download failed:', err);
+    }
+  };
+
+  const handleUploadComplete = () => {
+    if (courseSectionId) {
+      queryClient.invalidateQueries({ queryKey: ['courseContent', courseSectionId] });
+    }
+  };
+
+  if (!files?.length && !isTeacher) {
+    return <EmptyState message="No files available yet." />;
+  }
 
   return (
-    <div className="bg-white rounded-xl shadow-card">
-      <div className="p-4 border-b border-gray-100">
-        <div className="flex gap-2 flex-wrap">
-          {categories.map((filter) => (
-            <button
-              key={filter}
-              onClick={() => setCategoryFilter(filter)}
-              className={cn(
-                'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                categoryFilter === filter
-                  ? 'bg-navy-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100'
-              )}
-            >
-              {filter}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="divide-y divide-gray-100">
-        {filteredFiles?.map((file: CourseFile) => (
-          <div key={file.id} className={cn("flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors", !file.is_visible && isTeacher && "opacity-60")}>
-            {getFileIcon(file.file_type)}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <p className={cn("font-medium", file.is_visible ? 'text-navy-800' : 'text-gray-500')}>{file.file_name}</p>
-                {!file.is_visible && isTeacher && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
-                    Hidden
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-gray-500">{formatFileSize(file.file_size_bytes)} • {formatDate(file.created_at)}</p>
-            </div>
-            {isTeacher && onTogglePublish && (
+    <>
+      <FilePreviewModal
+        file={previewFile}
+        isOpen={!!previewFile}
+        onClose={() => setPreviewFile(null)}
+      />
+
+      <UploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        courseSectionId={courseSectionId}
+        onUploadComplete={handleUploadComplete}
+      />
+
+      <div className="bg-white rounded-xl shadow-card">
+        {/* Header with Upload Button */}
+        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex gap-2 flex-wrap">
+            {categories.map((filter) => (
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onTogglePublish(file);
-                }}
+                key={filter}
+                type="button"
+                onClick={() => setCategoryFilter(filter)}
                 className={cn(
-                  'text-xs font-medium px-2 py-1 rounded transition-colors',
-                  file.is_visible
-                    ? 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                    : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                  'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                  categoryFilter === filter
+                    ? 'bg-navy-600 text-white'
+                    : 'text-gray-600 hover:bg-gray-100'
                 )}
               >
-                {file.is_visible ? 'Hide' : 'Show'}
+                {filter} ({categoryCounts[filter] || 0})
               </button>
-            )}
-            <a
-              href={file.file_url}
-              download
-              className="p-2 text-gray-400 hover:text-navy-600 transition-colors"
-            >
-              <Download className="w-5 h-5" />
-            </a>
+            ))}
           </div>
-        ))}
+
+          {isTeacher && (
+            <button
+              type="button"
+              onClick={() => setIsUploadModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition-colors text-sm font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              Upload File
+            </button>
+          )}
+        </div>
+
+        {/* File List */}
+        {filteredFiles?.length === 0 ? (
+          <div className="p-8">
+            <EmptyState
+              message={
+                isTeacher
+                  ? 'No files uploaded yet. Click "+ Upload File" to get started.'
+                  : 'No files available in this category.'
+              }
+            />
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {filteredFiles?.map((file: CourseFile) => (
+              <div
+                key={file.id}
+                className={cn(
+                  "flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors",
+                  !file.is_visible && isTeacher && "opacity-60"
+                )}
+              >
+                {getFileIcon(file.file_type)}
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p
+                      className={cn("font-medium cursor-pointer hover:text-navy-600", file.is_visible ? 'text-navy-800' : 'text-gray-500')}
+                      onClick={() => file.is_visible && setPreviewFile(file)}
+                    >
+                      {file.file_name}
+                    </p>
+                    {!file.is_visible && isTeacher && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
+                        Draft
+                      </span>
+                    )}
+                    {getCategoryBadge(file.category)}
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    {formatFileSize(file.file_size_bytes)} • {formatDate(file.created_at)}
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2">
+                  {isTeacher && onTogglePublish && (
+                    <button
+                      type="button"
+                      onClick={() => onTogglePublish(file)}
+                      className={cn(
+                        'text-xs font-medium px-3 py-1.5 rounded transition-colors',
+                        file.is_visible
+                          ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200'
+                      )}
+                    >
+                      {file.is_visible ? 'Unpublish' : 'Publish'}
+                    </button>
+                  )}
+
+                  {isTeacher && onDelete && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm(`Are you sure you want to delete "${file.file_name}"?`)) {
+                          onDelete(file);
+                        }
+                      }}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                      title="Delete file"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  {file.is_visible && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setPreviewFile(file)}
+                        className="p-2 text-gray-400 hover:text-navy-600 transition-colors"
+                        title="Preview"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownload(file)}
+                        className="p-2 text-gray-400 hover:text-navy-600 transition-colors"
+                        title="Download"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-    </div>
+    </>
   );
 }
 
