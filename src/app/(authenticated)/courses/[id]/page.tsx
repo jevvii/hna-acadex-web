@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -59,6 +59,7 @@ import {
   User,
   Award,
   X,
+  Upload,
 } from 'lucide-react';
 
 const tabs = [
@@ -1279,7 +1280,10 @@ function FilePreviewModal({
             <Dialog.Title className="text-lg font-semibold text-navy-900 truncate">
               {file.file_name}
             </Dialog.Title>
-            <Dialog.Close className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+            <Dialog.Description className="sr-only">
+              Preview of {file.file_name}
+            </Dialog.Description>
+            <Dialog.Close className="p-2 hover:bg-gray-100 rounded-full transition-colors" aria-label="Close preview">
               <X className="w-5 h-5 text-gray-500" />
             </Dialog.Close>
           </div>
@@ -1325,6 +1329,225 @@ function FilePreviewModal({
                 </p>
               </div>
             )}
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+
+// Upload Modal - File upload with category selection
+function UploadModal({
+  isOpen,
+  onClose,
+  courseSectionId,
+  onUploadComplete,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  courseSectionId: string;
+  onUploadComplete: () => void;
+}) {
+  const [files, setFiles] = useState<File[]>([]);
+  const [category, setCategory] = useState<'module' | 'assignment' | 'quiz' | 'general'>('general');
+  const [isPublished, setIsPublished] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = e.target.files;
+    if (selectedFiles) {
+      setFiles((prev) => [...prev, ...Array.from(selectedFiles)]);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpload = async () => {
+    if (files.length === 0) return;
+
+    setUploading(true);
+    const progress: Record<string, number> = {};
+    files.forEach((f) => {
+      progress[f.name] = 0;
+    });
+    setUploadProgress(progress);
+
+    let successCount = 0;
+    for (const file of files) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('category', category);
+        formData.append('is_visible', String(isPublished));
+
+        // Simulate progress for UX (actual progress would need XMLHttpRequest)
+        setUploadProgress((p) => ({ ...p, [file.name]: 50 }));
+
+        await filesApi.uploadFile(courseSectionId, formData);
+
+        setUploadProgress((p) => ({ ...p, [file.name]: 100 }));
+        successCount++;
+      } catch (err) {
+        logger.error('Upload failed for', file.name, err);
+        setUploadProgress((p) => ({ ...p, [file.name]: -1 })); // -1 indicates error
+      }
+    }
+
+    setUploading(false);
+    if (successCount === files.length) {
+      queryClient.invalidateQueries({ queryKey: ['courseContent', courseSectionId] });
+      onUploadComplete();
+      onClose();
+      setFiles([]);
+      setUploadProgress({});
+    }
+  };
+
+  const handleClose = () => {
+    if (!uploading) {
+      setFiles([]);
+      setUploadProgress({});
+      onClose();
+    }
+  };
+
+  return (
+    <Dialog.Root open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
+        <Dialog.Content className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 bg-white rounded-2xl shadow-2xl z-50 md:w-full md:max-w-lg md:max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+            <Dialog.Title className="text-lg font-semibold text-navy-900">
+              Upload Files
+            </Dialog.Title>
+            <Dialog.Description className="sr-only">
+              Upload files to the course
+            </Dialog.Description>
+            <Dialog.Close className="p-2 hover:bg-gray-100 rounded-full transition-colors" disabled={uploading} aria-label="Close upload dialog">
+              <X className="w-5 h-5 text-gray-500" />
+            </Dialog.Close>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Category Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as typeof category)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-500"
+                disabled={uploading}
+              >
+                <option value="general">General</option>
+                <option value="module">Module</option>
+                <option value="assignment">Assignment</option>
+                <option value="quiz">Quiz</option>
+              </select>
+            </div>
+
+            {/* Visibility Toggle */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isPublished"
+                checked={isPublished}
+                onChange={(e) => setIsPublished(e.target.checked)}
+                className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
+                disabled={uploading}
+              />
+              <label htmlFor="isPublished" className="text-sm text-gray-700">
+                Publish immediately (visible to students)
+              </label>
+            </div>
+
+            {/* File Input */}
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+                disabled={uploading}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="w-full p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-navy-500 hover:bg-navy-50/50 transition-colors flex flex-col items-center gap-2"
+              >
+                <Upload className="w-8 h-8 text-gray-400" />
+                <span className="text-sm text-gray-600">
+                  {files.length > 0 ? 'Add more files' : 'Click to select files'}
+                </span>
+              </button>
+            </div>
+
+            {/* Selected Files List */}
+            {files.length > 0 && (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Selected Files ({files.length})
+                </label>
+                {files.map((file, index) => (
+                  <div key={index} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                    <FileText className="w-5 h-5 text-gray-400" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-700 truncate">{file.name}</p>
+                      <p className="text-xs text-gray-500">{(file.size / 1024).toFixed(1)} KB</p>
+                    </div>
+                    {uploadProgress[file.name] !== undefined && (
+                      <div className="w-16">
+                        {uploadProgress[file.name] === -1 ? (
+                          <span className="text-xs text-red-500">Failed</span>
+                        ) : uploadProgress[file.name] === 100 ? (
+                          <CheckCircle className="w-5 h-5 text-emerald-500" />
+                        ) : (
+                          <div className="w-full bg-gray-200 rounded-full h-1.5">
+                            <div
+                              className="bg-navy-600 h-1.5 rounded-full transition-all"
+                              style={{ width: `${uploadProgress[file.name]}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {!uploading && uploadProgress[file.name] === undefined && (
+                      <button
+                        onClick={() => removeFile(index)}
+                        className="p-1 hover:bg-gray-200 rounded transition-colors"
+                      >
+                        <X className="w-4 h-4 text-gray-400" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="p-4 border-t border-gray-100 flex gap-3 justify-end">
+            <button
+              onClick={handleClose}
+              disabled={uploading}
+              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleUpload}
+              disabled={uploading || files.length === 0}
+              className="px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
+              {uploading ? 'Uploading...' : `Upload ${files.length} file${files.length !== 1 ? 's' : ''}`}
+            </button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>
