@@ -2072,6 +2072,21 @@ export default function CoursePage() {
     }
   };
 
+  // Delete file mutation
+  const deleteFileMutation = useMutation({
+    mutationFn: (fileId: string) => filesApi.deleteFile(fileId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['courseContent', courseId] });
+    },
+    onError: (err) => {
+      logger.error('Failed to delete file:', err);
+    },
+  });
+
+  const handleDeleteFile = (file: CourseFile) => {
+    deleteFileMutation.mutate(file.id);
+  };
+
   // Fetch course content (works for both students and teachers)
   const { data: courseDetail } = useQuery({
     queryKey: ['courseDetail', courseId],
@@ -2134,7 +2149,15 @@ export default function CoursePage() {
       case 'quizzes':
         return <QuizzesTab quizzes={quizzes} isTeacher={isTeacher} onAddQuiz={() => setIsQuizModalOpen(true)} onTogglePublish={toggleQuizPublish} />;
       case 'files':
-        return <FilesTab files={files} isTeacher={isTeacher} onTogglePublish={toggleFileVisibility} />;
+        return (
+          <FilesTab
+            files={files}
+            isTeacher={isTeacher}
+            courseSectionId={courseId}
+            onTogglePublish={toggleFileVisibility}
+            onDelete={isTeacher ? handleDeleteFile : undefined}
+          />
+        );
       case 'announcements':
         return <AnnouncementsTab announcements={announcements} />;
       case 'attendance':
