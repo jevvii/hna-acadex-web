@@ -1339,20 +1339,28 @@ function FilePreviewModal({
 }
 
 
-// Upload Modal - File upload with category selection
+// Helper to format week label
+function weekLabel(module: WeeklyModule): string {
+  return `Week ${module.week_number}: ${module.title}`;
+}
+
+// Upload Modal - File upload with category and week selection
 function UploadModal({
   isOpen,
   onClose,
   courseSectionId,
+  modules,
   onUploadComplete,
 }: {
   isOpen: boolean;
   onClose: () => void;
   courseSectionId?: string;
+  modules: WeeklyModule[];
   onUploadComplete: () => void;
 }) {
   const [files, setFiles] = useState<File[]>([]);
   const [category, setCategory] = useState<'module' | 'assignment' | 'quiz' | 'general'>('general');
+  const [selectedWeekId, setSelectedWeekId] = useState<string | null>(null);
   const [isPublished, setIsPublished] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
@@ -1387,6 +1395,9 @@ function UploadModal({
         formData.append('file', file);
         formData.append('category', category);
         formData.append('is_visible', String(isPublished));
+        if (selectedWeekId) {
+          formData.append('weekly_module_id', selectedWeekId);
+        }
 
         // Simulate progress for UX (actual progress would need XMLHttpRequest)
         setUploadProgress((p) => ({ ...p, [file.name]: 50 }));
@@ -1437,6 +1448,22 @@ function UploadModal({
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Week/Module Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Week/Topic</label>
+              <select
+                value={selectedWeekId || ''}
+                onChange={(e) => setSelectedWeekId(e.target.value || null)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-500"
+                disabled={uploading}
+              >
+                <option value="">Unassigned</option>
+                {modules.sort((a, b) => a.week_number - b.week_number).map((m) => (
+                  <option key={m.id} value={m.id}>{weekLabel(m)}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Category Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
@@ -1564,21 +1591,74 @@ function UploadModal({
 // Files Tab
 function FilesTab({
   files,
+  modules,
   isTeacher,
   courseSectionId,
   onTogglePublish,
   onDelete,
+  onUpdateWeek,
 }: {
   files: CourseFile[];
+  modules: WeeklyModule[];
   isTeacher?: boolean;
   courseSectionId?: string;
   onTogglePublish?: (file: CourseFile) => void;
   onDelete?: (file: CourseFile) => void;
+  onUpdateWeek?: (file: CourseFile, weekId: string | null) => void;
 }) {
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [previewFile, setPreviewFile] = useState<CourseFile | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [editingWeekFileId, setEditingWeekFileId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+
+  // Create a map for quick module lookup
+  const moduleById = new Map<string, WeeklyModule>();
+  modules?.forEach((m) => moduleById.set(m.id, m));
+
+  const getWeekBadge = (file: CourseFile) => {
+    const module = file.weekly_module_id ? moduleById.get(file.weekly_module_id) : null;
+    const labelText = module ? `Week ${module.week_number}: ${module.title}` : 'Unassigned';
+    const isEditing = editingWeekFileId === file.id;
+
+    if (isEditing && isTeacher) {
+      return (
+        <select
+          autoFocus
+          value={file.weekly_module_id || ''}
+          onChange={(e) => {
+            const newWeekId = e.target.value || null;
+            onUpdateWeek?.(file, newWeekId);
+            setEditingWeekFileId(null);
+          }}
+          onBlur={() => setEditingWeekFileId(null)}
+          className="text-xs px-2 py-0.5 rounded border border-amber-300 bg-amber-50 text-amber-700 focus:outline-none focus:ring-1 focus:ring-amber-500"
+        >
+          <option value="">Unassigned</option>
+          {modules?.sort((a, b) => a.week_number - b.week_number).map((m) => (
+            <option key={m.id} value={m.id}>Week {m.week_number}: {m.title}</option>
+          ))}
+        </select>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={() => isTeacher && setEditingWeekFileId(file.id)}
+        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
+          isTeacher ? 'cursor-pointer hover:bg-amber-100' : 'cursor-default'
+        } ${
+          module
+            ? 'bg-amber-50 text-amber-700 border-amber-200'
+            : 'bg-gray-50 text-gray-500 border-gray-200'
+        }`}
+        title={isTeacher ? 'Click to change week assignment' : undefined}
+      >
+        {labelText}
+      </button>
+    );
+  };
 
   const getFileIcon = (type?: string) => {
     switch (type?.toLowerCase()) {
@@ -1668,6 +1748,7 @@ function FilesTab({
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         courseSectionId={courseSectionId}
+        modules={modules}
         onUploadComplete={handleUploadComplete}
       />
 
@@ -1741,6 +1822,7 @@ function FilesTab({
                       </span>
                     )}
                     {getCategoryBadge(file.category)}
+                    {getWeekBadge(file)}
                   </div>
                   <p className="text-sm text-gray-500">
                     {formatFileSize(file.file_size_bytes)} • {formatDate(file.created_at)}
@@ -2088,6 +2170,16 @@ export default function CoursePage() {
     deleteFileMutation.mutate(file.id);
   };
 
+  // Update file week assignment
+  const handleUpdateFileWeek = async (file: CourseFile, weekId: string | null) => {
+    try {
+      await filesApi.updateFile(file.id, { weekly_module_id: weekId });
+      queryClient.invalidateQueries({ queryKey: ['courseContent', courseId] });
+    } catch (error) {
+      logger.error('Failed to update file week assignment:', error);
+    }
+  };
+
   // Fetch course content (works for both students and teachers)
   const { data: courseDetail } = useQuery({
     queryKey: ['courseDetail', courseId],
@@ -2153,10 +2245,12 @@ export default function CoursePage() {
         return (
           <FilesTab
             files={files}
+            modules={modules}
             isTeacher={isTeacher}
             courseSectionId={courseId}
             onTogglePublish={toggleFileVisibility}
             onDelete={isTeacher ? handleDeleteFile : undefined}
+            onUpdateWeek={handleUpdateFileWeek}
           />
         );
       case 'announcements':

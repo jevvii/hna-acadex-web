@@ -330,6 +330,9 @@ export const filesApi = {
   toggleFileVisibility: async (fileId: string, isVisible: boolean) => {
     return api.patch(`/course-files/${fileId}/`, { is_visible: isVisible });
   },
+  updateFile: async (fileId: string, data: { weekly_module_id?: string | null }) => {
+    return api.patch(`/course-files/${fileId}/`, data);
+  },
   deleteFile: async (fileId: string) => {
     return api.delete(`/course-files/${fileId}/`);
   },
