@@ -27,6 +27,8 @@ import {
   CourseFile,
   Announcement,
   AttendanceRecord,
+  AttendanceStatus,
+  AttendanceHistoryItem,
   MeetingSession,
   GradebookData,
 } from '@/lib/types';
@@ -61,6 +63,8 @@ import {
   X,
   Upload,
   Trash2,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 
 const tabs = [
@@ -1256,6 +1260,7 @@ function FilePreviewModal({
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !file) {
@@ -1307,6 +1312,13 @@ function FilePreviewModal({
     };
   }, [isOpen, file]);
 
+  // Reset fullscreen when closing
+  useEffect(() => {
+    if (!isOpen) {
+      setIsFullscreen(false);
+    }
+  }, [isOpen]);
+
   if (!file) return null;
 
   const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(
@@ -1318,7 +1330,12 @@ function FilePreviewModal({
     <Dialog.Root open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
-        <Dialog.Content className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 bg-white rounded-2xl shadow-2xl z-50 md:w-full md:max-w-4xl md:max-h-[90vh] overflow-hidden flex flex-col">
+        <Dialog.Content className={cn(
+          "bg-white rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col",
+          isFullscreen
+            ? "fixed inset-0 rounded-none"
+            : "fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-4xl md:max-h-[90vh]"
+        )}>
           <div className="p-4 border-b border-gray-100 flex items-center justify-between">
             <Dialog.Title className="text-lg font-semibold text-navy-900 truncate">
               {file.file_name}
@@ -1326,12 +1343,28 @@ function FilePreviewModal({
             <Dialog.Description className="sr-only">
               Preview of {file.file_name}
             </Dialog.Description>
-            <Dialog.Close className="p-2 hover:bg-gray-100 rounded-full transition-colors" aria-label="Close preview">
-              <X className="w-5 h-5 text-gray-500" />
-            </Dialog.Close>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+              >
+                {isFullscreen ? (
+                  <Minimize2 className="w-5 h-5 text-gray-500" />
+                ) : (
+                  <Maximize2 className="w-5 h-5 text-gray-500" />
+                )}
+              </button>
+              <Dialog.Close className="p-2 hover:bg-gray-100 rounded-full transition-colors" aria-label="Close preview">
+                <X className="w-5 h-5 text-gray-500" />
+              </Dialog.Close>
+            </div>
           </div>
 
-          <div className="flex-1 overflow-auto p-4">
+          <div className={cn(
+            "flex-1 overflow-auto p-4",
+            isFullscreen && "flex items-center justify-center"
+          )}>
             {isLoading && (
               <div className="flex items-center justify-center h-[400px]">
                 <Loader2 className="w-8 h-8 text-navy-600 animate-spin" />
@@ -1349,14 +1382,20 @@ function FilePreviewModal({
               <img
                 src={blobUrl}
                 alt={file.file_name}
-                className="max-w-full max-h-[70vh] mx-auto object-contain"
+                className={cn(
+                  "object-contain",
+                  isFullscreen ? "max-w-full max-h-full" : "max-w-full max-h-[70vh] mx-auto"
+                )}
               />
             )}
 
             {!isLoading && !hasError && blobUrl && isPdf && (
               <iframe
                 src={blobUrl}
-                className="w-full h-[70vh]"
+                className={cn(
+                  "w-full",
+                  isFullscreen ? "h-full" : "h-[70vh]"
+                )}
                 title={`PDF Preview - ${file.file_name}`}
               />
             )}
@@ -1976,92 +2015,430 @@ function AnnouncementsTab({ announcements }: { announcements: Announcement[] }) 
 function AttendanceTab({ courseId }: { courseId: string }) {
   const isStudent = useIsStudent();
   const isTeacher = useIsTeacher();
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const queryClient = useQueryClient();
 
-  const { data: meetings, isLoading: meetingsLoading } = useQuery({
-    queryKey: ['meetings', courseId],
-    queryFn: () => attendanceApi.getMeetings(courseId),
+  // New meeting modal state
+  const [isNewMeetingModalOpen, setIsNewMeetingModalOpen] = useState(false);
+  const [newMeetingDate, setNewMeetingDate] = useState<string>(
+    new Date().toISOString().split('T')[0]
+  );
+  const [newMeetingTitle, setNewMeetingTitle] = useState('');
+
+  // Selected session for teacher view
+  const [selectedSessionIndex, setSelectedSessionIndex] = useState(0);
+
+  // Local state for optimistic attendance updates
+  const [localRecords, setLocalRecords] = useState<Record<string, AttendanceStatus>>({});
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Fetch attendance overview
+  const { data: overview, isLoading, error } = useQuery({
+    queryKey: ['attendanceOverview', courseId],
+    queryFn: () => attendanceApi.getAttendanceOverview(courseId),
     enabled: !!courseId,
   });
 
-  const currentMeeting = meetings?.[0]; // Get first meeting for demo
-
-  const { data: attendance, isLoading: attendanceLoading } = useQuery({
-    queryKey: ['attendance', currentMeeting?.id],
-    queryFn: () => attendanceApi.getAttendance(currentMeeting?.id ?? ''),
-    enabled: !!currentMeeting?.id && isTeacher,
+  // Create meeting mutation
+  const createMeetingMutation = useMutation({
+    mutationFn: () => attendanceApi.createMeeting(courseId, newMeetingDate, newMeetingTitle || formatDate(newMeetingDate)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendanceOverview', courseId] });
+      setIsNewMeetingModalOpen(false);
+      setNewMeetingTitle('');
+      setNewMeetingDate(new Date().toISOString().split('T')[0]);
+    },
   });
 
+  // Update attendance mutation
+  const updateAttendanceMutation = useMutation({
+    mutationFn: (records: { student_id: string; status: string; remarks?: string }[]) =>
+      attendanceApi.updateRecords(overview?.sessions?.[selectedSessionIndex]?.id || '', records),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendanceOverview', courseId] });
+      setLocalRecords({});
+      setHasChanges(false);
+    },
+  });
+
+  // Helper to format date for display
+  const formatDisplayDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
+  // Auto-generate title from date
+  const generateTitleFromDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
+  // Get status badge colors
+  const getStatusBadge = (status: AttendanceStatus) => {
+    const configs = {
+      Present: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300' },
+      Late: { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-300' },
+      Absent: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300' },
+      Excused: { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-300' },
+    };
+    return configs[status] || configs.Present;
+  };
+
+  // Cycle through statuses
+  const cycleStatus = (current: AttendanceStatus): AttendanceStatus => {
+    const order: AttendanceStatus[] = ['Present', 'Late', 'Excused', 'Absent'];
+    const currentIndex = order.indexOf(current);
+    return order[(currentIndex + 1) % order.length];
+  };
+
+  // Student view
   if (isStudent) {
-    // Student view - show their attendance summary
-    const presentCount = 18; // These would come from API
-    const lateCount = 2;
-    const absentCount = 0;
+    const summary = overview?.summary;
+    const history: AttendanceHistoryItem[] = overview?.history || [];
+
+    if (isLoading) return <LoadingState />;
+    if (error) return <ErrorState message="Failed to load attendance" />;
 
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-3 gap-4">
+        {/* Stats Overview */}
+        <div className="grid grid-cols-5 gap-4">
           <div className="bg-white rounded-xl shadow-card p-4 text-center">
-            <p className="text-3xl font-bold text-green-600">{presentCount}</p>
+            <p className="text-3xl font-bold text-green-600">{summary?.present_count ?? 0}</p>
             <p className="text-sm text-gray-500">Present</p>
           </div>
           <div className="bg-white rounded-xl shadow-card p-4 text-center">
-            <p className="text-3xl font-bold text-yellow-600">{lateCount}</p>
+            <p className="text-3xl font-bold text-amber-600">{summary?.late_count ?? 0}</p>
             <p className="text-sm text-gray-500">Late</p>
           </div>
           <div className="bg-white rounded-xl shadow-card p-4 text-center">
-            <p className="text-3xl font-bold text-red-600">{absentCount}</p>
+            <p className="text-3xl font-bold text-red-600">{summary?.absent_count ?? 0}</p>
             <p className="text-sm text-gray-500">Absent</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-card p-4 text-center">
+            <p className="text-3xl font-bold text-gray-600">{summary?.excused_count ?? 0}</p>
+            <p className="text-sm text-gray-500">Excused</p>
+          </div>
+          <div className="bg-white rounded-xl shadow-card p-4 text-center">
+            <p className="text-3xl font-bold text-purple-600">{summary?.total_sessions ?? 0}</p>
+            <p className="text-sm text-gray-500">Sessions</p>
           </div>
         </div>
 
+        {/* Attendance Percentage */}
+        {summary && summary.total_sessions > 0 && (
+          <div className="bg-white rounded-xl shadow-card p-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-600">Attendance Rate</span>
+              <span className="text-lg font-bold text-navy-800">{Math.round(summary.attendance_percentage)}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div
+                className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${summary.attendance_percentage}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Attendance History */}
         <div className="bg-white rounded-xl shadow-card">
           <div className="p-4 border-b border-gray-100">
             <h3 className="font-display font-semibold text-navy-800">Attendance History</h3>
           </div>
-          <EmptyState message="Attendance records will appear here" />
+          {history.length > 0 ? (
+            <div className="divide-y divide-gray-100">
+              {history.map((item: AttendanceHistoryItem) => {
+                const badge = getStatusBadge(item.status);
+                return (
+                  <div key={item.meeting_id} className="p-4 flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-navy-800">{item.title}</p>
+                      <p className="text-sm text-gray-500">{formatDisplayDate(item.date)}</p>
+                      {item.remarks && (
+                        <p className="text-xs text-gray-400 mt-1">{item.remarks}</p>
+                      )}
+                    </div>
+                    <span className={cn(
+                      'px-3 py-1 rounded-full text-xs font-medium border',
+                      badge.bg, badge.text, badge.border
+                    )}>
+                      {item.status}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <EmptyState message="No attendance records yet" />
+          )}
         </div>
       </div>
     );
   }
 
   // Teacher view
+  const sessions = overview?.sessions || [];
+  const students = overview?.students || [];
+  const records = overview?.records || [];
+
+  // Build record map for current session
+  const recordMap: Record<string, AttendanceStatus> = {};
+  const currentSessionId = sessions[selectedSessionIndex]?.id;
+  records.forEach((r: AttendanceRecord) => {
+    if (r.meeting_id === currentSessionId) {
+      recordMap[r.student_id] = localRecords[r.student_id] || r.status;
+    }
+  });
+  // Merge with local changes
+  Object.entries(localRecords).forEach(([key, status]) => {
+    recordMap[key] = status;
+  });
+
+  // Count attendance for current session
+  const sessionCounts = {
+    present: Object.values(recordMap).filter(s => s === 'Present').length,
+    late: Object.values(recordMap).filter(s => s === 'Late').length,
+    absent: Object.values(recordMap).filter(s => s === 'Absent').length,
+    excused: Object.values(recordMap).filter(s => s === 'Excused').length,
+  };
+
+  if (isLoading) return <LoadingState />;
+  if (error) return <ErrorState message="Failed to load attendance" />;
+
   return (
     <div className="space-y-6">
+      {/* New Meeting Modal */}
+      {isNewMeetingModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-semibold text-lg text-navy-800">New Meeting</h3>
+              <button
+                onClick={() => setIsNewMeetingModalOpen(false)}
+                className="p-1 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <input
+                  type="date"
+                  value={newMeetingDate}
+                  onChange={(e) => {
+                    setNewMeetingDate(e.target.value);
+                    if (!newMeetingTitle) {
+                      setNewMeetingTitle(generateTitleFromDate(e.target.value));
+                    }
+                  }}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-navy-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title (optional)</label>
+                <input
+                  type="text"
+                  value={newMeetingTitle}
+                  onChange={(e) => setNewMeetingTitle(e.target.value)}
+                  placeholder={generateTitleFromDate(newMeetingDate)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-navy-500"
+                />
+              </div>
+              {createMeetingMutation.isError && (
+                <p className="text-sm text-red-600">
+                  {createMeetingMutation.error instanceof Error
+                    ? createMeetingMutation.error.message
+                    : 'Failed to create meeting'}
+                </p>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setIsNewMeetingModalOpen(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => createMeetingMutation.mutate()}
+                  disabled={createMeetingMutation.isPending}
+                  className="flex-1 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 disabled:opacity-50"
+                >
+                  {createMeetingMutation.isPending ? 'Creating...' : 'Create'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Session Navigation */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => setSelectedDate(new Date(selectedDate.getTime() - 86400000))}
-            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <span className="font-display text-lg font-semibold">
-            {selectedDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-          </span>
-          <button
-            onClick={() => setSelectedDate(new Date(selectedDate.getTime() + 86400000))}
-            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
-        <button className="btn btn-primary">+ New Meeting</button>
-      </div>
-
-      {meetingsLoading ? (
-        <LoadingState />
-      ) : currentMeeting ? (
-        <div className="bg-white rounded-xl shadow-card p-8">
-          <h3 className="font-display font-semibold text-navy-800 mb-4">{currentMeeting.title}</h3>
-          {attendanceLoading ? (
-            <LoadingState />
+          {sessions.length > 0 ? (
+            <>
+              <button
+                onClick={() => setSelectedSessionIndex(Math.min(selectedSessionIndex + 1, sessions.length - 1))}
+                disabled={selectedSessionIndex >= sessions.length - 1}
+                className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <div className="text-center">
+                <p className="font-display font-semibold text-navy-800">
+                  {sessions[selectedSessionIndex]?.title || 'Select Session'}
+                </p>
+                <p className="text-sm text-gray-500">
+                  {formatDisplayDate(sessions[selectedSessionIndex]?.date || '')}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedSessionIndex(Math.max(selectedSessionIndex - 1, 0))}
+                disabled={selectedSessionIndex <= 0}
+                className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+              <span className="text-sm text-gray-400">
+                ({selectedSessionIndex + 1} of {sessions.length})
+              </span>
+            </>
           ) : (
-            <EmptyState message="Select students to mark attendance" />
+            <p className="text-gray-500">No sessions yet</p>
           )}
         </div>
+        <button
+          onClick={() => setIsNewMeetingModalOpen(true)}
+          className="btn btn-primary flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          New Meeting
+        </button>
+      </div>
+
+      {/* Session Content */}
+      {sessions.length > 0 && students.length > 0 ? (
+        <div className="bg-white rounded-xl shadow-card overflow-hidden">
+          {/* Session Stats */}
+          <div className="p-4 border-b border-gray-100 bg-gray-50">
+            <div className="flex items-center gap-6 text-sm">
+              <span className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-green-500" />
+                <span className="text-gray-600">Present: {sessionCounts.present}</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-amber-500" />
+                <span className="text-gray-600">Late: {sessionCounts.late}</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-red-500" />
+                <span className="text-gray-600">Absent: {sessionCounts.absent}</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-full bg-gray-400" />
+                <span className="text-gray-600">Excused: {sessionCounts.excused}</span>
+              </span>
+              <span className="ml-auto text-gray-500">
+                {sessionCounts.present + sessionCounts.late} / {students.length} attended
+              </span>
+            </div>
+          </div>
+
+          {/* Student List */}
+          <div className="divide-y divide-gray-100">
+            {students.map((student: {
+              student_id: string;
+              student_name: string;
+              student_email: string;
+              avatar_url?: string | null;
+            }) => {
+              const currentStatus = recordMap[student.student_id] || 'Present';
+              const badge = getStatusBadge(currentStatus);
+              return (
+                <div
+                  key={student.student_id}
+                  className="p-4 flex items-center justify-between hover:bg-gray-50"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-navy-500 to-green-600 flex items-center justify-center text-white font-semibold">
+                      {student.avatar_url ? (
+                        <img
+                          src={student.avatar_url}
+                          alt={student.student_name}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        getInitials(student.student_name)
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium text-navy-800">{student.student_name}</p>
+                      <p className="text-sm text-gray-500">{student.student_email}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const newStatus = cycleStatus(currentStatus);
+                      setLocalRecords(prev => ({ ...prev, [student.student_id]: newStatus }));
+                      setHasChanges(true);
+                    }}
+                    className={cn(
+                      'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
+                      badge.bg, badge.text, badge.border,
+                      'hover:opacity-80'
+                    )}
+                  >
+                    {currentStatus}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Save Button */}
+          {hasChanges && (
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setLocalRecords({});
+                  setHasChanges(false);
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100"
+              >
+                Discard
+              </button>
+              <button
+                onClick={() => {
+                  const updates = Object.entries(localRecords).map(([studentId, status]) => ({
+                    student_id: studentId,
+                    status,
+                  }));
+                  updateAttendanceMutation.mutate(updates);
+                }}
+                disabled={updateAttendanceMutation.isPending}
+                className="px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 disabled:opacity-50"
+              >
+                {updateAttendanceMutation.isPending ? 'Saving...' : 'Save Attendance'}
+              </button>
+            </div>
+          )}
+        </div>
+      ) : sessions.length > 0 && students.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-card p-8 text-center">
+          <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500">No students enrolled in this course</p>
+        </div>
       ) : (
-        <EmptyState message="No meetings scheduled" />
+        <div className="bg-white rounded-xl shadow-card p-8 text-center">
+          <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500 mb-4">No meetings scheduled yet</p>
+          <button
+            onClick={() => setIsNewMeetingModalOpen(true)}
+            className="btn btn-primary"
+          >
+            Create First Meeting
+          </button>
+        </div>
       )}
     </div>
   );

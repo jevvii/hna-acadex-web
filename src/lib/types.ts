@@ -429,6 +429,52 @@ export interface AttendanceRecord {
   created_at: string;
 }
 
+export interface AttendanceSummary {
+  total_sessions: number;
+  present_count: number;
+  absent_count: number;
+  late_count: number;
+  excused_count: number;
+  attendance_percentage: number;
+}
+
+export interface AttendanceHistoryItem {
+  meeting_id: string;
+  date: string;
+  title: string;
+  status: AttendanceStatus;
+  remarks?: string | null;
+}
+
+export interface AttendanceOverviewStudent {
+  course_section_id: string;
+  sessions: MeetingSession[];
+  summary: AttendanceSummary;
+  history: AttendanceHistoryItem[];
+  updated_at: string;
+}
+
+export interface AttendanceStudent {
+  student_id: string;
+  student_name: string;
+  student_email: string;
+  avatar_url?: string | null;
+  total_sessions: number;
+  present_count: number;
+  absent_count: number;
+  late_count: number;
+  excused_count: number;
+  attendance_percentage: number;
+}
+
+export interface AttendanceOverviewTeacher {
+  course_section_id: string;
+  sessions: MeetingSession[];
+  students: AttendanceStudent[];
+  records: AttendanceRecord[];
+  updated_at: string;
+}
+
 export interface StudentUploadedFile {
   id: string;
   student_id: string;
@@ -643,4 +689,51 @@ export interface Question {
   alternate_answers?: string[];
   case_sensitive?: boolean;
   word_limit?: number;
+}
+
+// Attendance types
+export interface AttendanceSummary {
+  total_sessions: number;
+  present_count: number;
+  absent_count: number;
+  late_count: number;
+  excused_count: number;
+  attendance_percentage: number;
+}
+
+export interface AttendanceHistoryItem {
+  meeting_id: string;
+  date: string;
+  title: string;
+  status: AttendanceStatus;
+  remarks?: string | null;
+}
+
+export interface AttendanceOverviewStudent {
+  course_section_id: string;
+  sessions: MeetingSession[];
+  summary: AttendanceSummary;
+  history: AttendanceHistoryItem[];
+  updated_at: string;
+}
+
+export interface AttendanceStudent {
+  student_id: string;
+  student_name: string;
+  student_email: string;
+  avatar_url?: string | null;
+  total_sessions: number;
+  present_count: number;
+  absent_count: number;
+  late_count: number;
+  excused_count: number;
+  attendance_percentage: number;
+}
+
+export interface AttendanceOverviewTeacher {
+  course_section_id: string;
+  sessions: MeetingSession[];
+  students: AttendanceStudent[];
+  records: AttendanceRecord[];
+  updated_at: string;
 }
