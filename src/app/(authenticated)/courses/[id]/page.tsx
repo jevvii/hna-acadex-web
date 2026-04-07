@@ -135,6 +135,8 @@ function ModulesTab({
   onToggleActivityPublish,
   onToggleQuizPublish,
   onToggleFileVisibility,
+  onPreviewFile,
+  onDownloadFile,
 }: {
   modules: WeeklyModule[];
   activities: Activity[];
@@ -144,6 +146,8 @@ function ModulesTab({
   onToggleActivityPublish?: (activity: Activity) => void;
   onToggleQuizPublish?: (quiz: Quiz) => void;
   onToggleFileVisibility?: (file: CourseFile) => void;
+  onPreviewFile?: (file: CourseFile) => void;
+  onDownloadFile?: (file: CourseFile) => void;
 }) {
   const router = useRouter();
   // Track which modules are expanded - all expanded by default when modules load
@@ -247,7 +251,20 @@ function ModulesTab({
         const modFiles = files.filter((f) => f.weekly_module_id === module.id && (isTeacher || f.is_visible));
 
         // Combine all items with their type and status config for display
+        // Files are hoisted to the top, followed by activities, then quizzes
         const moduleItems = [
+          // Files first (learning materials)
+          ...modFiles.map((f) => ({
+            id: f.id,
+            type: 'file' as const,
+            title: f.file_name,
+            meta: formatFileSize(f.file_size_bytes),
+            published: f.is_visible,
+            iconColor: 'text-blue-500',
+            iconBg: 'bg-blue-50',
+            status: 'file',
+            originalItem: f,
+          })),
           ...modActivities.map((a) => {
             const config = getActivityConfig(a);
             return {
@@ -278,17 +295,6 @@ function ModulesTab({
               originalItem: q,
             };
           }),
-          ...modFiles.map((f) => ({
-            id: f.id,
-            type: 'file' as const,
-            title: f.file_name,
-            meta: formatFileSize(f.file_size_bytes),
-            published: f.is_visible,
-            iconColor: 'text-blue-500',
-            iconBg: 'bg-blue-50',
-            status: 'file',
-            originalItem: f,
-          })),
         ];
 
         const itemCount = moduleItems.length;
@@ -352,12 +358,18 @@ function ModulesTab({
                               if (item.status !== 'not-open') {
                                 router.push(`/quizzes/${item.id}`);
                               }
+                            } else if (item.type === 'file' && onPreviewFile) {
+                              const file = item.originalItem as CourseFile;
+                              if (file.is_visible || isTeacher) {
+                                onPreviewFile(file);
+                              }
                             }
                           }}
                           className={cn(
-                            "flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors",
-                            (item.type === 'activity' || (item.type === 'quiz' && item.status !== 'not-open')) && "cursor-pointer",
-                            item.type === 'quiz' && item.status === 'not-open' && "opacity-60 cursor-not-allowed"
+                            "flex items-center gap-3 p-3 rounded-xl transition-colors",
+                            (item.type === 'activity' || (item.type === 'quiz' && item.status !== 'not-open') || item.type === 'file') && "cursor-pointer hover:bg-gray-50",
+                            item.type === 'quiz' && item.status === 'not-open' && "opacity-60 cursor-not-allowed",
+                            item.type === 'file' && !item.published && !isTeacher && "cursor-not-allowed"
                           )}
                         >
                           <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0', item.iconBg)}>
@@ -409,6 +421,35 @@ function ModulesTab({
                             )}
                             {item.type === 'quiz' && item.status === 'closed' && (
                               <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Closed</span>
+                            )}
+                            {/* File preview/download actions */}
+                            {item.type === 'file' && item.published && (
+                              <div className="flex items-center gap-1">
+                                {onPreviewFile && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onPreviewFile(item.originalItem as CourseFile);
+                                    }}
+                                    className="p-1.5 rounded-lg text-gray-400 hover:text-navy-600 hover:bg-navy-50 transition-colors"
+                                    title="Preview"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </button>
+                                )}
+                                {onDownloadFile && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onDownloadFile(item.originalItem as CourseFile);
+                                    }}
+                                    className="p-1.5 rounded-lg text-gray-400 hover:text-navy-600 hover:bg-navy-50 transition-colors"
+                                    title="Download"
+                                  >
+                                    <Download className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
                             )}
                             {/* Draft/Hidden badge for teachers */}
                             {!item.published && isTeacher && (
@@ -2121,6 +2162,7 @@ export default function CoursePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('modules');
+  const [previewFile, setPreviewFile] = useState<CourseFile | null>(null);
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const { courses, fetchCourses } = useCoursesStore();
@@ -2180,6 +2222,15 @@ export default function CoursePage() {
     }
   };
 
+  // Download file
+  const handleDownloadFile = async (file: CourseFile) => {
+    try {
+      await filesApi.downloadFile(file.file_url, file.file_name);
+    } catch (err) {
+      logger.error('Download failed:', err);
+    }
+  };
+
   // Fetch course content (works for both students and teachers)
   const { data: courseDetail } = useQuery({
     queryKey: ['courseDetail', courseId],
@@ -2236,6 +2287,8 @@ export default function CoursePage() {
           onToggleActivityPublish={toggleActivityPublish}
           onToggleQuizPublish={toggleQuizPublish}
           onToggleFileVisibility={toggleFileVisibility}
+          onPreviewFile={(file) => setPreviewFile(file)}
+          onDownloadFile={handleDownloadFile}
         />;
       case 'assignments':
         return <AssignmentsTab activities={activities} isTeacher={isTeacher} onAddActivity={() => setIsActivityModalOpen(true)} onTogglePublish={toggleActivityPublish} />;
@@ -2260,12 +2313,18 @@ export default function CoursePage() {
       case 'grades':
         return <GradesTab courseId={courseId} />;
       default:
-        return <ModulesTab modules={modules} activities={activities} quizzes={quizzes} files={files} />;
+        return <ModulesTab modules={modules} activities={activities} quizzes={quizzes} files={files} onPreviewFile={(file) => setPreviewFile(file)} onDownloadFile={handleDownloadFile} />;
     }
   };
 
   return (
     <div className="min-h-screen">
+      {/* File Preview Modal */}
+      <FilePreviewModal
+        file={previewFile}
+        isOpen={!!previewFile}
+        onClose={() => setPreviewFile(null)}
+      />
       {/* Course Header */}
       <div className="relative h-60 bg-gradient-to-r from-navy-600 to-green-700 overflow-hidden">
         <div className="absolute inset-0 opacity-10">
