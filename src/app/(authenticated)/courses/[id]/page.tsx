@@ -2031,6 +2031,12 @@ function AttendanceTab({ courseId }: { courseId: string }) {
   const [localRecords, setLocalRecords] = useState<Record<string, AttendanceStatus>>({});
   const [hasChanges, setHasChanges] = useState(false);
 
+  // Clear local records when switching sessions
+  useEffect(() => {
+    setLocalRecords({});
+    setHasChanges(false);
+  }, [selectedSessionIndex]);
+
   // Fetch attendance overview
   const { data: overview, isLoading, error } = useQuery({
     queryKey: ['attendanceOverview', courseId],
@@ -2046,6 +2052,9 @@ function AttendanceTab({ courseId }: { courseId: string }) {
       setIsNewMeetingModalOpen(false);
       setNewMeetingTitle('');
       setNewMeetingDate(new Date().toISOString().split('T')[0]);
+      setSelectedSessionIndex(0); // New meeting will be at index 0 (most recent)
+      setLocalRecords({}); // Clear local records for fresh start
+      setHasChanges(false);
     },
   });
 
@@ -2072,95 +2081,128 @@ function AttendanceTab({ courseId }: { courseId: string }) {
     return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   };
 
-  // Get status badge colors
-  const getStatusBadge = (status: AttendanceStatus) => {
-    const configs = {
-      Present: { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300' },
-      Late: { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-300' },
-      Absent: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300' },
-      Excused: { bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-300' },
+  // Get status indicator style for circular indicator (teacher view)
+  const getStatusIndicatorStyle = (status: AttendanceStatus | 'None') => {
+    const configs: Record<string, { border: string; fill: string; text: string }> = {
+      Present: { border: 'border-[#86efac]', fill: 'bg-[#22c55e]', text: 'text-[#22c55e]' },
+      Late: { border: 'border-[#fcd34d]', fill: 'bg-[#f59e0b]', text: 'text-[#f59e0b]' },
+      Absent: { border: 'border-[#fca5a5]', fill: 'bg-[#ef4444]', text: 'text-[#ef4444]' },
+      Excused: { border: 'border-[#c4b5fd]', fill: 'bg-[#a78bfa]', text: 'text-[#a78bfa]' },
+      None: { border: 'border-gray-300', fill: 'bg-transparent', text: 'text-gray-400' },
+    };
+    return configs[status] || configs.None;
+  };
+
+  // Get status pill style for history items (student view)
+  const getStatusPillStyle = (status: AttendanceStatus) => {
+    const configs: Record<string, { bg: string; text: string }> = {
+      Present: { bg: 'bg-green-100', text: 'text-[#22c55e]' },
+      Late: { bg: 'bg-amber-100', text: 'text-[#f59e0b]' },
+      Absent: { bg: 'bg-red-100', text: 'text-[#ef4444]' },
+      Excused: { bg: 'bg-purple-100', text: 'text-[#a78bfa]' },
     };
     return configs[status] || configs.Present;
   };
 
-  // Cycle through statuses
-  const cycleStatus = (current: AttendanceStatus): AttendanceStatus => {
-    const order: AttendanceStatus[] = ['Present', 'Late', 'Excused', 'Absent'];
-    const currentIndex = order.indexOf(current);
-    return order[(currentIndex + 1) % order.length];
+  // Cycle through statuses (None is only the initial unmarked state, not part of the cycle)
+  // Cycle order: Present → Late → Absent → Excused → Present
+  // When 'None' (unmarked), clicking goes to 'Present'
+  const cycleStatus = (current: AttendanceStatus | 'None'): AttendanceStatus => {
+    const STATUS_CYCLE: AttendanceStatus[] = ['Present', 'Late', 'Absent', 'Excused'];
+    if (current === 'None') {
+      return 'Present'; // First click from unmarked goes to Present
+    }
+    const currentIndex = STATUS_CYCLE.indexOf(current);
+    return STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
   };
 
   // Student view
   if (isStudent) {
-    const summary = overview?.summary;
+    const summary = overview?.summary as {
+      total_sessions: number;
+      present_count: number;
+      absent_count: number;
+      late_count: number;
+      excused_count: number;
+      attendance_percentage: number;
+    } | undefined;
     const history: AttendanceHistoryItem[] = overview?.history || [];
 
     if (isLoading) return <LoadingState />;
     if (error) return <ErrorState message="Failed to load attendance" />;
 
+    // Determine attendance rate color
+    const attendanceRate = summary?.attendance_percentage ?? 0;
+    const rateColor = attendanceRate >= 75 ? '#22c55e' : attendanceRate >= 50 ? '#f59e0b' : '#ef4444';
+
     return (
-      <div className="space-y-6">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-5 gap-4">
-          <div className="bg-white rounded-xl shadow-card p-4 text-center">
-            <p className="text-3xl font-bold text-green-600">{summary?.present_count ?? 0}</p>
-            <p className="text-sm text-gray-500">Present</p>
+      <div className="space-y-5">
+        {/* Stats Strip - 5 compact cards */}
+        <div className="grid grid-cols-5 gap-3">
+          <div className="bg-gray-50 rounded-[10px] p-3.5 text-center">
+            <p className="text-[26px] font-medium text-[#22c55e]">{summary?.present_count ?? 0}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">Present</p>
           </div>
-          <div className="bg-white rounded-xl shadow-card p-4 text-center">
-            <p className="text-3xl font-bold text-amber-600">{summary?.late_count ?? 0}</p>
-            <p className="text-sm text-gray-500">Late</p>
+          <div className="bg-gray-50 rounded-[10px] p-3.5 text-center">
+            <p className="text-[26px] font-medium text-[#f59e0b]">{summary?.late_count ?? 0}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">Late</p>
           </div>
-          <div className="bg-white rounded-xl shadow-card p-4 text-center">
-            <p className="text-3xl font-bold text-red-600">{summary?.absent_count ?? 0}</p>
-            <p className="text-sm text-gray-500">Absent</p>
+          <div className="bg-gray-50 rounded-[10px] p-3.5 text-center">
+            <p className="text-[26px] font-medium text-[#ef4444]">{summary?.absent_count ?? 0}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">Absent</p>
           </div>
-          <div className="bg-white rounded-xl shadow-card p-4 text-center">
-            <p className="text-3xl font-bold text-gray-600">{summary?.excused_count ?? 0}</p>
-            <p className="text-sm text-gray-500">Excused</p>
+          <div className="bg-gray-50 rounded-[10px] p-3.5 text-center">
+            <p className="text-[26px] font-medium text-[#a78bfa]">{summary?.excused_count ?? 0}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">Excused</p>
           </div>
-          <div className="bg-white rounded-xl shadow-card p-4 text-center">
-            <p className="text-3xl font-bold text-purple-600">{summary?.total_sessions ?? 0}</p>
-            <p className="text-sm text-gray-500">Sessions</p>
+          <div className="bg-gray-50 rounded-[10px] p-3.5 text-center">
+            <p className="text-[26px] font-medium text-gray-500">{summary?.total_sessions ?? 0}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">Sessions</p>
           </div>
         </div>
 
-        {/* Attendance Percentage */}
+        {/* Attendance Rate Card */}
         {summary && summary.total_sessions > 0 && (
-          <div className="bg-white rounded-xl shadow-card p-6">
+          <div className="bg-white rounded-[10px] border p-3.5" style={{ borderWidth: '0.5px', borderColor: 'rgb(229 231 235)' }}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-600">Attendance Rate</span>
-              <span className="text-lg font-bold text-navy-800">{Math.round(summary.attendance_percentage)}%</span>
+              <span className="text-[13px] font-medium text-gray-600">Attendance Rate</span>
+              <span className="text-[22px] font-medium" style={{ color: rateColor }}>
+                {Math.round(summary.attendance_percentage)}%
+              </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-gray-100 rounded-[3px] h-[6px] overflow-hidden">
               <div
-                className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${summary.attendance_percentage}%` }}
+                className="h-full rounded-[3px] transition-all duration-300"
+                style={{ width: `${summary.attendance_percentage}%`, backgroundColor: rateColor }}
               />
             </div>
           </div>
         )}
 
         {/* Attendance History */}
-        <div className="bg-white rounded-xl shadow-card">
-          <div className="p-4 border-b border-gray-100">
-            <h3 className="font-display font-semibold text-navy-800">Attendance History</h3>
-          </div>
+        <div>
+          <h3 className="text-[13px] font-medium text-gray-700 mb-2">Attendance History</h3>
           {history.length > 0 ? (
-            <div className="divide-y divide-gray-100">
+            <div className="space-y-[7px]">
               {history.map((item: AttendanceHistoryItem) => {
-                const badge = getStatusBadge(item.status);
+                const pillStyle = getStatusPillStyle(item.status);
                 return (
-                  <div key={item.meeting_id} className="p-4 flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-navy-800">{item.title}</p>
-                      <p className="text-sm text-gray-500">{formatDisplayDate(item.date)}</p>
-                      {item.remarks && (
-                        <p className="text-xs text-gray-400 mt-1">{item.remarks}</p>
-                      )}
+                  <div
+                    key={item.meeting_id}
+                    className="bg-white rounded-[10px] p-[11px_14px] flex items-center gap-2.5"
+                    style={{ borderWidth: '0.5px', borderColor: 'rgb(229 231 235)' }}
+                  >
+                    <div
+                      className="w-[10px] h-[10px] rounded-full shrink-0"
+                      style={{ backgroundColor: item.status === 'Present' ? '#22c55e' : item.status === 'Late' ? '#f59e0b' : item.status === 'Absent' ? '#ef4444' : '#a78bfa' }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{item.title}</p>
+                      <p className="text-xs text-gray-500">{formatDisplayDate(item.date)}</p>
                     </div>
                     <span className={cn(
-                      'px-3 py-1 rounded-full text-xs font-medium border',
-                      badge.bg, badge.text, badge.border
+                      'px-2.5 py-1 rounded-full text-xs font-medium shrink-0',
+                      pillStyle.bg, pillStyle.text
                     )}>
                       {item.status}
                     </span>
@@ -2323,25 +2365,53 @@ function AttendanceTab({ courseId }: { courseId: string }) {
           <div className="p-4 border-b border-gray-100 bg-gray-50">
             <div className="flex items-center gap-6 text-sm">
               <span className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-green-500" />
+                <span className="w-3 h-3 rounded-full bg-[#22c55e]" />
                 <span className="text-gray-600">Present: {sessionCounts.present}</span>
               </span>
               <span className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-amber-500" />
+                <span className="w-3 h-3 rounded-full bg-[#f59e0b]" />
                 <span className="text-gray-600">Late: {sessionCounts.late}</span>
               </span>
               <span className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-red-500" />
+                <span className="w-3 h-3 rounded-full bg-[#ef4444]" />
                 <span className="text-gray-600">Absent: {sessionCounts.absent}</span>
               </span>
               <span className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-gray-400" />
+                <span className="w-3 h-3 rounded-full bg-[#a78bfa]" />
                 <span className="text-gray-600">Excused: {sessionCounts.excused}</span>
               </span>
               <span className="ml-auto text-gray-500">
                 {sessionCounts.present + sessionCounts.late} / {students.length} attended
               </span>
             </div>
+          </div>
+
+          {/* Legend */}
+          <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50/50 flex items-center gap-4 text-xs">
+            <span className="text-gray-500">Legend:</span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3.5 h-3.5 rounded-full border-[2.5px] border-gray-300" />
+                <span className="text-gray-500">None</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3.5 h-3.5 rounded-full border-[2.5px] border-[#86efac] bg-[#22c55e]" />
+                <span className="text-gray-500">Present</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3.5 h-3.5 rounded-full border-[2.5px] border-[#fcd34d] bg-[#f59e0b]" />
+                <span className="text-gray-500">Late</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3.5 h-3.5 rounded-full border-[2.5px] border-[#fca5a5] bg-[#ef4444]" />
+                <span className="text-gray-500">Absent</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-3.5 h-3.5 rounded-full border-[2.5px] border-[#c4b5fd] bg-[#a78bfa]" />
+                <span className="text-gray-500">Excused</span>
+              </div>
+            </div>
+            <span className="ml-auto text-gray-400">Tap to cycle</span>
           </div>
 
           {/* Student List */}
@@ -2352,44 +2422,55 @@ function AttendanceTab({ courseId }: { courseId: string }) {
               student_email: string;
               avatar_url?: string | null;
             }) => {
-              const currentStatus = recordMap[student.student_id] || 'Present';
-              const badge = getStatusBadge(currentStatus);
+              const currentStatus = (recordMap[student.student_id] || 'None') as AttendanceStatus | 'None';
+              const style = getStatusIndicatorStyle(currentStatus);
+              const showStatusText = currentStatus !== 'None';
               return (
                 <div
                   key={student.student_id}
-                  className="p-4 flex items-center justify-between hover:bg-gray-50"
+                  className="p-4 flex items-center hover:bg-gray-50"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-navy-500 to-green-600 flex items-center justify-center text-white font-semibold">
-                      {student.avatar_url ? (
-                        <img
-                          src={student.avatar_url}
-                          alt={student.student_name}
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
-                      ) : (
-                        getInitials(student.student_name)
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium text-navy-800">{student.student_name}</p>
-                      <p className="text-sm text-gray-500">{student.student_email}</p>
-                    </div>
-                  </div>
+                  {/* Status Circle */}
                   <button
                     onClick={() => {
                       const newStatus = cycleStatus(currentStatus);
                       setLocalRecords(prev => ({ ...prev, [student.student_id]: newStatus }));
                       setHasChanges(true);
                     }}
-                    className={cn(
-                      'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
-                      badge.bg, badge.text, badge.border,
-                      'hover:opacity-80'
-                    )}
+                    className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mr-3 border-[2.5px] transition-all hover:scale-105"
+                    style={{ borderColor: currentStatus === 'None' ? 'rgb(209 213 219)' : currentStatus === 'Present' ? '#86efac' : currentStatus === 'Late' ? '#fcd34d' : currentStatus === 'Absent' ? '#fca5a5' : '#c4b5fd' }}
                   >
-                    {currentStatus}
+                    <div
+                      className="w-3.5 h-3.5 rounded-full"
+                      style={{ backgroundColor: currentStatus === 'None' ? 'transparent' : currentStatus === 'Present' ? '#22c55e' : currentStatus === 'Late' ? '#f59e0b' : currentStatus === 'Absent' ? '#ef4444' : '#a78bfa' }}
+                    />
                   </button>
+
+                  {/* Avatar */}
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-navy-500 to-green-600 flex items-center justify-center text-white font-semibold shrink-0">
+                    {student.avatar_url ? (
+                      <img
+                        src={student.avatar_url}
+                        alt={student.student_name}
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      getInitials(student.student_name)
+                    )}
+                  </div>
+
+                  {/* Name and Email */}
+                  <div className="ml-3 flex-1 min-w-0">
+                    <p className="font-medium text-navy-800 truncate">{student.student_name}</p>
+                    <p className="text-sm text-gray-500 truncate">{student.student_email}</p>
+                  </div>
+
+                  {/* Status Label */}
+                  {showStatusText && (
+                    <span className={cn('text-xs font-medium ml-2', style.text)}>
+                      {currentStatus}
+                    </span>
+                  )}
                 </div>
               );
             })}
