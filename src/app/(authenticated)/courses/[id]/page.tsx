@@ -2185,7 +2185,10 @@ function AttendanceTab({ courseId }: { courseId: string }) {
           {history.length > 0 ? (
             <div className="space-y-[7px]">
               {history.map((item: AttendanceHistoryItem) => {
-                const pillStyle = getStatusPillStyle(item.status);
+                // Handle null status (unmarked/not recorded)
+                const isUnmarked = item.status === null;
+                const pillStyle = isUnmarked ? null : getStatusPillStyle(item.status as AttendanceStatus);
+                const dotColor = isUnmarked ? '#9ca3af' : item.status === 'Present' ? '#22c55e' : item.status === 'Late' ? '#f59e0b' : item.status === 'Absent' ? '#ef4444' : '#a78bfa';
                 return (
                   <div
                     key={item.meeting_id}
@@ -2194,18 +2197,24 @@ function AttendanceTab({ courseId }: { courseId: string }) {
                   >
                     <div
                       className="w-[10px] h-[10px] rounded-full shrink-0"
-                      style={{ backgroundColor: item.status === 'Present' ? '#22c55e' : item.status === 'Late' ? '#f59e0b' : item.status === 'Absent' ? '#ef4444' : '#a78bfa' }}
+                      style={{ backgroundColor: dotColor }}
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{item.title}</p>
                       <p className="text-xs text-gray-500">{formatDisplayDate(item.date)}</p>
                     </div>
-                    <span className={cn(
-                      'px-2.5 py-1 rounded-full text-xs font-medium shrink-0',
-                      pillStyle.bg, pillStyle.text
-                    )}>
-                      {item.status}
-                    </span>
+                    {isUnmarked ? (
+                      <span className="px-2.5 py-1 rounded-full text-xs font-medium shrink-0 bg-gray-100 text-gray-400">
+                        Not marked
+                      </span>
+                    ) : (
+                      <span className={cn(
+                        'px-2.5 py-1 rounded-full text-xs font-medium shrink-0',
+                        pillStyle!.bg, pillStyle!.text
+                      )}>
+                        {item.status}
+                      </span>
+                    )}
                   </div>
                 );
               })}

@@ -442,7 +442,7 @@ export interface AttendanceHistoryItem {
   meeting_id: string;
   date: string;
   title: string;
-  status: AttendanceStatus;
+  status: AttendanceStatus | null;  // null means unmarked/not recorded
   remarks?: string | null;
 }
 
@@ -705,7 +705,7 @@ export interface AttendanceHistoryItem {
   meeting_id: string;
   date: string;
   title: string;
-  status: AttendanceStatus;
+  status: AttendanceStatus | null;  // null means unmarked/not recorded
   remarks?: string | null;
 }
 
