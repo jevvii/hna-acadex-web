@@ -737,3 +737,115 @@ export interface AttendanceOverviewTeacher {
   records: AttendanceRecord[];
   updated_at: string;
 }
+
+// Grading Period types
+export type PeriodType = 'quarter' | 'semester';
+
+export interface GradingPeriod {
+  id: string;
+  school_year: string;
+  period_type: PeriodType;
+  period_number: number;
+  label: string;  // 'Q1', 'Q2', etc. or '1st Sem', '2nd Sem'
+  start_date: string;
+  end_date: string;
+  is_current: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GradeEntry {
+  id: string;
+  enrollment_id: string;
+  grading_period_id: string;
+  course_section_id?: string;
+  student_name?: string;
+  period_label: string;
+  score: number | null;
+  computed_score: number | null;
+  override_score: number | null;
+  is_published: boolean;
+  computed_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Student grade view types
+export interface StudentPeriodGrade {
+  period: GradingPeriod;
+  score: number | null;
+  is_published: boolean;
+}
+
+export interface StudentGradeData {
+  course_section_id: string;
+  course_code: string;
+  course_title: string;
+  grade_level: GradeLevel;
+  periods: StudentPeriodGrade[];
+  final_grade: number | null;
+  final_grade_letter: string | null;
+}
+
+// Subject teacher gradebook types
+export interface SubjectPeriodGrade {
+  period_id: string;
+  period_label: string;
+  grade_entry_id: string | null;
+  computed_score: number | null;
+  override_score: number | null;
+  score: number | null;
+  is_published: boolean;
+}
+
+export interface SubjectStudentGrade {
+  enrollment_id: string;
+  student_id: string;
+  student_name: string;
+  student_email: string;
+  periods: SubjectPeriodGrade[];
+  final_grade: number | null;
+  final_grade_letter: string | null;
+}
+
+export interface SubjectGradeData {
+  course_section_id: string;
+  course_code: string;
+  course_title: string;
+  grade_level: GradeLevel;
+  period_type: PeriodType;
+  periods: GradingPeriod[];
+  students: SubjectStudentGrade[];
+}
+
+// Advisory teacher grade view types
+export interface AdvisorySubjectGrade {
+  subject_id: string;
+  subject_code: string;
+  subject_title: string;
+  teacher_name: string;
+  periods: {
+    period_label: string;
+    score: number | null;
+    is_published: boolean;
+  }[];
+  final_grade: number | null;
+  final_grade_letter: string | null;
+}
+
+export interface AdvisoryStudentGrade {
+  student_id: string;
+  student_name: string;
+  subjects: AdvisorySubjectGrade[];
+  final_average: number | null;
+}
+
+export interface AdvisoryGradeData {
+  section_id: string;
+  section_name: string;
+  grade_level: GradeLevel;
+  strand: StrandType;
+  school_year: string;
+  periods: GradingPeriod[];
+  students: AdvisoryStudentGrade[];
+}

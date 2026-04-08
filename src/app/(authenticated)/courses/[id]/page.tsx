@@ -18,6 +18,7 @@ import {
   activitiesApi,
   quizzesApi,
   filesApi,
+  gradingApi,
 } from '@/lib/api';
 import {
   WeeklyModule,
@@ -66,6 +67,7 @@ import {
   Maximize2,
   Minimize2,
 } from 'lucide-react';
+import { StudentGradesView, TeacherGradesView } from '@/components/grades';
 
 const tabs = [
   { id: 'modules', label: 'Modules', icon: BookOpen },
@@ -2535,91 +2537,25 @@ function AttendanceTab({ courseId }: { courseId: string }) {
 }
 
 // Grades Tab
-function GradesTab({ courseId }: { courseId: string }) {
+function GradesTab({ courseId, courseInfo }: { courseId: string; courseInfo?: { course_section_id: string; course_code: string; course_title: string; section_name: string; teacher_id?: string; teacher_name?: string; grade_level?: string; strand?: string; school_year?: string } }) {
   const isStudent = useIsStudent();
+  const isTeacher = useIsTeacher();
+  const queryClient = useQueryClient();
 
-  const { data: grades, isLoading, error } = useQuery({
-    queryKey: ['grades', courseId],
-    queryFn: () => gradesApi.getMyGrades(courseId),
-    enabled: !!courseId && isStudent,
-  });
-
-  if (!isStudent) {
-    return (
-      <div className="bg-white rounded-xl shadow-card p-8 text-center">
-        <TrendingUp className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-        <p className="text-gray-500">View the Gradebook to manage student grades</p>
-      </div>
-    );
+  // For students, use StudentGradesView
+  if (isStudent) {
+    return <StudentGradesView courseSectionId={courseId} />;
   }
 
-  if (isLoading) return <LoadingState />;
-  if (error) return <ErrorState message="Failed to load grades" />;
+  // For teachers, use TeacherGradesView
+  // Note: Advisory view requires section_id and TeacherAdvisory check on backend
+  // For now, subject teachers see their subject gradebook
+  if (isTeacher) {
+    return <TeacherGradesView courseSectionId={courseId} />;
+  }
 
-  return (
-    <div className="space-y-6">
-      {/* Grade Overview */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl shadow-card p-4 text-center">
-          <p className="text-3xl font-bold text-green-600">{grades?.current_grade || 'N/A'}</p>
-          <p className="text-sm text-gray-500">Current Grade</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-card p-4 text-center">
-          <p className="text-3xl font-bold text-blue-600">{grades?.class_average || 'N/A'}</p>
-          <p className="text-sm text-gray-500">Class Average</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-card p-4 text-center">
-          <p className="text-3xl font-bold text-navy-600">{grades?.gpa || 'N/A'}</p>
-          <p className="text-sm text-gray-500">GPA</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-card p-4 text-center">
-          <p className="text-3xl font-bold text-navy-600">{grades?.completed || 'N/A'}</p>
-          <p className="text-sm text-gray-500">Completed</p>
-        </div>
-      </div>
-
-      {/* Grades Table */}
-      <div className="bg-white rounded-xl shadow-card overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600 uppercase tracking-wider">Item</th>
-              <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600 uppercase tracking-wider">Type</th>
-              <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600 uppercase tracking-wider">Due Date</th>
-              <th className="text-left px-6 py-4 text-sm font-semibold text-gray-600 uppercase tracking-wider">Score</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {grades?.items?.map((item: { title: string; type: string; due_date?: string; score?: string; percentage?: number }, index: number) => (
-              <tr key={index} className="hover:bg-gray-50">
-                <td className="px-6 py-4">
-                  <p className="font-medium text-navy-800">{item.title}</p>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600">{item.type}</td>
-                <td className="px-6 py-4 text-sm text-gray-600">{formatDate(item.due_date)}</td>
-                <td className="px-6 py-4">
-                  <span className={cn(
-                    'font-semibold',
-                    (item.percentage ?? 0) >= 90 && 'text-green-600',
-                    (item.percentage ?? 0) >= 80 && (item.percentage ?? 0) < 90 && 'text-blue-600',
-                    (item.percentage ?? 0) < 80 && 'text-yellow-600',
-                  )}>
-                    {item.score}
-                  </span>
-                </td>
-              </tr>
-            )) || (
-              <tr>
-                <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
-                  No graded items yet
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+  // Admin fallback - could show either view, defaulting to subject view
+  return <TeacherGradesView courseSectionId={courseId} />;
 }
 
 export default function CoursePage() {
@@ -2778,7 +2714,7 @@ export default function CoursePage() {
       case 'attendance':
         return <AttendanceTab courseId={courseId} />;
       case 'grades':
-        return <GradesTab courseId={courseId} />;
+        return <GradesTab courseId={courseId} courseInfo={courseInfo as any} />;
       default:
         return <ModulesTab modules={modules} activities={activities} quizzes={quizzes} files={files} onPreviewFile={(file) => setPreviewFile(file)} onDownloadFile={handleDownloadFile} />;
     }

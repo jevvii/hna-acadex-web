@@ -539,3 +539,49 @@ export const activityCommentsApi = {
     return true;
   },
 };
+// Grading API
+import type {
+  GradingPeriod,
+  StudentGradeData,
+  SubjectGradeData,
+  AdvisoryGradeData,
+  GradeEntry,
+} from './types';
+
+export const gradingApi = {
+  // Get all grading periods
+  getGradingPeriods: async (schoolYear?: string): Promise<GradingPeriod[]> => {
+    const params = schoolYear ? `?school_year=${schoolYear}` : '';
+    return api.get(`/grading-periods/${params}`);
+  },
+
+  // Student grades
+  getStudentGrades: async (courseSectionId: string): Promise<StudentGradeData> => {
+    return api.get(`/course-sections/${courseSectionId}/grades/student/`);
+  },
+
+  // Advisory teacher grades (all students in advisory section)
+  getAdvisoryGrades: async (sectionId: string): Promise<AdvisoryGradeData> => {
+    return api.get(`/course-sections/${sectionId}/grades/advisory/`);
+  },
+
+  // Subject teacher gradebook
+  getSubjectGrades: async (courseSectionId: string): Promise<SubjectGradeData> => {
+    return api.get(`/course-sections/${courseSectionId}/grades/subject/`);
+  },
+
+  // Update grade entry (override score)
+  updateGradeEntry: async (entryId: string, data: { override_score?: number | null }): Promise<GradeEntry> => {
+    return api.patch(`/grade-entries/${entryId}/`, data);
+  },
+
+  // Publish/unpublish a single grade entry
+  publishGradeEntry: async (entryId: string, isPublished: boolean): Promise<GradeEntry> => {
+    return api.post(`/grade-entries/${entryId}/publish/`, { is_published: isPublished });
+  },
+
+  // Bulk publish all grades for a period
+  bulkPublishGrades: async (courseSectionId: string, gradingPeriodId: string): Promise<{ published_count: number }> => {
+    return api.post(`/course-sections/${courseSectionId}/grades/bulk-publish/`, { grading_period_id: gradingPeriodId });
+  },
+};
