@@ -739,14 +739,16 @@ export interface AttendanceOverviewTeacher {
 }
 
 // Grading Period types
-export type PeriodType = 'quarter' | 'semester';
+// All periods are quarters now
+// semester_group: 1 for Q1+Q2 (1st Sem), 2 for Q3+Q4 (2nd Sem), null for Grades 7-10
 
 export interface GradingPeriod {
   id: string;
   school_year: string;
-  period_type: PeriodType;
-  period_number: number;
-  label: string;  // 'Q1', 'Q2', etc. or '1st Sem', '2nd Sem'
+  period_type: 'quarter';  // Always quarter now
+  period_number: number;  // 1-4 for Q1-Q4
+  semester_group: number | null;  // 1 for 1st Sem, 2 for 2nd Sem, null for Grades 7-10
+  label: string;  // 'Q1', 'Q2', 'Q3', 'Q4'
   start_date: string;
   end_date: string;
   is_current: boolean;
@@ -813,7 +815,7 @@ export interface SubjectGradeData {
   course_code: string;
   course_title: string;
   grade_level: GradeLevel;
-  period_type: PeriodType;
+  semester_group: number | null;  // For Grades 11-12: 1 or 2, for Grades 7-10: null
   periods: GradingPeriod[];
   students: SubjectStudentGrade[];
 }
