@@ -65,6 +65,18 @@ function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId
     },
   });
 
+  const bulkPublishMutation = useMutation({
+    mutationFn: (periodId: string) =>
+      gradingApi.bulkPublishGrades(courseSectionId, periodId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subjectGrades', courseSectionId] });
+    },
+  });
+
+  const handleBulkPublish = (periodId: string) => {
+    bulkPublishMutation.mutate(periodId);
+  };
+
   const handleEdit = (entryId: string, currentValue: number | null) => {
     setEditingEntry(entryId);
     setEditValue(currentValue !== null ? String(currentValue) : '');
@@ -92,7 +104,10 @@ function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId
 
   const periods = grades?.periods || [];
   const students = grades?.students || [];
-  const periodLabels = grades?.grade_level ? getPeriodLabels(grades.grade_level) : ['Q1', 'Q2', 'Q3', 'Q4'];
+  const semesterGroup = grades?.semester_group;
+
+  // Determine semester label for display
+  const semesterLabel = semesterGroup === 1 ? '1st Semester' : semesterGroup === 2 ? '2nd Semester' : null;
 
   // Handle case where grading periods haven't been set up yet
   if (periods.length === 0) {
@@ -130,6 +145,14 @@ function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId
 
   return (
     <div className="space-y-4">
+      {/* Semester indicator for Grades 11-12 */}
+      {semesterLabel && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-sm text-blue-800">
+          <span className="font-medium">{semesterLabel}</span>
+          <span className="text-blue-600 ml-2">({periods.map(p => p.label).join(', ')})</span>
+        </div>
+      )}
+
       {/* Header with period labels */}
       <div className="bg-white rounded-xl shadow-card overflow-hidden">
         <div className="overflow-x-auto">
@@ -139,11 +162,41 @@ function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId
                 <th className="sticky left-0 bg-gray-50 z-10 text-left px-4 py-3 text-sm font-semibold text-gray-600 uppercase tracking-wider min-w-[200px]">
                   Student Name
                 </th>
-                {periods.map((period) => (
-                  <th key={period.id} className="text-center px-4 py-3 text-sm font-semibold text-gray-600 uppercase tracking-wider min-w-[100px]">
-                    {period.label}
-                  </th>
-                ))}
+                {periods.map((period) => {
+                  const periodEntries = students.flatMap(s => s.periods || []).filter(p => p.period_id === period.id);
+                  const publishedCount = periodEntries.filter(p => p.is_published).length;
+                  const totalCount = periodEntries.length;
+                  const allPublished = totalCount > 0 && publishedCount === totalCount;
+                  const hasGrades = periodEntries.some(p => p.score !== null);
+
+                  return (
+                    <th key={period.id} className="text-center px-4 py-3 text-sm font-semibold text-gray-600 uppercase tracking-wider min-w-[120px]">
+                      <div className="flex flex-col items-center gap-1">
+                        <span>{period.label}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-normal text-gray-400">
+                            {publishedCount}/{totalCount}
+                          </span>
+                          {!allPublished && hasGrades && (
+                            <button
+                              onClick={() => handleBulkPublish(period.id)}
+                              disabled={bulkPublishMutation.isPending}
+                              className="text-xs px-2 py-0.5 bg-navy-600 text-white rounded hover:bg-navy-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Publish all grades for this period"
+                            >
+                              {bulkPublishMutation.isPending ? 'Publishing...' : 'Publish All'}
+                            </button>
+                          )}
+                          {allPublished && (
+                            <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">
+                              Published
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </th>
+                  );
+                })}
                 <th className="text-center px-4 py-3 text-sm font-semibold text-gray-600 uppercase tracking-wider min-w-[100px]">
                   Final
                 </th>
