@@ -73,8 +73,19 @@ function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId
     },
   });
 
+  const bulkPublishFinalMutation = useMutation({
+    mutationFn: () => gradingApi.bulkPublishFinalGrades(courseSectionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subjectGrades', courseSectionId] });
+    },
+  });
+
   const handleBulkPublish = (periodId: string) => {
     bulkPublishMutation.mutate(periodId);
+  };
+
+  const handleBulkPublishFinal = () => {
+    bulkPublishFinalMutation.mutate();
   };
 
   const handleEdit = (entryId: string, currentValue: number | null) => {
@@ -198,7 +209,23 @@ function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId
                   );
                 })}
                 <th className="text-center px-4 py-3 text-sm font-semibold text-gray-600 uppercase tracking-wider min-w-[100px]">
-                  Final
+                  <div className="flex flex-col items-center gap-1">
+                    <span>Final</span>
+                    {grades?.all_final_published ? (
+                      <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">
+                        Published
+                      </span>
+                    ) : (
+                      <button
+                        onClick={handleBulkPublishFinal}
+                        disabled={bulkPublishFinalMutation.isPending}
+                        className="text-xs px-2 py-0.5 bg-navy-600 text-white rounded hover:bg-navy-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Publish all final grades"
+                      >
+                        {bulkPublishFinalMutation.isPending ? 'Publishing...' : 'Publish Final'}
+                      </button>
+                    )}
+                  </div>
                 </th>
               </tr>
             </thead>

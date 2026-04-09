@@ -584,4 +584,9 @@ export const gradingApi = {
   bulkPublishGrades: async (courseSectionId: string, gradingPeriodId: string): Promise<{ published_count: number }> => {
     return api.post(`/course-sections/${courseSectionId}/grades/bulk-publish/`, { grading_period_id: gradingPeriodId });
   },
+
+  // Bulk publish final grades for all students in a course section
+  bulkPublishFinalGrades: async (courseSectionId: string): Promise<{ published_count: number }> => {
+    return api.post(`/course-sections/${courseSectionId}/grades/bulk-publish-final/`);
+  },
 };

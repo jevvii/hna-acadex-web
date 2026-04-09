@@ -787,6 +787,7 @@ export interface StudentGradeData {
   periods: StudentPeriodGrade[];
   final_grade: number | null;
   final_grade_letter: string | null;
+  is_final_published: boolean;
 }
 
 // Subject teacher gradebook types
@@ -808,6 +809,7 @@ export interface SubjectStudentGrade {
   periods: SubjectPeriodGrade[];
   final_grade: number | null;
   final_grade_letter: string | null;
+  is_final_published?: boolean;
 }
 
 export interface SubjectGradeData {
@@ -818,6 +820,7 @@ export interface SubjectGradeData {
   semester_group: number | null;  // For Grades 11-12: 1 or 2, for Grades 7-10: null
   periods: GradingPeriod[];
   students: SubjectStudentGrade[];
+  all_final_published?: boolean;  // True if all students' final grades are published
 }
 
 // Advisory teacher grade view types

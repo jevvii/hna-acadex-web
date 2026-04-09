@@ -83,8 +83,9 @@ export function StudentGradesView({ courseSectionId }: StudentGradesViewProps) {
   if (error) return <ErrorState message="Failed to load grades" onRetry={() => refetch()} />;
 
   const periods = grades?.periods || [];
-  const finalGrade = grades?.final_grade;
-  const finalGradeLetter = grades?.final_grade_letter;
+  const isFinalPublished = grades?.is_final_published || false;
+  const finalGrade = isFinalPublished ? grades?.final_grade : null;
+  const finalGradeLetter = isFinalPublished ? grades?.final_grade_letter : null;
 
   // Check if there are any periods configured
   if (periods.length === 0) {
