@@ -546,6 +546,7 @@ import type {
   SubjectGradeData,
   AdvisoryGradeData,
   GradeEntry,
+  GradeWeightConfig,
 } from './types';
 
 export const gradingApi = {
@@ -588,5 +589,15 @@ export const gradingApi = {
   // Bulk publish final grades for all students in a course section
   bulkPublishFinalGrades: async (courseSectionId: string): Promise<{ published_count: number }> => {
     return api.post(`/course-sections/${courseSectionId}/grades/bulk-publish-final/`);
+  },
+
+  // Grade weight configuration
+  getGradeWeights: async (courseSectionId: string): Promise<GradeWeightConfig> => {
+    return api.get(`/course-sections/${courseSectionId}/grade-weights/`);
+  },
+  updateGradeWeights: async (courseSectionId: string, data: {
+    written_works: number; performance_tasks: number; quarterly_assessment: number;
+  }): Promise<GradeWeightConfig> => {
+    return api.put(`/course-sections/${courseSectionId}/grade-weights/`, data);
   },
 };

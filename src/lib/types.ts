@@ -854,3 +854,16 @@ export interface AdvisoryGradeData {
   periods: GradingPeriod[];
   students: AdvisoryStudentGrade[];
 }
+
+// Grade weight configuration types
+export interface GradeWeightConfig {
+  id: string;
+  course_section: string;
+  written_works: number;
+  performance_tasks: number;
+  quarterly_assessment: number;
+  is_customized: boolean;
+  subject_category: string | null;
+  category_label: string | null;
+  updated_at: string;
+}

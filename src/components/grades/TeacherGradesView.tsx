@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { TrendingUp, AlertCircle, Loader2, Edit2, Check, X, Users, BookOpen, Save } from 'lucide-react';
 import { gradingApi, coursesApi } from '@/lib/api';
+import { GradeWeightsConfig } from './GradeWeightsConfig';
 import { useIsTeacher } from '@/store/auth';
 import type { SubjectGradeData, AdvisoryGradeData, GradingPeriod, GradeEntry, GradeLevel } from '@/lib/types';
 import { getGradeColorClass, getGradeBgClass, formatGrade, getPeriodLabels, getLetterGrade } from '@/lib/gradeUtils';
@@ -163,6 +164,9 @@ function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId
           <span className="text-blue-600 ml-2">({periods.map(p => p.label).join(', ')})</span>
         </div>
       )}
+
+      {/* Grade Weights Configuration */}
+      <GradeWeightsConfig courseSectionId={courseSectionId} />
 
       {/* Header with period labels */}
       <div className="bg-white rounded-xl shadow-card overflow-hidden">
