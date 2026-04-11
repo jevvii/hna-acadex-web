@@ -22,6 +22,11 @@ import type {
   ActivityComment,
   Submission,
   Question,
+  GradeSubmission,
+  SectionReportCard,
+  StudentReportCard,
+  GradeEntry,
+  GradeWeightConfig,
 } from './types';
 import { API_BASE_URL } from './config';
 import { logger } from './logger';
@@ -545,8 +550,6 @@ import type {
   StudentGradeData,
   SubjectGradeData,
   AdvisoryGradeData,
-  GradeEntry,
-  GradeWeightConfig,
 } from './types';
 
 export const gradingApi = {
@@ -599,5 +602,31 @@ export const gradingApi = {
     written_works: number; performance_tasks: number; quarterly_assessment: number;
   }): Promise<GradeWeightConfig> => {
     return api.put(`/course-sections/${courseSectionId}/grade-weights/`, data);
+  },
+
+  // Grade submission (subject teacher)
+  submitPeriodGrades: async (courseSectionId: string, gradingPeriodId: string): Promise<GradeSubmission> => {
+    return api.post(`/course-sections/${courseSectionId}/grades/submit/`, { grading_period_id: gradingPeriodId });
+  },
+  takeBackPeriodGrades: async (courseSectionId: string, gradingPeriodId: string): Promise<GradeSubmission> => {
+    return api.post(`/course-sections/${courseSectionId}/grades/take-back/`, { grading_period_id: gradingPeriodId });
+  },
+
+  // Report card (adviser)
+  publishReportCard: async (sectionId: string, gradingPeriodId: string): Promise<SectionReportCard> => {
+    return api.post(`/advisory/${sectionId}/report-card/publish/`, { grading_period_id: gradingPeriodId });
+  },
+  unpublishReportCard: async (sectionId: string, gradingPeriodId: string): Promise<SectionReportCard> => {
+    return api.post(`/advisory/${sectionId}/report-card/unpublish/`, { grading_period_id: gradingPeriodId });
+  },
+
+  // Adviser override
+  adviserOverrideGrade: async (entryId: string, overrideScore: number | null): Promise<GradeEntry> => {
+    return api.patch(`/grade-entries/${entryId}/adviser-override/`, { override_score: overrideScore });
+  },
+
+  // Student report card
+  getStudentReportCard: async (): Promise<StudentReportCard> => {
+    return api.get('/students/me/report-card/');
   },
 };

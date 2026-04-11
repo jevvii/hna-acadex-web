@@ -819,6 +819,7 @@ export interface SubjectGradeData {
   grade_level: GradeLevel;
   semester_group: number | null;  // For Grades 11-12: 1 or 2, for Grades 7-10: null
   periods: GradingPeriod[];
+  submissions: GradeSubmission[];
   students: SubjectStudentGrade[];
   all_final_published?: boolean;  // True if all students' final grades are published
 }
@@ -866,4 +867,57 @@ export interface GradeWeightConfig {
   subject_category: string | null;
   category_label: string | null;
   updated_at: string;
+}
+
+// Grade submission types
+export interface GradeSubmission {
+  grading_period_id: string;
+  period_label: string;
+  status: 'draft' | 'submitted' | 'published';
+  submitted_by: string | null;
+  submitted_at: string | null;
+}
+
+export interface SectionReportCard {
+  id: string;
+  section_id: string;
+  grading_period_id: string;
+  is_published: boolean;
+  published_by: string | null;
+  published_at: string | null;
+}
+
+export interface StudentReportCard {
+  section_name: string;
+  grade_level: string;
+  strand: string | null;
+  school_year: string;
+  periods: GradingPeriod[];
+  subjects: {
+    course_section_id: string;
+    course_code: string;
+    course_title: string;
+    teacher_name: string;
+    period_grades: {
+      period_label: string;
+      score: number | null;
+      adviser_overridden: boolean;
+    }[];
+    final_grade: number | null;
+    final_grade_letter: string | null;
+  }[];
+  overall_average: number | null;
+}
+
+export interface AdvisorySubmissionStatus {
+  course_section_id: string;
+  course_code: string;
+  course_title: string;
+  teacher_name: string;
+  periods: {
+    grading_period_id: string;
+    period_label: string;
+    status: 'draft' | 'submitted' | 'published';
+    submitted_at: string | null;
+  }[];
 }
