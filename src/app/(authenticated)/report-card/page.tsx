@@ -43,8 +43,8 @@ export default function ReportCardPage() {
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      {/* Header with Print Button */}
+      <div className="flex items-center justify-between mb-6 print:hidden">
         <div className="flex items-center gap-4">
           <Link
             href="/"
@@ -63,17 +63,19 @@ export default function ReportCardPage() {
         </button>
       </div>
 
-      <h1 className="font-display text-3xl font-bold text-navy-800 mb-6">
+      <h1 className="font-display text-3xl font-bold text-navy-800 mb-6 print:hidden">
         My Report Card
       </h1>
 
       {/* Report Card Content */}
-      <ReportCardView
-        reportCard={reportCard}
-        isLoading={isLoading}
-        error={error as Error | null}
-        onRetry={() => refetch()}
-      />
+      <div className="rounded-xl overflow-hidden shadow-card print:shadow-none print:rounded-none">
+        <ReportCardView
+          reportCard={reportCard}
+          isLoading={isLoading}
+          error={error as Error | null}
+          onRetry={() => refetch()}
+        />
+      </div>
     </div>
   );
 }

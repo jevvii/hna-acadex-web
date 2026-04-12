@@ -385,3 +385,59 @@
   background-color: #60a5fa !important;
   color: #ffffff !important;
 }
+
+/* Print styles for report card */
+@media print {
+  @page {
+    margin: 1cm;
+    size: A4 portrait;
+  }
+
+  /* Hide sidebar, navigation, and interactive elements */
+  nav,
+  aside,
+  [data-sidebar],
+  .print:hidden {
+    display: none !important;
+  }
+
+  /* Reset layout for full-width printing */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11pt;
+  }
+
+  /* Preserve background colors for grade cells */
+  * {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  /* Remove shadows and rounded corners for clean print */
+  .shadow-card,
+  .shadow-card-hover {
+    box-shadow: none !important;
+  }
+
+  /* Report card container: ensure clean borders */
+  .report-card-container {
+    border: 1px solid #e2e8f0;
+    border-radius: 0 !important;
+  }
+
+  /* Force table cells to not break across pages */
+  table {
+    page-break-inside: avoid;
+  }
+
+  tr {
+    page-break-inside: avoid;
+  }
+
+  /* Ensure the main content takes full width */
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}

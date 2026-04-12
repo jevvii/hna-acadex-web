@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { ClipboardList, FlagIcon, AlertCircle } from 'lucide-react';
+import { useAuthStore } from '@/store/auth';
 import type { StudentReportCard } from '@/lib/types';
 import {
   getGradeColorClasses,
@@ -38,16 +39,6 @@ function LoadingSkeleton() {
             <div className="h-4 w-36 bg-gray-100 rounded animate-pulse" />
           </div>
         </div>
-      </div>
-
-      {/* Summary cards skeleton */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="bg-white rounded-xl shadow-card p-6 animate-pulse">
-            <div className="h-8 w-20 bg-gray-200 rounded mb-2" />
-            <div className="h-4 w-12 bg-gray-100 rounded" />
-          </div>
-        ))}
       </div>
 
       {/* Table skeleton */}
@@ -149,7 +140,7 @@ function EmptyState() {
 }
 
 // ---------------------------------------------------------------------------
-// Main component
+// Main component — DepEd-style report card
 // ---------------------------------------------------------------------------
 
 export function ReportCardView({
@@ -158,6 +149,8 @@ export function ReportCardView({
   error,
   onRetry,
 }: ReportCardViewProps) {
+  const user = useAuthStore((state) => state.user);
+
   // ---- Loading / error / empty guards ----
 
   if (isLoading) {
@@ -176,7 +169,7 @@ export function ReportCardView({
 
   const { periods, subjects, overall_average } = reportCard;
 
-  // Compute period averages (average of all subject scores for that period)
+  // Compute period averages
   const periodAverages = periods.map((period) => {
     const scores = subjects
       .map((s) => {
@@ -191,239 +184,232 @@ export function ReportCardView({
     return { period, average: avg };
   });
 
-  // Compute the overall average from the data, or fall back to computing from period averages
   const overallAverage = overall_average ?? computeFinalGrade(periodAverages.map((p) => p.average));
   const overallDescriptor = getDepEdLetterGrade(overallAverage);
 
-  // ---- Render ----
+  // Student info
+  const studentName = user?.full_name || 'Student';
+  const gradeLevel = reportCard.grade_level;
+  const strand = reportCard.strand;
+  const section = reportCard.section_name;
+  const schoolYear = reportCard.school_year;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-xl shadow-card p-6"
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-navy-100 rounded-xl flex items-center justify-center">
-            <ClipboardList className="w-5 h-5 text-navy-600" />
-          </div>
+    <div className="report-card-container">
+      {/* Navy Header Bar */}
+      <div className="bg-gradient-to-r from-navy-700 to-navy-900 rounded-t-xl px-6 py-5 print:rounded-none print:px-4 print:py-3">
+        <div className="flex items-center justify-between">
           <div>
-            <h2 className="font-display text-lg font-semibold text-navy-800">
-              Report Card
-            </h2>
-            <p className="text-sm text-gray-500">
-              {reportCard.grade_level}
-              {reportCard.strand ? ` - ${reportCard.strand}` : ''}
-              {' '}&bull;{' '}
-              {reportCard.school_year}
+            <h1 className="text-white font-display text-2xl font-semibold print:text-xl">
+              REPORT CARD
+            </h1>
+            <p className="text-white/70 text-sm print:text-xs">
+              Department of Education
             </p>
           </div>
+          <ClipboardList className="w-8 h-8 text-white/40 print:hidden" />
         </div>
-      </motion.div>
+      </div>
 
-      {/* Summary cards */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-        className="grid grid-cols-2 sm:grid-cols-3 gap-4"
-      >
-        {periodAverages.map(({ period, average }) => {
-          const colors = getGradeColorClasses(average);
-          return (
-            <div
-              key={period.id}
-              className={cn(
-                'bg-white rounded-xl shadow-card p-6 border',
-                colors.border,
-              )}
-            >
-              <p className="text-sm text-slate-500 mb-1">{period.label} Average</p>
-              <p className={cn('text-3xl font-bold', colors.text)}>
-                {formatGrade(average)}
-              </p>
+      {/* Student Info Block */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4 print:px-4 print:py-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 text-sm print:text-xs">
+          <div>
+            <span className="text-gray-500 block">Name</span>
+            <span className="font-semibold text-navy-800">{studentName}</span>
+          </div>
+          <div>
+            <span className="text-gray-500 block">Grade Level</span>
+            <span className="font-semibold text-navy-800">{gradeLevel}</span>
+          </div>
+          <div>
+            <span className="text-gray-500 block">Section</span>
+            <span className="font-semibold text-navy-800">{section}</span>
+          </div>
+          <div>
+            <span className="text-gray-500 block">School Year</span>
+            <span className="font-semibold text-navy-800">{schoolYear}</span>
+          </div>
+          {strand && strand !== 'NONE' && (
+            <div>
+              <span className="text-gray-500 block">Strand</span>
+              <span className="font-semibold text-navy-800">{strand}</span>
             </div>
-          );
-        })}
+          )}
+        </div>
+      </div>
 
-        {/* Overall average card */}
-        {(() => {
-          const colors = getGradeColorClasses(overallAverage);
-          return (
-            <div
-              className={cn(
-                'bg-white rounded-xl shadow-card p-6 border',
-                colors.border,
-              )}
-            >
-              <p className="text-sm text-slate-500 mb-1">Overall</p>
-              <p className={cn('text-3xl font-bold', colors.text)}>
-                {formatGrade(overallAverage)}
-              </p>
-            </div>
-          );
-        })()}
-      </motion.div>
-
-      {/* Grades table */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="bg-white rounded-xl shadow-card overflow-hidden"
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px]">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600 uppercase tracking-wider sticky left-0 bg-gray-50 z-10 min-w-[200px]">
-                  Subject
+      {/* Grades Table */}
+      <div className="overflow-x-auto print:overflow-visible">
+        <table className="w-full min-w-[700px] print:min-w-0">
+          <thead>
+            <tr className="bg-navy-50 print:bg-gray-100">
+              <th className="text-left px-4 py-3 text-xs font-semibold text-navy-700 uppercase tracking-wider print:text-[10px] print:px-2 print:py-2 min-w-[200px] print:min-w-0">
+                Learning Areas
+              </th>
+              {periods.map((period) => (
+                <th
+                  key={period.id}
+                  className="text-center px-4 py-3 text-xs font-semibold text-navy-700 uppercase tracking-wider print:text-[10px] print:px-2 print:py-2 min-w-[80px] print:min-w-0"
+                >
+                  {period.label}
                 </th>
-                {periods.map((period) => (
-                  <th
-                    key={period.id}
-                    className="text-center px-4 py-3 text-sm font-semibold text-gray-600 uppercase tracking-wider min-w-[100px]"
-                  >
-                    {period.label}
-                  </th>
-                ))}
-                <th className="text-center px-4 py-3 text-sm font-semibold text-gray-600 uppercase tracking-wider min-w-[100px]">
-                  Final
-                </th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600 uppercase tracking-wider min-w-[160px]">
-                  Descriptor
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {subjects.map((subject) => {
-                const periodScores = periods.map((period) => {
-                  const pg = subject.period_grades.find(
-                    (pg) => pg.period_label === period.label,
-                  );
-                  return {
-                    period,
-                    score: pg?.score ?? null,
-                    overridden: pg?.adviser_overridden ?? false,
-                  };
-                });
+              ))}
+              <th className="text-center px-4 py-3 text-xs font-semibold text-navy-700 uppercase tracking-wider print:text-[10px] print:px-2 print:py-2 min-w-[100px] print:min-w-0">
+                Final Rating
+              </th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-navy-700 uppercase tracking-wider print:text-[10px] print:px-2 print:py-2 min-w-[140px] print:min-w-0">
+                Remarks
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 print:divide-gray-200">
+            {subjects.map((subject, idx) => {
+              const periodScores = periods.map((period) => {
+                const pg = subject.period_grades.find(
+                  (pg) => pg.period_label === period.label,
+                );
+                return {
+                  period,
+                  score: pg?.score ?? null,
+                  overridden: pg?.adviser_overridden ?? false,
+                };
+              });
 
-                const finalGrade = computeFinalGrade(periodScores.map((p) => p.score));
-                const descriptor = getDepEdLetterGrade(finalGrade);
+              const finalGrade = computeFinalGrade(periodScores.map((p) => p.score));
+              const descriptor = getDepEdLetterGrade(finalGrade);
+              const rowBg = idx % 2 === 0 ? 'bg-white' : 'bg-gray-50 print:bg-gray-50';
 
+              return (
+                <tr key={subject.course_section_id} className={rowBg}>
+                  <td className="px-4 py-3 print:px-2 print:py-1.5">
+                    <div className="font-medium text-slate-800 text-sm print:text-xs">
+                      {subject.course_title}
+                    </div>
+                    <div className="text-xs text-slate-500 print:text-[10px]">
+                      {subject.teacher_name}
+                    </div>
+                  </td>
+
+                  {periodScores.map(({ period, score, overridden }) => {
+                    const colors = getGradeColorClasses(score);
+                    return (
+                      <td key={period.id} className="text-center px-4 py-3 print:px-2 print:py-1.5">
+                        <span
+                          className={cn(
+                            'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-sm font-semibold print:text-xs',
+                            colors.bg,
+                            colors.text,
+                          )}
+                        >
+                          {formatGrade(score)}
+                          {overridden && (
+                            <span title="Grade adjusted by adviser">
+                              <FlagIcon className="w-3 h-3 text-amber-500 print:hidden" />
+                            </span>
+                          )}
+                        </span>
+                      </td>
+                    );
+                  })}
+
+                  {/* Final Rating column */}
+                  {(() => {
+                    const finalColors = getGradeColorClasses(finalGrade);
+                    return (
+                      <td className="text-center px-4 py-3 print:px-2 print:py-1.5">
+                        <span
+                          className={cn(
+                            'inline-flex items-center px-2 py-0.5 rounded-md text-sm font-bold print:text-xs',
+                            finalColors.bg,
+                            finalColors.text,
+                          )}
+                        >
+                          {formatGrade(finalGrade)}
+                        </span>
+                      </td>
+                    );
+                  })()}
+
+                  {/* Remarks column */}
+                  <td className="px-4 py-3 print:px-2 print:py-1.5">
+                    <span className="text-sm text-slate-700 print:text-xs">{descriptor}</span>
+                  </td>
+                </tr>
+              );
+            })}
+
+            {/* General Average row */}
+            <tr className="bg-navy-50 border-t-2 border-navy-200 print:bg-gray-100">
+              <td className="px-4 py-3 font-bold text-navy-800 text-sm print:text-xs print:px-2 print:py-1.5">
+                GENERAL AVERAGE
+              </td>
+
+              {periodAverages.map(({ period, average }) => {
+                const colors = getGradeColorClasses(average);
                 return (
-                  <tr key={subject.course_section_id} className="hover:bg-gray-50/50">
-                    <td className="px-4 py-3 sticky left-0 bg-white z-10">
-                      <div className="font-medium text-slate-800 text-sm">
-                        {subject.course_title}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        {subject.teacher_name}
-                      </div>
-                    </td>
-
-                    {periodScores.map(({ period, score, overridden }) => {
-                      const colors = getGradeColorClasses(score);
-                      return (
-                        <td key={period.id} className="text-center px-4 py-3">
-                          <span
-                            className={cn(
-                              'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-sm font-semibold',
-                              colors.bg,
-                              colors.text,
-                            )}
-                          >
-                            {formatGrade(score)}
-                            {overridden && (
-                              <span title="Grade adjusted by adviser">
-                                <FlagIcon className="w-3 h-3 text-amber-500" />
-                              </span>
-                            )}
-                          </span>
-                        </td>
-                      );
-                    })}
-
-                    {/* Final grade column */}
-                    {(() => {
-                      const finalColors = getGradeColorClasses(finalGrade);
-                      return (
-                        <td className="text-center px-4 py-3">
-                          <span
-                            className={cn(
-                              'inline-flex items-center px-2 py-0.5 rounded-md text-sm font-bold',
-                              finalColors.bg,
-                              finalColors.text,
-                            )}
-                          >
-                            {formatGrade(finalGrade)}
-                          </span>
-                        </td>
-                      );
-                    })()}
-
-                    {/* Descriptor column */}
-                    <td className="px-4 py-3">
-                      <span className="text-sm text-slate-700">{descriptor}</span>
-                    </td>
-                  </tr>
+                  <td key={period.id} className="text-center px-4 py-3 print:px-2 print:py-1.5">
+                    <span
+                      className={cn(
+                        'inline-flex items-center px-2 py-0.5 rounded-md text-sm font-bold print:text-xs',
+                        colors.bg,
+                        colors.text,
+                      )}
+                    >
+                      {formatGrade(average)}
+                    </span>
+                  </td>
                 );
               })}
 
-              {/* Overall average row */}
-              <tr className="bg-gray-50 border-t-2 border-gray-300">
-                <td className="px-4 py-3 sticky left-0 bg-gray-50 z-10 font-bold text-slate-800 text-sm">
-                  OVERALL AVERAGE
-                </td>
+              {/* Overall final rating */}
+              {(() => {
+                const colors = getGradeColorClasses(overallAverage);
+                return (
+                  <td className="text-center px-4 py-3 print:px-2 print:py-1.5">
+                    <span
+                      className={cn(
+                        'inline-flex items-center px-2 py-0.5 rounded-md text-sm font-bold print:text-xs',
+                        colors.bg,
+                        colors.text,
+                      )}
+                    >
+                      {formatGrade(overallAverage)}
+                    </span>
+                  </td>
+                );
+              })()}
 
-                {periodAverages.map(({ period, average }) => {
-                  const colors = getGradeColorClasses(average);
-                  return (
-                    <td key={period.id} className="text-center px-4 py-3">
-                      <span
-                        className={cn(
-                          'inline-flex items-center px-2 py-0.5 rounded-md text-sm font-bold',
-                          colors.bg,
-                          colors.text,
-                        )}
-                      >
-                        {formatGrade(average)}
-                      </span>
-                    </td>
-                  );
-                })}
+              {/* Overall remarks */}
+              <td className="px-4 py-3 print:px-2 print:py-1.5">
+                <span className="text-sm font-bold text-navy-800 print:text-xs">
+                  {overallDescriptor}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-                {/* Overall final grade */}
-                {(() => {
-                  const colors = getGradeColorClasses(overallAverage);
-                  return (
-                    <td className="text-center px-4 py-3">
-                      <span
-                        className={cn(
-                          'inline-flex items-center px-2 py-0.5 rounded-md text-sm font-bold',
-                          colors.bg,
-                          colors.text,
-                        )}
-                      >
-                        {formatGrade(overallAverage)}
-                      </span>
-                    </td>
-                  );
-                })()}
-
-                {/* Overall descriptor */}
-                <td className="px-4 py-3">
-                  <span className="text-sm font-bold text-slate-800">
-                    {overallDescriptor}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+      {/* Published Dates Footer */}
+      <div className="bg-gray-50 border-t border-gray-200 px-6 py-3 print:px-4 print:py-2">
+        <div className="flex flex-wrap gap-3">
+          {periods.map((period) => {
+            const hasGrades = subjects.some((s) =>
+              s.period_grades.some((pg) => pg.period_label === period.label && pg.score !== null),
+            );
+            if (!hasGrades) return null;
+            return (
+              <span
+                key={period.id}
+                className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200 print:border print:border-gray-300 print:bg-white print:text-gray-600"
+              >
+                {period.label} Published
+              </span>
+            );
+          })}
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

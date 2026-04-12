@@ -44,16 +44,18 @@ function StudentDashboard() {
         <p className="text-gray-500 mt-1">Access your enrolled courses and materials</p>
       </motion.div>
 
-      {/* Report Card Summary */}
-      <ReportCardCard />
-
-      {/* Course Grid */}
+      {/* Course Grid with Report Card Card as first item */}
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
         className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
       >
+        {/* Report Card Card */}
+        <motion.div variants={itemVariants}>
+          <ReportCardCard />
+        </motion.div>
+
         {studentCourses.map((course, index) => (
           <motion.div
             key={course.course_section_id}
@@ -134,21 +136,23 @@ function TeacherDashboard() {
         </div>
       </motion.div>
 
-      {/* Advisory Dashboard Card (only for advisers) */}
-      {user?.advisory_section_id && (
-        <AdvisoryDashboardCard
-          sectionId={user.advisory_section_id}
-          sectionName={user.advisory_section_name || ''}
-        />
-      )}
-
-      {/* Course Grid */}
+      {/* Course Grid with Advisory Card as first item */}
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
         className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
       >
+        {/* Advisory Dashboard Card (only for advisers) */}
+        {user?.advisory_section_id && (
+          <motion.div variants={itemVariants}>
+            <AdvisoryDashboardCard
+              sectionId={user.advisory_section_id}
+              sectionName={user.advisory_section_name || ''}
+            />
+          </motion.div>
+        )}
+
         {teacherCourses.map((course, index) => (
           <motion.div
             key={course.course_section_id}

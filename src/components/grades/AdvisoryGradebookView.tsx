@@ -83,7 +83,7 @@ export function AdvisoryGradebookView({ sectionId }: { sectionId: string }) {
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
   const [overriddenEntries, setOverriddenEntries] = useState<Set<string>>(new Set());
 
-  const { data, isLoading, error, refetch } = useQuery<AdvisoryGradeData>({
+  const { data, isPending, error, refetch } = useQuery<AdvisoryGradeData>({
     queryKey: ['advisoryGrades', sectionId],
     queryFn: () => gradingApi.getAdvisoryGrades(sectionId),
     enabled: !!sectionId,
@@ -129,7 +129,7 @@ export function AdvisoryGradebookView({ sectionId }: { sectionId: string }) {
     },
   });
 
-  if (isLoading) return <LoadingState />;
+  if (isPending) return <LoadingState />;
   if (error) return <ErrorState message="Failed to load advisory grades" onRetry={() => refetch()} />;
 
   const students = data?.students || [];

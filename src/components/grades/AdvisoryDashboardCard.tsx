@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
-import { GraduationCap, AlertTriangle, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
+import { Users, AlertTriangle, ChevronRight, GraduationCap, Loader2, AlertCircle } from 'lucide-react';
 import { gradingApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { isAtRisk } from '@/lib/gradeUtils';
@@ -56,17 +56,37 @@ function countAtRiskStudents(data: AdvisoryGradeData): number {
 }
 
 export function AdvisoryDashboardCard({ sectionId, sectionName }: AdvisoryDashboardCardProps) {
-  const { data: grades, isLoading, error, refetch } = useQuery<AdvisoryGradeData>({
+  const { data: grades, isPending, error, refetch } = useQuery<AdvisoryGradeData>({
     queryKey: ['advisoryGrades', sectionId],
     queryFn: () => gradingApi.getAdvisoryGrades(sectionId),
     enabled: !!sectionId,
   });
 
-  if (isLoading) {
+  if (isPending) {
     return (
-      <div className="bg-white rounded-xl shadow-card p-6 mb-8">
-        <div className="flex items-center justify-center py-6">
-          <Loader2 className="w-6 h-6 text-navy-600 animate-spin" />
+      <div className="group">
+        <div className="block bg-white rounded-2xl shadow-card overflow-hidden">
+          <div className="h-32 bg-gradient-to-r from-navy-600 to-navy-800 relative overflow-hidden">
+            <div className="absolute inset-0 opacity-20">
+              <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <pattern id="grid-advisory-loading" width="20" height="20" patternUnits="userSpaceOnUse">
+                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="white" strokeWidth="0.5" />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid-advisory-loading)" />
+              </svg>
+            </div>
+            <div className="relative z-10 p-6">
+              <div className="h-3 w-20 bg-white/20 rounded animate-pulse" />
+              <div className="h-6 w-32 bg-white/20 rounded mt-2 animate-pulse" />
+            </div>
+          </div>
+          <div className="p-5">
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="w-6 h-6 text-navy-600 animate-spin" />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -74,18 +94,38 @@ export function AdvisoryDashboardCard({ sectionId, sectionName }: AdvisoryDashbo
 
   if (error) {
     return (
-      <div className="bg-white rounded-xl shadow-card p-6 mb-8">
-        <div className="flex flex-col items-center justify-center py-4 text-gray-500">
-          <AlertCircle className="w-8 h-8 mb-2" />
-          <p className="text-sm">Failed to load advisory data</p>
-          <button
-            onClick={() => refetch()}
-            className="mt-2 text-sm text-navy-600 hover:text-navy-800 underline"
-          >
-            Try Again
-          </button>
+      <motion.div whileHover={{ y: -4 }} className="group">
+        <div className="block bg-white rounded-2xl shadow-card overflow-hidden">
+          <div className="h-32 bg-gradient-to-r from-navy-600 to-navy-800 relative overflow-hidden">
+            <div className="absolute inset-0 opacity-20">
+              <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <pattern id="grid-advisory-error" width="20" height="20" patternUnits="userSpaceOnUse">
+                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="white" strokeWidth="0.5" />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid-advisory-error)" />
+              </svg>
+            </div>
+            <div className="relative z-10 p-6">
+              <span className="text-white/80 text-xs font-semibold uppercase tracking-wider">Advisory</span>
+              <h3 className="text-white font-display text-xl font-semibold mt-1">{sectionName}</h3>
+            </div>
+          </div>
+          <div className="p-5">
+            <div className="flex flex-col items-center justify-center py-4 text-gray-500">
+              <AlertCircle className="w-8 h-8 mb-2" />
+              <p className="text-sm">Failed to load advisory data</p>
+              <button
+                onClick={() => refetch()}
+                className="mt-2 text-sm text-navy-600 hover:text-navy-800 underline"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
@@ -93,85 +133,104 @@ export function AdvisoryDashboardCard({ sectionId, sectionName }: AdvisoryDashbo
   const submissionStatus = grades?.submission_status || [];
   const periodProgress = computePeriodProgress(periods, submissionStatus);
   const atRiskCount = grades ? countAtRiskStudents(grades) : 0;
-  const firstCourseSectionId = submissionStatus[0]?.course_section_id;
+  const studentCount = grades?.students.length || 0;
 
   const schoolYear = grades?.school_year || '';
   const isSHS = grades?.grade_level === 'Grade 11' || grades?.grade_level === 'Grade 12';
   const semesterLabel = isSHS ? '1st Semester' : '';
+  const gradeLevel = grades?.grade_level || '';
+  const strand = grades?.strand || '';
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-xl shadow-card p-6 mb-8"
+      whileHover={{ y: -4 }}
+      className="group"
     >
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-10 h-10 bg-navy-100 rounded-xl flex items-center justify-center">
-          <GraduationCap className="w-5 h-5 text-navy-600" />
+      <Link
+        href={`/advisory/${sectionId}/grades`}
+        className="block bg-white rounded-2xl shadow-card overflow-hidden hover:shadow-card-hover transition-all duration-300"
+      >
+        {/* Header with Navy Gradient */}
+        <div className="h-32 bg-gradient-to-r from-navy-600 to-navy-800 p-6 relative overflow-hidden">
+          <div className="absolute inset-0 opacity-20">
+            <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <pattern id={`grid-advisory-${sectionId}`} width="20" height="20" patternUnits="userSpaceOnUse">
+                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="white" strokeWidth="0.5" />
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill={`url(#grid-advisory-${sectionId})`} />
+            </svg>
+          </div>
+          <div className="relative z-10">
+            <span className="text-white/80 text-xs font-semibold uppercase tracking-wider">
+              Advisory
+            </span>
+            <h3 className="text-white font-display text-xl font-semibold mt-1">
+              {sectionName}
+            </h3>
+            <p className="text-white/70 text-sm mt-1">
+              {gradeLevel}{strand && strand !== 'NONE' ? ` \u2022 ${strand}` : ''}
+              {schoolYear ? ` \u2022 SY ${schoolYear}` : ''}
+              {semesterLabel ? ` \u2022 ${semesterLabel}` : ''}
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className="font-display text-lg font-semibold text-navy-800">
-            My Advisory: {sectionName}
-          </h2>
-          <p className="text-sm text-gray-500">
-            {schoolYear}{semesterLabel ? ` \u2022 ${semesterLabel}` : ''}
-          </p>
-        </div>
-      </div>
 
-      {/* Submission Progress */}
-      <div className="mb-5">
-        <h3 className="text-sm font-semibold text-navy-800 mb-3">Submission Progress</h3>
-        <div className="space-y-2">
-          {periodProgress.map(({ periodLabel, submitted, total }) => {
-            const pct = total > 0 ? (submitted / total) * 100 : 0;
-            const isComplete = submitted === total && total > 0;
+        {/* Body */}
+        <div className="p-5">
+          {/* Student count */}
+          <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
+            <Users className="w-4 h-4" />
+            <span>{studentCount} student{studentCount !== 1 ? 's' : ''}</span>
+          </div>
 
-            return (
-              <div key={periodLabel} className="flex items-center gap-3">
-                <span className="text-sm text-gray-600 w-8 font-medium">{periodLabel}</span>
-                <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className={cn(
-                      'h-full rounded-full transition-all duration-500',
-                      isComplete ? 'bg-green-500' : 'bg-blue-500',
-                    )}
-                    style={{ width: `${pct}%` }}
-                  />
+          {/* Submission Progress */}
+          <div className="space-y-2 mb-4">
+            {periodProgress.map(({ periodLabel, submitted, total }) => {
+              const pct = total > 0 ? (submitted / total) * 100 : 0;
+              const isComplete = submitted === total && total > 0;
+
+              return (
+                <div key={periodLabel} className="flex items-center gap-3">
+                  <span className="text-sm text-gray-600 w-8 font-medium">{periodLabel}</span>
+                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full rounded-full transition-all duration-500',
+                        isComplete ? 'bg-green-500' : 'bg-navy-500',
+                      )}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className={cn(
+                    'text-xs font-medium w-32 text-right',
+                    isComplete ? 'text-green-600' : 'text-gray-500',
+                  )}>
+                    {submitted}/{total} submitted
+                  </span>
                 </div>
-                <span className={cn(
-                  'text-xs font-medium w-32 text-right',
-                  isComplete ? 'text-green-600' : 'text-gray-500',
-                )}>
-                  {submitted}/{total} subjects submitted
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+              );
+            })}
+          </div>
 
-      {/* At-Risk Warning */}
-      {atRiskCount > 0 && (
-        <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
-          <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-          <span className="text-sm text-amber-700">
-            {atRiskCount} student{atRiskCount !== 1 ? 's' : ''} at risk (grade &lt; 75 in any subject)
-          </span>
-        </div>
-      )}
+          {/* At-Risk Warning */}
+          {atRiskCount > 0 && (
+            <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+              <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+              <span className="text-sm text-amber-700">
+                {atRiskCount} at risk
+              </span>
+            </div>
+          )}
 
-      {/* Manage Advisory Grades Link */}
-      {firstCourseSectionId && (
-        <Link
-          href={`/courses/${firstCourseSectionId}?tab=grades&subtab=advisory`}
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-navy-600 hover:text-navy-800 transition-colors group"
-        >
-          Manage Advisory Grades
-          <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-        </Link>
-      )}
+          {/* Footer */}
+          <div className="flex items-center gap-2 text-navy-600 group-hover:text-navy-800 transition-colors">
+            <span className="text-sm font-medium">Manage Advisory</span>
+            <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </div>
+        </div>
+      </Link>
     </motion.div>
   );
 }
