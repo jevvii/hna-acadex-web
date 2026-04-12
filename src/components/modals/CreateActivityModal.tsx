@@ -36,6 +36,9 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
   const [deadline, setDeadline] = useState<Dayjs | null>(null);
   const [allowLateSubmissions, setAllowLateSubmissions] = useState(true);
   const [fileTypes, setFileTypes] = useState<string[]>(['all']);
+  const [componentType, setComponentType] = useState<'written_works' | 'performance_task' | null>(null);
+  const [isExam, setIsExam] = useState(false);
+  const [examType, setExamType] = useState<'monthly' | 'quarterly' | null>(null);
   const [error, setError] = useState('');
 
   const editor = useEditor({
@@ -92,6 +95,9 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
       if (selectedModuleId) {
         formData.append('weekly_module_id', selectedModuleId);
       }
+      formData.append('component_type', isExam ? (examType === 'monthly' ? 'written_works' : 'quarterly_assessment') : (componentType || ''));
+      formData.append('is_exam', String(isExam));
+      formData.append('exam_type', isExam ? (examType || '') : '');
       return activitiesApi.createActivity(courseId, formData);
     },
     onSuccess: () => {
@@ -115,6 +121,9 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
     setDeadline(null);
     setAllowLateSubmissions(true);
     setFileTypes(['all']);
+    setComponentType(null);
+    setIsExam(false);
+    setExamType(null);
     setError('');
     editor?.commands.clearContent();
   };
@@ -127,6 +136,14 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
     }
     if (!points || parseInt(points) <= 0) {
       setError('Points must be greater than 0');
+      return;
+    }
+    if (!isExam && !componentType) {
+      setError('Please select a learning component (Written Works or Performance Task)');
+      return;
+    }
+    if (isExam && !examType) {
+      setError('Please select an exam type (Monthly or Quarterly)');
       return;
     }
     createMutation.mutate();
@@ -185,7 +202,7 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g., Week 1 Assignment"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-slate-900 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors"
               />
             </div>
 
@@ -327,7 +344,7 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
                   value={points}
                   onChange={(e) => setPoints(e.target.value)}
                   min="1"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-slate-900 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors"
                 />
               </div>
               <div>
@@ -339,7 +356,7 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
                   value={attemptLimit}
                   onChange={(e) => setAttemptLimit(e.target.value)}
                   min="1"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-slate-900 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors"
                 />
               </div>
             </div>
@@ -390,6 +407,90 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Learning Component / Exam Type */}
+            <div className="space-y-3">
+              {/* Mark as Exam toggle */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isExam}
+                  onChange={(e) => {
+                    setIsExam(e.target.checked);
+                    if (e.target.checked) {
+                      setComponentType(null);
+                    } else {
+                      setExamType(null);
+                    }
+                  }}
+                  className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
+                />
+                <span className="text-sm font-medium text-gray-700">This is an Exam</span>
+              </label>
+
+              {/* Component Type selector - shown when NOT an exam */}
+              {!isExam && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Learning Component <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    {([
+                      { value: 'written_works', label: 'Written Works' },
+                      { value: 'performance_task', label: 'Performance Task' },
+                    ] as const).map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setComponentType(opt.value)}
+                        className={cn(
+                          'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                          componentType === opt.value
+                            ? 'bg-navy-600 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Exam Type selector - shown when IS an exam */}
+              {isExam && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Exam Type <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    {([
+                      { value: 'monthly', label: 'Monthly Exam' },
+                      { value: 'quarterly', label: 'Quarterly Exam' },
+                    ] as const).map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setExamType(opt.value)}
+                        className={cn(
+                          'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                          examType === opt.value
+                            ? 'bg-navy-600 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {examType === 'monthly' ? 'Counts as Written Works' :
+                     examType === 'quarterly' ? 'Counts as Quarterly Assessment' :
+                     'Select an exam type to see component mapping'}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Deadline Toggle */}

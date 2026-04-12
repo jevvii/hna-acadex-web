@@ -514,6 +514,9 @@ export default function ActivityDetailsPage() {
     allowed_file_types: string[];
     score_selection_policy: 'highest' | 'latest';
     weekly_module_id: string;
+    component_type: 'written_works' | 'performance_task' | 'quarterly_assessment' | null;
+    is_exam: boolean;
+    exam_type: 'monthly' | 'quarterly' | null;
   }>({
     title: '',
     instructions: '',
@@ -525,6 +528,9 @@ export default function ActivityDetailsPage() {
     allowed_file_types: ['all'],
     score_selection_policy: 'highest',
     weekly_module_id: '',
+    component_type: null,
+    is_exam: false,
+    exam_type: null,
   });
   const [editError, setEditError] = useState('');
 
@@ -600,6 +606,9 @@ export default function ActivityDetailsPage() {
       allowed_file_types: activity.allowed_file_types || ['all'],
       score_selection_policy: (activity.score_selection_policy as 'highest' | 'latest') || 'highest',
       weekly_module_id: activity.weekly_module_id || '',
+      component_type: activity.component_type ?? null,
+      is_exam: activity.is_exam ?? false,
+      exam_type: activity.exam_type ?? null,
     });
 
     // Initialize Tiptap editor content
@@ -640,6 +649,9 @@ export default function ActivityDetailsPage() {
       if (editForm.weekly_module_id) {
         formData.append('weekly_module_id', editForm.weekly_module_id);
       }
+      formData.append('component_type', editForm.is_exam ? (editForm.exam_type === 'monthly' ? 'written_works' : 'quarterly_assessment') : (editForm.component_type || ''));
+      formData.append('is_exam', String(editForm.is_exam));
+      formData.append('exam_type', editForm.is_exam ? (editForm.exam_type || '') : '');
       return activitiesApi.updateActivity(activityId, formData);
     },
     onSuccess: () => {
@@ -657,6 +669,14 @@ export default function ActivityDetailsPage() {
   const handleSaveEdit = () => {
     if (!editForm.title.trim()) {
       setEditError('Title is required');
+      return;
+    }
+    if (!editForm.is_exam && !editForm.component_type) {
+      setEditError('Please select a learning component (Written Works or Performance Task)');
+      return;
+    }
+    if (editForm.is_exam && !editForm.exam_type) {
+      setEditError('Please select an exam type (Monthly or Quarterly)');
       return;
     }
     if (!editForm.points || editForm.points <= 0) {
@@ -729,6 +749,20 @@ export default function ActivityDetailsPage() {
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
                   <h1 className="font-display text-2xl lg:text-3xl font-bold text-navy-900">{activity.title}</h1>
+                  {activity.is_exam && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+                      {activity.exam_type === 'monthly' ? 'Monthly Exam' :
+                       activity.exam_type === 'quarterly' ? 'Quarterly Exam' :
+                       'Exam'}
+                    </span>
+                  )}
+                  {!activity.is_exam && activity.component_type && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">
+                      {activity.component_type === 'written_works' ? 'Written Works' :
+                       activity.component_type === 'performance_task' ? 'Performance Task' :
+                       activity.component_type === 'quarterly_assessment' ? 'Quarterly Assessment' : null}
+                    </span>
+                  )}
                   {/* Status badge - only show for students */}
                   {isStudent && (isGraded && activity.my_submission ? (
                     <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium flex items-center gap-1">
@@ -804,7 +838,7 @@ export default function ActivityDetailsPage() {
                       type="text"
                       value={editForm.title}
                       onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-slate-900 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none"
                     />
                   </div>
 
@@ -880,7 +914,7 @@ export default function ActivityDetailsPage() {
                         value={editForm.points}
                         onChange={(e) => setEditForm({ ...editForm, points: parseInt(e.target.value) || 0 })}
                         min="1"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-slate-900 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none"
                       />
                     </div>
                     <div>
@@ -890,7 +924,7 @@ export default function ActivityDetailsPage() {
                         value={editForm.attempt_limit}
                         onChange={(e) => setEditForm({ ...editForm, attempt_limit: parseInt(e.target.value) || 1 })}
                         min="1"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-slate-900 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none"
                       />
                     </div>
                   </div>
@@ -915,6 +949,90 @@ export default function ActivityDetailsPage() {
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Learning Component / Exam Type */}
+                  <div className="space-y-3">
+                    {/* Mark as Exam toggle */}
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editForm.is_exam}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setEditForm({
+                            ...editForm,
+                            is_exam: checked,
+                            ...(checked ? { component_type: null } : { exam_type: null }),
+                          });
+                        }}
+                        className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700">This is an Exam</span>
+                    </label>
+
+                    {/* Component Type selector - shown when NOT an exam */}
+                    {!editForm.is_exam && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                          Learning Component <span className="text-red-500">*</span>
+                        </label>
+                        <div className="flex gap-2">
+                          {([
+                            { value: 'written_works', label: 'Written Works' },
+                            { value: 'performance_task', label: 'Performance Task' },
+                          ] as const).map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => setEditForm({ ...editForm, component_type: opt.value })}
+                              className={cn(
+                                'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                                editForm.component_type === opt.value
+                                  ? 'bg-navy-600 text-white'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              )}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Exam Type selector - shown when IS an exam */}
+                    {editForm.is_exam && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                          Exam Type <span className="text-red-500">*</span>
+                        </label>
+                        <div className="flex gap-2">
+                          {([
+                            { value: 'monthly', label: 'Monthly Exam' },
+                            { value: 'quarterly', label: 'Quarterly Exam' },
+                          ] as const).map((opt) => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => setEditForm({ ...editForm, exam_type: opt.value })}
+                              className={cn(
+                                'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                                editForm.exam_type === opt.value
+                                  ? 'bg-navy-600 text-white'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              )}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1">
+                          {editForm.exam_type === 'monthly' ? 'Counts as Written Works' :
+                           editForm.exam_type === 'quarterly' ? 'Counts as Quarterly Assessment' :
+                           'Select an exam type to see component mapping'}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Deadline */}

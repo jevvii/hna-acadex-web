@@ -566,7 +566,7 @@ export const gradingApi = {
 
   // Advisory teacher grades (all students in advisory section)
   getAdvisoryGrades: async (sectionId: string): Promise<AdvisoryGradeData> => {
-    return api.get(`/course-sections/${sectionId}/grades/advisory/`);
+    return api.get(`/sections/${sectionId}/grades/advisory/`);
   },
 
   // Subject teacher gradebook

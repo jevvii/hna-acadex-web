@@ -85,17 +85,3 @@ export function getInitials(name: string): string {
     .toUpperCase()
     .slice(0, 2);
 }
-
-export function getGradeColor(grade: number): string {
-  if (grade >= 90) return "text-success";
-  if (grade >= 80) return "text-info";
-  if (grade >= 70) return "text-warning";
-  return "text-error";
-}
-
-export function getGradeBg(grade: number): string {
-  if (grade >= 90) return "bg-success/10";
-  if (grade >= 80) return "bg-info/10";
-  if (grade >= 70) return "bg-warning/10";
-  return "bg-error/10";
-}

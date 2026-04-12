@@ -7,6 +7,10 @@ export type GradeLevel =
 export type SubmissionStatus = 'not_submitted' | 'submitted' | 'late' | 'graded';
 export type ScoreSelectionPolicy = 'latest' | 'highest';
 
+export type ComponentType = 'written_works' | 'performance_task' | 'quarterly_assessment';
+
+export type ExamType = 'monthly' | 'quarterly';
+
 export type ActivityStatus = 'not-submitted' | 'submitted' | 'graded';
 
 export interface AttemptDisplay {
@@ -62,6 +66,8 @@ export interface Profile {
   student_id?: string;
   theme?: 'light' | 'dark' | 'system';
   requires_setup?: boolean;
+  advisory_section_id?: string;
+  advisory_section_name?: string;
   created_at: string;
   updated_at: string;
 }
@@ -213,6 +219,9 @@ export interface Activity {
   support_file_url?: string;
   attempt_limit?: number;
   score_selection_policy?: ScoreSelectionPolicy;
+  component_type?: ComponentType | null;
+  is_exam?: boolean;
+  exam_type?: ExamType | null;
   is_published: boolean;
   created_by?: string;
   student_count?: number;
@@ -619,27 +628,6 @@ export interface QuizQuestionWithData extends QuizQuestion {
   blanks?: { id: string; correct_answer: string }[];
 }
 
-// Builder question types (frontend state)
-export interface QuestionOption {
-  id: string;
-  text: string;  // Maps to 'choice_text' in API
-  is_correct: boolean;
-  sort_order: number;
-}
-
-export interface Question {
-  id: string;  // 'new-${uuid}' for new, uuid string for existing
-  type: QuizQuestionType;
-  text: string;  // HTML from Tiptap
-  points: number;
-  sort_order: number;
-  options?: QuestionOption[];  // Maps to 'choices' in API
-  correct_answer?: string;  // For identification type
-  alternate_answers?: string[];  // For identification type
-  case_sensitive?: boolean;  // For identification type
-  word_limit?: number;  // For essay type
-}
-
 // Meeting with attendance records
 export interface MeetingWithAttendance extends MeetingSession {
   attendance_records?: AttendanceRecord[];
@@ -647,95 +635,6 @@ export interface MeetingWithAttendance extends MeetingSession {
   present_count?: number;
   absent_count?: number;
   late_count?: number;
-}
-
-// Quiz builder types
-export interface QuestionOption {
-  id: string;
-  text: string;
-  is_correct: boolean;
-  sort_order: number;
-}
-
-export interface Question {
-  id: string;
-  type: QuizQuestionType;
-  text: string;
-  points: number;
-  sort_order: number;
-  options?: QuestionOption[];
-  correct_answer?: string;
-  alternate_answers?: string[];
-  case_sensitive?: boolean;
-  word_limit?: number;
-}
-
-// Quiz Builder types (frontend state)
-export interface QuestionOption {
-  id: string;
-  text: string;
-  is_correct: boolean;
-  sort_order: number;
-}
-
-export interface Question {
-  id: string;
-  type: QuizQuestionType;
-  text: string;
-  points: number;
-  sort_order: number;
-  options?: QuestionOption[];
-  correct_answer?: string;
-  alternate_answers?: string[];
-  case_sensitive?: boolean;
-  word_limit?: number;
-}
-
-// Attendance types
-export interface AttendanceSummary {
-  total_sessions: number;
-  present_count: number;
-  absent_count: number;
-  late_count: number;
-  excused_count: number;
-  attendance_percentage: number;
-}
-
-export interface AttendanceHistoryItem {
-  meeting_id: string;
-  date: string;
-  title: string;
-  status: AttendanceStatus | null;  // null means unmarked/not recorded
-  remarks?: string | null;
-}
-
-export interface AttendanceOverviewStudent {
-  course_section_id: string;
-  sessions: MeetingSession[];
-  summary: AttendanceSummary;
-  history: AttendanceHistoryItem[];
-  updated_at: string;
-}
-
-export interface AttendanceStudent {
-  student_id: string;
-  student_name: string;
-  student_email: string;
-  avatar_url?: string | null;
-  total_sessions: number;
-  present_count: number;
-  absent_count: number;
-  late_count: number;
-  excused_count: number;
-  attendance_percentage: number;
-}
-
-export interface AttendanceOverviewTeacher {
-  course_section_id: string;
-  sessions: MeetingSession[];
-  students: AttendanceStudent[];
-  records: AttendanceRecord[];
-  updated_at: string;
 }
 
 // Grading Period types
@@ -831,9 +730,11 @@ export interface AdvisorySubjectGrade {
   subject_title: string;
   teacher_name: string;
   periods: {
+    grading_period_id: string;
     period_label: string;
     score: number | null;
     is_published: boolean;
+    grade_entry_id?: string | null;
   }[];
   final_grade: number | null;
   final_grade_letter: string | null;
@@ -854,6 +755,15 @@ export interface AdvisoryGradeData {
   school_year: string;
   periods: GradingPeriod[];
   students: AdvisoryStudentGrade[];
+  submission_status: AdvisorySubmissionStatus[];
+  report_card_status: AdvisoryReportCardStatus[];
+}
+
+export interface AdvisoryReportCardStatus {
+  grading_period_id: string;
+  period_label: string;
+  is_published: boolean;
+  published_at: string | null;
 }
 
 // Grade weight configuration types

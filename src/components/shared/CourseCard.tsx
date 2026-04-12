@@ -71,33 +71,19 @@ export const StudentCourseCard = memo(function StudentCourseCard({ course, index
           {course.grade_summary && (
             <div className="border-t border-gray-100 pt-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-500">Current Grade</p>
-                  <p className={cn(
-                    'text-2xl font-bold',
-                    course.final_grade && course.final_grade >= 90 ? 'text-green-600' :
-                    course.final_grade && course.final_grade >= 80 ? 'text-blue-600' :
-                    course.final_grade && course.final_grade >= 75 ? 'text-yellow-600' :
-                    'text-gray-600'
-                  )}>
-                    {course.final_grade_letter || 'N/A'}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">Progress</p>
-                  <div className="flex items-center gap-2">
-                    <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-navy-600 rounded-full"
-                        style={{
-                          width: `${(course.grade_summary.graded_items_count / Math.max(course.grade_summary.total_items_count, 1)) * 100}%`
-                        }}
-                      />
-                    </div>
-                    <span className="text-xs text-gray-500">
-                      {course.grade_summary.graded_items_count}/{course.grade_summary.total_items_count}
-                    </span>
+                <p className="text-sm text-gray-500">Progress</p>
+                <div className="flex items-center gap-2">
+                  <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-navy-600 rounded-full"
+                      style={{
+                        width: `${(course.grade_summary.graded_items_count / Math.max(course.grade_summary.total_items_count, 1)) * 100}%`
+                      }}
+                    />
                   </div>
+                  <span className="text-xs text-gray-500">
+                    {course.grade_summary.graded_items_count}/{course.grade_summary.total_items_count}
+                  </span>
                 </div>
               </div>
             </div>

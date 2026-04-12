@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useCoursesStore } from '@/store/courses';
-import { useIsStudent, useIsTeacher } from '@/store/auth';
+import { useIsStudent, useIsTeacher, useAuthStore } from '@/store/auth';
 import { CreateActivityModal } from '@/components/modals/CreateActivityModal';
 import { CreateQuizModal } from '@/components/modals/CreateQuizModal';
 import { cn, getInitials, toMediaProxyUrl } from '@/lib/utils';
@@ -45,6 +46,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ExternalLink,
+  ClipboardList,
   Download,
   Calendar,
   Clock,
@@ -67,7 +69,7 @@ import {
   Maximize2,
   Minimize2,
 } from 'lucide-react';
-import { StudentGradesView, TeacherGradesView } from '@/components/grades';
+import { TeacherGradesView } from '@/components/grades';
 
 const tabs = [
   { id: 'modules', label: 'Modules', icon: BookOpen },
@@ -384,7 +386,15 @@ function ModulesTab({
                             {item.type === 'quiz' && <ClipboardCheck className={cn('w-4.5 h-4.5', item.iconColor)} />}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-navy-800 truncate">{item.title}</div>
+                            <div className="flex items-center gap-1.5">
+                              <div className="text-sm font-medium text-navy-800 truncate">{item.title}</div>
+                              {item.type === 'activity' && (item.originalItem as Activity).is_exam && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 flex-shrink-0">
+                                  {(item.originalItem as Activity).exam_type === 'monthly' ? 'Monthly' :
+                                   (item.originalItem as Activity).exam_type === 'quarterly' ? 'Quarterly' : 'Exam'}
+                                </span>
+                              )}
+                            </div>
                             <div className="text-xs text-gray-400 mt-0.5">{item.meta}</div>
                           </div>
                           <div className="flex-shrink-0">
@@ -809,6 +819,13 @@ function AssignmentsTab({
                     {!activity.is_published && isTeacher && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
                         Draft
+                      </span>
+                    )}
+                    {activity.is_exam && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+                        {activity.exam_type === 'monthly' ? 'Monthly Exam' :
+                         activity.exam_type === 'quarterly' ? 'Quarterly Exam' :
+                         'Exam'}
                       </span>
                     )}
                   </div>
@@ -2541,20 +2558,97 @@ function GradesTab({ courseId, courseInfo }: { courseId: string; courseInfo?: { 
   const isStudent = useIsStudent();
   const isTeacher = useIsTeacher();
   const queryClient = useQueryClient();
+  const user = useAuthStore((state) => state.user);
+  const searchParams = useSearchParams();
 
-  // For students, use StudentGradesView
+  const defaultSubTab = searchParams.get('subtab') === 'advisory' ? 'advisory' : 'subject';
+  const [gradesSubTab, setGradesSubTab] = useState<'subject' | 'advisory'>(defaultSubTab);
+
+  // Determine roles for this course
+  const isSubjectTeacher = courseInfo?.teacher_id === user?.id;
+  const isAdviserForThisSection = !!user?.advisory_section_id;
+
+  // For students, redirect to Report Card page
   if (isStudent) {
-    return <StudentGradesView courseSectionId={courseId} />;
+    return (
+      <div className="text-center py-12">
+        <ClipboardList className="mx-auto h-10 w-10 text-slate-300" />
+        <h3 className="mt-3 text-base font-medium text-slate-700">
+          Your grades are on your Report Card
+        </h3>
+        <p className="mt-1 text-sm text-slate-500">
+          Your adviser publishes your consolidated report card{' '}
+          with grades from all subjects.
+        </p>
+        <Link
+          href="/report-card"
+          className="mt-4 inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-500"
+        >
+          View My Report Card →
+        </Link>
+      </div>
+    );
   }
 
-  // For teachers, use TeacherGradesView
-  // Note: Advisory view requires section_id and TeacherAdvisory check on backend
-  // For now, subject teachers see their subject gradebook
-  if (isTeacher) {
-    return <TeacherGradesView courseSectionId={courseId} />;
+  // Determine which sub-tabs to show
+  const showSubjectTab = isSubjectTeacher || !isAdviserForThisSection;
+  const showAdvisoryTab = isAdviserForThisSection;
+  const showBothTabs = showSubjectTab && showAdvisoryTab;
+
+  // Effective tab: if only one tab is available, force it
+  const effectiveTab: 'subject' | 'advisory' = showBothTabs
+    ? gradesSubTab
+    : showAdvisoryTab
+      ? 'advisory'
+      : 'subject';
+
+  // Sub-tab bar (pill style, only when both roles apply)
+  const subTabBar = showBothTabs ? (
+    <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6">
+      <button
+        onClick={() => setGradesSubTab('subject')}
+        className={cn(
+          'px-4 py-2 text-sm font-medium rounded-lg transition-all',
+          effectiveTab === 'subject'
+            ? 'bg-white shadow-sm text-navy-800'
+            : 'text-gray-500 hover:text-gray-700'
+        )}
+      >
+        My Subject
+      </button>
+      <button
+        onClick={() => setGradesSubTab('advisory')}
+        className={cn(
+          'px-4 py-2 text-sm font-medium rounded-lg transition-all',
+          effectiveTab === 'advisory'
+            ? 'bg-white shadow-sm text-navy-800'
+            : 'text-gray-500 hover:text-gray-700'
+        )}
+      >
+        Advisory
+      </button>
+    </div>
+  ) : null;
+
+  // For teachers and admins
+  if (isTeacher || !isStudent) {
+    return (
+      <div>
+        {subTabBar}
+        {effectiveTab === 'subject' ? (
+          <TeacherGradesView courseSectionId={courseId} />
+        ) : (
+          <TeacherGradesView
+            courseSectionId={courseId}
+            isAdvisory
+            sectionId={user?.advisory_section_id}
+          />
+        )}
+      </div>
+    );
   }
 
-  // Admin fallback - could show either view, defaulting to subject view
+  // Fallback
   return <TeacherGradesView courseSectionId={courseId} />;
 }
 

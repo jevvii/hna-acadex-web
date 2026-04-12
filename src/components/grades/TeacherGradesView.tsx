@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { TrendingUp, AlertCircle, Loader2, Edit2, Check, X, Users, BookOpen, Send, RotateCcw, Lock, ShieldCheck } from 'lucide-react';
 import { gradingApi, coursesApi } from '@/lib/api';
 import { GradeWeightsConfig } from './GradeWeightsConfig';
+import { AdvisoryGradebookView } from './AdvisoryGradebookView';
 import { useIsTeacher } from '@/store/auth';
-import type { SubjectGradeData, AdvisoryGradeData, GradingPeriod, GradeEntry, GradeLevel, GradeSubmission } from '@/lib/types';
+import type { SubjectGradeData, GradingPeriod, GradeEntry, GradeLevel, GradeSubmission } from '@/lib/types';
 import { getGradeColorClass, getGradeBgClass, formatGrade, getPeriodLabels, getLetterGrade } from '@/lib/gradeUtils';
 import { cn } from '@/lib/utils';
 
@@ -426,90 +427,7 @@ function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId
   );
 }
 
-// Advisory Teacher View (Read-only overview of all students across all subjects)
-function AdvisoryGradebookView({ sectionId }: { sectionId: string }) {
-  const { data: grades, isLoading, error, refetch } = useQuery<AdvisoryGradeData>({
-    queryKey: ['advisoryGrades', sectionId],
-    queryFn: () => gradingApi.getAdvisoryGrades(sectionId),
-    enabled: !!sectionId,
-  });
-
-  if (isLoading) return <LoadingState />;
-  if (error) return <ErrorState message="Failed to load advisory grades" onRetry={() => refetch()} />;
-
-  const students = grades?.students || [];
-  const periods = grades?.periods || [];
-  const subjects = students[0]?.subjects || [];
-
-  return (
-    <div className="space-y-6">
-      {/* Section info */}
-      <div className="bg-white rounded-xl shadow-card p-4">
-        <div className="flex items-center gap-4">
-          <Users className="w-6 h-6 text-navy-600" />
-          <div>
-            <h3 className="font-semibold text-navy-800">{grades?.section_name}</h3>
-            <p className="text-sm text-gray-500">
-              {grades?.grade_level} - {grades?.strand} | {grades?.school_year}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Advisory Overview Table */}
-      <div className="bg-white rounded-xl shadow-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px]">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="sticky left-0 bg-gray-50 z-10 text-left px-4 py-3 text-sm font-semibold text-gray-600 uppercase tracking-wider min-w-[180px]">
-                  Student Name
-                </th>
-                {subjects.map((subject) => (
-                  <th key={subject.subject_id} className="text-center px-4 py-3 text-sm font-semibold text-gray-600 uppercase tracking-wider min-w-[120px]">
-                    <div className="flex flex-col items-center">
-                      <span>{subject.subject_code}</span>
-                      <span className="text-xs text-gray-400 font-normal">{subject.teacher_name}</span>
-                    </div>
-                  </th>
-                ))}
-                <th className="text-center px-4 py-3 text-sm font-semibold text-gray-600 uppercase tracking-wider min-w-[80px]">
-                  Average
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {students.map((student) => (
-                <tr key={student.student_id} className="hover:bg-gray-50">
-                  <td className="sticky left-0 bg-white z-10 px-4 py-3 font-medium text-navy-800">
-                    {student.student_name}
-                  </td>
-                  {(student.subjects || []).map((subject) => (
-                    <td key={subject.subject_id} className="text-center px-4 py-3">
-                      <span className={cn('font-semibold', getGradeColorClass(subject.final_grade))}>
-                        {formatGrade(subject.final_grade)}
-                      </span>
-                    </td>
-                  ))}
-                  <td className="text-center px-4 py-3">
-                    <span className={cn('font-bold text-lg', getGradeColorClass(student.final_average))}>
-                      {formatGrade(student.final_average)}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {students.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            No students in this advisory section.
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+// Advisory Teacher View — delegates to the full-featured AdvisoryGradebookView component
 
 interface TeacherGradesViewProps {
   courseSectionId: string;

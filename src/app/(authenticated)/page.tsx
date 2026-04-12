@@ -2,11 +2,13 @@
 
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useIsStudent, useIsTeacher } from '@/store/auth';
+import { useIsStudent, useIsTeacher, useAuthStore } from '@/store/auth';
 import { useCoursesStore } from '@/store/courses';
 import { StudentCourse, TeacherCourse } from '@/lib/types';
 import { BookOpen, Users, CheckCircle } from 'lucide-react';
 import { StudentCourseCard, TeacherCourseCard } from '@/components/shared/CourseCard';
+import { AdvisoryDashboardCard } from '@/components/grades/AdvisoryDashboardCard';
+import { ReportCardCard } from '@/components/grades/ReportCardCard';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -42,6 +44,9 @@ function StudentDashboard() {
         <p className="text-gray-500 mt-1">Access your enrolled courses and materials</p>
       </motion.div>
 
+      {/* Report Card Summary */}
+      <ReportCardCard />
+
       {/* Course Grid */}
       <motion.div
         variants={containerVariants}
@@ -64,6 +69,7 @@ function StudentDashboard() {
 
 function TeacherDashboard() {
   const { courses, fetchCourses } = useCoursesStore();
+  const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
     fetchCourses();
@@ -127,6 +133,14 @@ function TeacherDashboard() {
           </div>
         </div>
       </motion.div>
+
+      {/* Advisory Dashboard Card (only for advisers) */}
+      {user?.advisory_section_id && (
+        <AdvisoryDashboardCard
+          sectionId={user.advisory_section_id}
+          sectionName={user.advisory_section_name || ''}
+        />
+      )}
 
       {/* Course Grid */}
       <motion.div

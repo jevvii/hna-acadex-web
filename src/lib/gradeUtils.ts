@@ -1,4 +1,5 @@
 import type { GradeLevel } from './types';
+import { DEPED_DEFAULT_WEIGHTS } from './gradeConstants';
 
 /**
  * Get period labels based on grade level.
@@ -138,4 +139,73 @@ export function getPublishStatus(entries: Array<{ is_published: boolean }>): { p
     published,
     unpublished: entries.length - published,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Advisory gradebook and DepEd reporting support
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns Tailwind color classes based on score.
+ * Three-tier scale aligned with DepEd passing threshold (75).
+ */
+export function getGradeColorClasses(score: number | null): {
+  text: string;
+  bg: string;
+  border: string;
+} {
+  if (score === null) return { text: 'text-slate-400', bg: 'bg-transparent', border: 'border-transparent' };
+  if (score >= 75) return { text: 'text-green-700', bg: 'bg-green-50', border: 'border-green-200' };
+  if (score >= 70) return { text: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' };
+  return { text: 'text-red-700', bg: 'bg-red-50', border: 'border-red-200' };
+}
+
+/**
+ * Returns DepEd letter grade description.
+ */
+export function getDepEdLetterGrade(score: number | null): string {
+  if (score === null) return '--';
+  if (score >= 90) return 'Outstanding';
+  if (score >= 85) return 'Very Satisfactory';
+  if (score >= 80) return 'Satisfactory';
+  if (score >= 75) return 'Fairly Satisfactory';
+  return 'Did Not Meet Expectations';
+}
+
+/**
+ * Returns short DepEd letter grade abbreviation.
+ */
+export function getShortDepEdLetterGrade(score: number | null): string {
+  if (score === null) return '--';
+  if (score >= 90) return 'O';
+  if (score >= 85) return 'VS';
+  if (score >= 80) return 'S';
+  if (score >= 75) return 'FS';
+  return 'DNME';
+}
+
+/**
+ * Computes final grade from period scores using DepEd average formula.
+ */
+export function computeFinalGrade(scores: (number | null)[]): number | null {
+  const valid = scores.filter((s): s is number => s !== null);
+  if (valid.length === 0) return null;
+  return Math.round((valid.reduce((a, b) => a + b, 0) / valid.length) * 100) / 100;
+}
+
+/**
+ * Checks if a student is at risk (any grade below 75).
+ */
+export function isAtRisk(grades: (number | null)[]): boolean {
+  return grades.some(g => g !== null && g < 75);
+}
+
+/**
+ * Gets DepEd default weights for a subject category.
+ */
+export function getDepEdDefaultWeights(
+  category: string | null,
+): { written_works: number; performance_tasks: number; quarterly_assessment: number } {
+  if (!category) return DEPED_DEFAULT_WEIGHTS.default;
+  return DEPED_DEFAULT_WEIGHTS[category] ?? DEPED_DEFAULT_WEIGHTS.default;
 }
