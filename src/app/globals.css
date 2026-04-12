@@ -3,441 +3,444 @@
 @tailwind utilities;
 
 :root {
-  /* Core colors */
-  --background: #FAFBFC;
-  --foreground: #1A3A6B;
+    /* Core colors */
+    --background: #fafbfc;
+    --foreground: #1a3a6b;
 
-  /* Navy scale */
-  --navy-50: #E8EEF5;
-  --navy-100: #C5D4E5;
-  --navy-200: #9FB5D3;
-  --navy-300: #7996C1;
-  --navy-400: #5C7DB3;
-  --navy-500: #3F64A5;
-  --navy-600: #1A3A6B;
-  --navy-700: #152E57;
-  --navy-800: #0F2147;
-  --navy-900: #0A1630;
+    /* Navy scale */
+    --navy-50: #e8eef5;
+    --navy-100: #c5d4e5;
+    --navy-200: #9fb5d3;
+    --navy-300: #7996c1;
+    --navy-400: #5c7db3;
+    --navy-500: #3f64a5;
+    --navy-600: #1a3a6b;
+    --navy-700: #152e57;
+    --navy-800: #0f2147;
+    --navy-900: #0a1630;
 
-  /* Gold scale */
-  --gold-50: #FCF6E5;
-  --gold-100: #F7E8C0;
-  --gold-200: #F1D896;
-  --gold-300: #EBC86C;
-  --gold-400: #E4B52F;
-  --gold-500: #D4A017;
-  --gold-600: #B88A14;
-  --gold-700: #9C7411;
-  --gold-800: #805E0E;
-  --gold-900: #64480B;
+    /* Gold scale */
+    --gold-50: #fcf6e5;
+    --gold-100: #f7e8c0;
+    --gold-200: #f1d896;
+    --gold-300: #ebc86c;
+    --gold-400: #e4b52f;
+    --gold-500: #d4a017;
+    --gold-600: #b88a14;
+    --gold-700: #9c7411;
+    --gold-800: #805e0e;
+    --gold-900: #64480b;
 
-  /* Semantic colors */
-  --success: #10B981;
-  --warning: #F59E0B;
-  --error: #EF4444;
-  --info: #3B82F6;
+    /* Semantic colors */
+    --success: #10b981;
+    --warning: #f59e0b;
+    --error: #ef4444;
+    --info: #3b82f6;
 
-  /* Background colors */
-  --bg-primary: #FAFBFC;
-  --bg-secondary: #FFFFFF;
-  --bg-tertiary: #F4F6FA;
+    /* Background colors */
+    --bg-primary: #fafbfc;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f4f6fa;
 
-  /* Text colors */
-  --text-primary: #1A3A6B;
-  --text-secondary: #5A6A85;
-  --text-tertiary: #94A3B8;
+    /* Text colors */
+    --text-primary: #1a3a6b;
+    --text-secondary: #5a6a85;
+    --text-tertiary: #94a3b8;
 
-  /* Border */
-  --border-default: #E2E8F0;
+    /* Border */
+    --border-default: #e2e8f0;
 
-  /* Shadows */
-  --shadow-card: 0 4px 12px rgba(26, 58, 107, 0.08);
-  --shadow-card-hover: 0 12px 24px rgba(26, 58, 107, 0.15);
-  --shadow-input-focus: 0 0 0 3px rgba(26, 58, 107, 0.1);
+    /* Shadows */
+    --shadow-card: 0 4px 12px rgba(26, 58, 107, 0.08);
+    --shadow-card-hover: 0 12px 24px rgba(26, 58, 107, 0.15);
+    --shadow-input-focus: 0 0 0 3px rgba(26, 58, 107, 0.1);
 
-  /* Transitions */
-  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    /* Transitions */
+    --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* Font families */
-  --font-crimson: 'Crimson Pro', Georgia, serif;
-  --font-source-sans: 'Source Sans 3', system-ui, sans-serif;
+    /* Font families */
+    --font-crimson: "Crimson Pro", Georgia, serif;
+    --font-source-sans: "Source Sans 3", system-ui, sans-serif;
 }
 
 @layer base {
-  * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
 
-  html {
-    scroll-behavior: smooth;
-  }
+    html {
+        scroll-behavior: smooth;
+    }
 
-  body {
-    color: var(--text-primary);
-    background: var(--bg-primary);
-    font-family: var(--font-source-sans);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
+    body {
+        color: var(--text-primary);
+        background: var(--bg-primary);
+        font-family: var(--font-source-sans);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-crimson);
-    font-weight: 600;
-    color: var(--text-primary);
-  }
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        font-family: var(--font-crimson);
+        font-weight: 600;
+        color: var(--text-primary);
+    }
 
-  /* Custom scrollbar */
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
 
-  ::-webkit-scrollbar-track {
-    background: var(--bg-tertiary);
-  }
+    ::-webkit-scrollbar-track {
+        background: var(--bg-tertiary);
+    }
 
-  ::-webkit-scrollbar-thumb {
-    background: var(--navy-300);
-    border-radius: 4px;
-  }
+    ::-webkit-scrollbar-thumb {
+        background: var(--navy-300);
+        border-radius: 4px;
+    }
 
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--navy-400);
-  }
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--navy-400);
+    }
 }
-
 @layer components {
-  /* Card component */
-  .card {
-    background: var(--bg-secondary);
-    border-radius: 12px;
-    box-shadow: var(--shadow-card);
-    transition: all var(--transition-base);
-  }
+    /* Card component */
+    .card {
+        background: var(--bg-secondary);
+        border-radius: 12px;
+        box-shadow: var(--shadow-card);
+        transition: all var(--transition-base);
+    }
 
-  .card-hover:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-card-hover);
-  }
+    .card-hover:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-card-hover);
+    }
 
-  /* Button base */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.5rem;
-    border-radius: 10px;
-    font-weight: 600;
-    font-size: 0.9375rem;
-    transition: all var(--transition-base);
-    cursor: pointer;
-    border: none;
-    font-family: var(--font-source-sans);
-  }
+    /* Button base */
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.9375rem;
+        transition: all var(--transition-base);
+        cursor: pointer;
+        border: none;
+        font-family: var(--font-source-sans);
+    }
 
-  .btn-primary {
-    background: var(--navy-600);
-    color: white;
-  }
+    .btn-primary {
+        background: var(--navy-600);
+        color: white;
+    }
 
-  .btn-primary:hover {
-    background: var(--navy-700);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-card);
-  }
+    .btn-primary:hover {
+        background: var(--navy-700);
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-card);
+    }
 
-  .btn-gold {
-    background: var(--gold-500);
-    color: white;
-  }
+    .btn-gold {
+        background: var(--gold-500);
+        color: white;
+    }
 
-  .btn-gold:hover {
-    background: var(--gold-600);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-card);
-  }
+    .btn-gold:hover {
+        background: var(--gold-600);
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-card);
+    }
 
-  .btn-outline {
-    background: transparent;
-    border: 1px solid var(--border-default);
-    color: var(--text-secondary);
-  }
+    .btn-outline {
+        background: transparent;
+        border: 1px solid var(--border-default);
+        color: var(--text-secondary);
+    }
 
-  .btn-outline:hover {
-    border-color: var(--navy-600);
-    color: var(--navy-600);
-    background: var(--navy-50);
-  }
+    .btn-outline:hover {
+        border-color: var(--navy-600);
+        color: var(--navy-600);
+        background: var(--navy-50);
+    }
 
-  /* Input base */
-  .input {
-    width: 100%;
-    padding: 0.875rem 1rem;
-    border: 1px solid var(--border-default);
-    border-radius: 10px;
-    font-size: 0.9375rem;
-    font-family: var(--font-source-sans);
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    transition: all var(--transition-base);
-  }
+    /* Input base */
+    .input {
+        width: 100%;
+        padding: 0.875rem 1rem;
+        border: 1px solid var(--border-default);
+        border-radius: 10px;
+        font-size: 0.9375rem;
+        font-family: var(--font-source-sans);
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        transition: all var(--transition-base);
+    }
 
-  .input:focus {
-    outline: none;
-    border-color: var(--navy-600);
-    box-shadow: var(--shadow-input-focus);
-  }
+    .input:focus {
+        outline: none;
+        border-color: var(--navy-600);
+        box-shadow: var(--shadow-input-focus);
+    }
 
-  .input::placeholder {
-    color: var(--text-tertiary);
-  }
+    .input::placeholder {
+        color: var(--text-tertiary);
+    }
 
-  /* Badge styles */
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.25rem 0.75rem;
-    border-radius: 9999px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
+    /* Badge styles */
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
 
-  .badge-success {
-    background: rgba(16, 185, 129, 0.1);
-    color: var(--success);
-  }
+    .badge-success {
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--success);
+    }
 
-  .badge-warning {
-    background: rgba(245, 158, 11, 0.1);
-    color: var(--warning);
-  }
+    .badge-warning {
+        background: rgba(245, 158, 11, 0.1);
+        color: var(--warning);
+    }
 
-  .badge-error {
-    background: rgba(239, 68, 68, 0.1);
-    color: var(--error);
-  }
+    .badge-error {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--error);
+    }
 
-  .badge-info {
-    background: rgba(59, 130, 246, 0.1);
-    color: var(--info);
-  }
+    .badge-info {
+        background: rgba(59, 130, 246, 0.1);
+        color: var(--info);
+    }
 
-  .badge-navy {
-    background: var(--navy-50);
-    color: var(--navy-600);
-  }
+    .badge-navy {
+        background: var(--navy-50);
+        color: var(--navy-600);
+    }
 
-  .badge-gold {
-    background: var(--gold-50);
-    color: var(--gold-700);
-  }
+    .badge-gold {
+        background: var(--gold-50);
+        color: var(--gold-700);
+    }
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+    .text-balance {
+        text-wrap: balance;
+    }
 
-  .font-display {
-    font-family: var(--font-crimson);
-  }
+    .font-display {
+        font-family: var(--font-crimson);
+    }
 
-  .font-body {
-    font-family: var(--font-source-sans);
-  }
+    .font-body {
+        font-family: var(--font-source-sans);
+    }
 }
 
 /* MUI Date/Time Picker overrides */
 
 /* Hide MUI's built-in AM/PM selector - we use our own custom toggle */
 .MuiTimePickerToolbar-ampmSelection {
-  display: none !important;
+    display: none !important;
 }
 
 .MuiToggleButtonGroup-root {
-  display: none !important;
+    display: none !important;
 }
 
 /* Unselected AM/PM — muted, no background */
 .MuiTimePickerToolbar-ampmLabel {
-  color: #475569 !important;
-  background-color: transparent !important;
-  border-radius: 6px !important;
-  padding: 2px 6px !important;
-  transition: background-color 0.15s ease !important;
-  opacity: 0.5 !important;
+    color: #475569 !important;
+    background-color: transparent !important;
+    border-radius: 6px !important;
+    padding: 2px 6px !important;
+    transition: background-color 0.15s ease !important;
+    opacity: 0.5 !important;
 }
 
 /* Hovered AM/PM — subtle highlight */
 .MuiTimePickerToolbar-ampmLabel:hover {
-  background-color: #334155 !important;
-  opacity: 0.8 !important;
+    background-color: #334155 !important;
+    opacity: 0.8 !important;
 }
 
 /* Selected AM/PM — persistent filled highlight like a hover that stays */
 .MuiTimePickerToolbar-ampmLabel.Mui-selected {
-  background-color: #334155 !important; /* slate-700 pill background */
-  color: #60a5fa !important;            /* blue text */
-  font-weight: 700 !important;
-  opacity: 1 !important;
-  border-radius: 6px !important;
-  padding: 2px 6px !important;
+    background-color: #334155 !important; /* slate-700 pill background */
+    color: #60a5fa !important; /* blue text */
+    font-weight: 700 !important;
+    opacity: 1 !important;
+    border-radius: 6px !important;
+    padding: 2px 6px !important;
 }
 
 /* Remove hover on already-selected */
 .MuiTimePickerToolbar-ampmLabel.Mui-selected:hover {
-  background-color: #334155 !important;
+    background-color: #334155 !important;
 }
 
 /* Also target the toolbar date/time display text for contrast */
 .MuiPickersToolbar-content .MuiTypography-root {
-  color: #f1f5f9 !important;
+    color: #f1f5f9 !important;
 }
 
 /* Ensure the analog clock numbers are visible */
 .MuiClock-pin {
-  background-color: #60a5fa !important;
+    background-color: #60a5fa !important;
 }
 
 .MuiClockPointer-root {
-  background-color: #60a5fa !important;
+    background-color: #60a5fa !important;
 }
 
 .MuiClockPointer-thumb {
-  background-color: #60a5fa !important;
-  border-color: #60a5fa !important;
+    background-color: #60a5fa !important;
+    border-color: #60a5fa !important;
 }
 
 /* Outer clock numbers (1-12) - visible */
 .MuiClockNumber-root {
-  color: #f1f5f9 !important;
+    color: #f1f5f9 !important;
 }
 
 .MuiClockNumber-root.Mui-selected {
-  background-color: #60a5fa !important;
-  color: #ffffff !important;
+    background-color: #60a5fa !important;
+    color: #ffffff !important;
 }
 
 /* Hide inner circle military time numbers - we use AM/PM toggle instead */
 .MuiClock-wrapper-inner {
-  display: none !important;
+    display: none !important;
 }
 
 .MuiClockNumber-root.MuiClockNumber-inner {
-  display: none !important;
+    display: none !important;
 }
 
 /* Hide inner clock numbers (13-23 and 0) when using 24-hour format */
 /* These appear as a second ring inside the main clock face */
 .MuiClock-root .MuiClockNumber-root[style*="translate"] {
-  /* Target inner positioned numbers via their inline styles */
+    /* Target inner positioned numbers via their inline styles */
 }
 
 /* Alternative: hide all clock numbers that would show 13-23 hours */
-.MuiClockNumber-root:nth-child(n+13):nth-child(-n+23) {
-  display: none !important;
+.MuiClockNumber-root:nth-child(n + 13):nth-child(-n + 23) {
+    display: none !important;
 }
 
 /* Hide the 00 hour (midnight in 24-hour format inner ring) */
 .MuiClockNumber-root:first-child {
-  /* Keep first number visible (it's usually 12 at top) */
+    /* Keep first number visible (it's usually 12 at top) */
 }
 
 /* MUI Date/Time Picker overrides - for dark theme modal */
 .MuiTimePickerToolbar-ampmLabel {
-  color: #475569 !important; /* slate-600 — muted gray when unselected */
-  font-weight: 400 !important;
-  opacity: 0.6;
+    color: #475569 !important; /* slate-600 — muted gray when unselected */
+    font-weight: 400 !important;
+    opacity: 0.6;
 }
 
 .MuiTimePickerToolbar-ampmLabel.Mui-selected {
-  color: #f1f5f9 !important; /* slate-100 — bright white when selected */
-  font-weight: 700 !important;
-  opacity: 1;
+    color: #f1f5f9 !important; /* slate-100 — bright white when selected */
+    font-weight: 700 !important;
+    opacity: 1;
 }
 
 /* Toolbar date/time display text for contrast */
 .MuiPickersToolbar-content .MuiTypography-root {
-  color: #f1f5f9 !important;
+    color: #f1f5f9 !important;
 }
 
 /* Analog clock styling */
 .MuiClock-pin,
 .MuiClockPointer-root {
-  background-color: #60a5fa !important;
+    background-color: #60a5fa !important;
 }
 
 .MuiClockPointer-thumb {
-  background-color: #60a5fa !important;
-  border-color: #60a5fa !important;
+    background-color: #60a5fa !important;
+    border-color: #60a5fa !important;
 }
 
 .MuiClockNumber-root {
-  color: #f1f5f9 !important;
+    color: #f1f5f9 !important;
 }
 
 .MuiClockNumber-root.Mui-selected {
-  background-color: #60a5fa !important;
-  color: #ffffff !important;
+    background-color: #60a5fa !important;
+    color: #ffffff !important;
 }
 
 /* Print styles for report card */
 @media print {
-  @page {
-    margin: 1cm;
-    size: A4 portrait;
-  }
+    @page {
+        margin: 1cm;
+        size: A4 portrait;
+    }
 
-  /* Hide sidebar, navigation, and interactive elements */
-  nav,
-  aside,
-  [data-sidebar],
-  .print:hidden {
-    display: none !important;
-  }
+    /* Hide sidebar, navigation, and interactive elements */
+    nav,
+    aside,
+    [data-sidebar] {
+        display: none !important;
+    }
 
-  /* Reset layout for full-width printing */
-  body {
-    background: white !important;
-    color: black !important;
-    font-size: 11pt;
-  }
+    /* Reset layout for full-width printing */
+    body {
+        background: white !important;
+        color: black !important;
+        font-size: 11pt;
+    }
 
-  /* Preserve background colors for grade cells */
-  * {
-    print-color-adjust: exact !important;
-    -webkit-print-color-adjust: exact !important;
-  }
+    /* Preserve background colors for grade cells */
+    * {
+        print-color-adjust: exact !important;
+        -webkit-print-color-adjust: exact !important;
+    }
 
-  /* Remove shadows and rounded corners for clean print */
-  .shadow-card,
-  .shadow-card-hover {
-    box-shadow: none !important;
-  }
+    /* Remove shadows and rounded corners for clean print */
+    .shadow-card,
+    .shadow-card-hover {
+        box-shadow: none !important;
+    }
 
-  /* Report card container: ensure clean borders */
-  .report-card-container {
-    border: 1px solid #e2e8f0;
-    border-radius: 0 !important;
-  }
+    /* Report card container: ensure clean borders */
+    .report-card-container {
+        border: 1px solid #e2e8f0;
+        border-radius: 0 !important;
+    }
 
-  /* Force table cells to not break across pages */
-  table {
-    page-break-inside: avoid;
-  }
+    /* Force table cells to not break across pages */
+    table {
+        page-break-inside: avoid;
+    }
 
-  tr {
-    page-break-inside: avoid;
-  }
+    tr {
+        page-break-inside: avoid;
+    }
 
-  /* Ensure the main content takes full width */
-  main {
-    margin: 0 !important;
-    padding: 0 !important;
-  }
+    /* Ensure the main content takes full width */
+    main {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
 }
