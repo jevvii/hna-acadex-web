@@ -132,18 +132,23 @@ export interface Enrollment {
 export interface GradeSummary {
   graded_items_count: number;
   total_items_count: number;
-  pending_items_count: number;
-  excluded_items_count: number;
-  has_pending: boolean;
-  has_released_grades: boolean;
-  has_no_gradeable_items: boolean;
-  is_partial: boolean;
+  pending_items_count?: number;
+  pending_count?: number;
+  excluded_items_count?: number;
+  excluded_count?: number;
+  has_pending?: boolean;
+  has_released_grades?: boolean;
+  has_no_gradeable_items?: boolean;
+  is_partial?: boolean;
+  has_grades?: boolean;
+  has_items?: boolean;
 }
 
 export interface StudentCourse {
   student_id: string;
   course_section_id: string;
   course_id: string;
+  section_id?: string;
   course_code: string;
   course_title: string;
   cover_image_url?: string;
@@ -165,6 +170,7 @@ export interface TeacherCourse {
   teacher_id: string;
   course_section_id: string;
   course_id: string;
+  section_id?: string;
   course_code: string;
   course_title: string;
   cover_image_url?: string;
@@ -176,6 +182,12 @@ export interface TeacherCourse {
   student_count: number;
   semester?: string;
   school_year: string;
+  grade_progress?: {
+    graded_items_count: number;
+    total_items_count: number;
+    pending_items_count: number;
+    progress_percent: number;
+  };
 }
 
 export interface WeeklyModule {

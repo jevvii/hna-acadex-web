@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronDown,
-  ChevronUp,
   AlertTriangle,
   TrendingUp,
   Award,
@@ -15,7 +14,12 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { getGradeColorClass, formatGrade, isAtRisk } from '@/lib/gradeUtils';
+import {
+  getGradeColorClass,
+  formatGrade,
+  isAtRisk,
+  isAdvisoryStudentAtRisk,
+} from '@/lib/gradeUtils';
 import type { AdvisoryStudentGrade } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
@@ -60,11 +64,8 @@ function getStudentStatus(student: AdvisoryStudentGrade): {
     };
   }
 
-  const allSubjectsAtRisk = student.subjects.some((subject) =>
-    isAtRisk([subject.final_grade])
-  );
-
-  if (allSubjectsAtRisk) {
+  const hasAtRiskSubject = isAdvisoryStudentAtRisk(student.subjects);
+  if (hasAtRiskSubject) {
     return {
       label: 'At Risk',
       variant: 'at-risk',
@@ -472,6 +473,14 @@ export function StudentGradeCard({
                     </p>
                   </div>
                 ))}
+                {student.subjects.length > 4 && (
+                  <div className="text-center">
+                    <p className="text-xs text-slate-400 mb-1">More</p>
+                    <p className="font-semibold text-slate-500">
+                      +{student.subjects.length - 4}
+                    </p>
+                  </div>
+                )}
                 <div className="h-10 w-px bg-slate-200" />
                 <div className={cn('text-center px-3 py-2 rounded-lg', colors.avgBg)}>
                   <p className="text-xs text-slate-500 mb-1">Average</p>
@@ -512,26 +521,26 @@ export function StudentGradeCard({
             >
               <div className="p-5">
                 {/* Subject Details Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                   {student.subjects.map((subject) => (
                     <div
                       key={subject.subject_id}
-                      className="bg-white rounded-lg p-4 shadow-sm"
+                      className="bg-white rounded-lg p-3 shadow-sm border border-slate-100"
                     >
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <h5 className="font-semibold text-navy-900">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="min-w-0 pr-2">
+                          <h5 className="font-semibold text-sm text-navy-900 truncate">
                             {subject.subject_code}
                           </h5>
-                          <p className="text-xs text-slate-500">
+                          <p className="text-[11px] text-slate-500 truncate">
                             {subject.teacher_name}
                           </p>
                         </div>
-                        <div className="text-right">
-                          <p className="text-xs text-slate-400">Final</p>
+                        <div className="text-right shrink-0">
+                          <p className="text-[10px] text-slate-400">Final</p>
                           <p
                             className={cn(
-                              'font-bold',
+                              'font-bold text-sm',
                               getGradeColorClass(subject.final_grade)
                             )}
                           >
@@ -541,7 +550,7 @@ export function StudentGradeCard({
                       </div>
 
                       {/* Period Grades */}
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-4 gap-1.5">
                         {subject.periods.map((periodGrade) => {
                           const published = isPeriodPublished(
                             periodGrade.grading_period_id
@@ -555,13 +564,13 @@ export function StudentGradeCard({
                             <div
                               key={periodGrade.grading_period_id}
                               className={cn(
-                                'bg-slate-50 rounded p-2 text-center',
+                                'group bg-slate-50 rounded-md px-1.5 py-1.5 text-center',
                                 atRisk && 'bg-red-50',
                                 published && 'bg-emerald-50/50'
                               )}
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <p className="text-xs text-slate-400 mb-1">
+                              <p className="text-[10px] text-slate-400 mb-1 truncate">
                                 {periodGrade.period_label}
                               </p>
                               {isEditing ? (
@@ -587,10 +596,10 @@ export function StudentGradeCard({
                                   autoFocus
                                 />
                               ) : (
-                                <div className="flex items-center justify-center gap-1">
+                                <div className="flex items-center justify-center gap-0.5">
                                   <span
                                     className={cn(
-                                      'font-semibold text-sm',
+                                      'font-semibold text-xs',
                                       atRisk
                                         ? 'text-red-600'
                                         : 'text-navy-900'
@@ -599,7 +608,7 @@ export function StudentGradeCard({
                                     {formatGrade(periodGrade.score)}
                                   </span>
                                   {atRisk && (
-                                    <AlertTriangle className="w-3 h-3 text-red-500" />
+                                    <AlertTriangle className="w-2.5 h-2.5 text-red-500" />
                                   )}
                                   {!published && entryId && (
                                     <button

@@ -200,6 +200,24 @@ export function isAtRisk(grades: (number | null)[]): boolean {
   return grades.some(g => g !== null && g < 75);
 }
 
+type AdvisoryRiskSubject = {
+  final_grade: number | null;
+  periods: Array<{ score: number | null }>;
+};
+
+/**
+ * Checks if an advisory student should be marked at risk.
+ * Uses subject final grade when available; otherwise falls back to period scores.
+ */
+export function isAdvisoryStudentAtRisk(subjects: AdvisoryRiskSubject[]): boolean {
+  return subjects.some((subject) => {
+    if (subject.final_grade !== null) {
+      return subject.final_grade < 75;
+    }
+    return subject.periods.some((period) => period.score !== null && period.score < 75);
+  });
+}
+
 /**
  * Gets DepEd default weights for a subject category.
  */

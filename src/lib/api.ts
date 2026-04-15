@@ -606,6 +606,9 @@ export const gradingApi = {
   bulkPublishFinalGrades: async (courseSectionId: string): Promise<{ published_count: number }> => {
     return api.post(`/course-sections/${courseSectionId}/grades/bulk-publish-final/`);
   },
+  takeBackFinalGrades: async (courseSectionId: string): Promise<{ taken_back_count: number }> => {
+    return api.post(`/course-sections/${courseSectionId}/grades/bulk-take-back-final/`);
+  },
 
   // Grade weight configuration
   getGradeWeights: async (courseSectionId: string): Promise<GradeWeightConfig> => {

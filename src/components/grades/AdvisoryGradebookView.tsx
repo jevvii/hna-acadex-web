@@ -25,7 +25,7 @@ import type {
   AdvisorySubmissionStatus,
   AdvisoryReportCardStatus,
 } from '@/lib/types';
-import { formatGrade } from '@/lib/gradeUtils';
+import { formatGrade, isAdvisoryStudentAtRisk } from '@/lib/gradeUtils';
 import { cn } from '@/lib/utils';
 import {
   StudentGradeCard,
@@ -102,10 +102,8 @@ function StatsBar({
   // Calculate stats
   const stats = useMemo(() => {
     const totalStudents = students.length;
-    const atRiskCount = students.filter((s) =>
-      s.subjects.some(
-        (sub) => sub.final_grade !== null && sub.final_grade < 75
-      )
+    const atRiskCount = students.filter((student) =>
+      isAdvisoryStudentAtRisk(student.subjects)
     ).length;
 
     const totalPeriods = submissionStatuses.reduce(
@@ -394,9 +392,7 @@ export function AdvisoryGradebookView({
         const hasGrades = student.subjects.some((s) =>
           s.periods.some((p) => p.score !== null)
         );
-        const hasAtRisk = student.subjects.some(
-          (s) => s.final_grade !== null && s.final_grade < 75
-        );
+        const hasAtRisk = isAdvisoryStudentAtRisk(student.subjects);
         const isHonors =
           student.final_average !== null && student.final_average >= 90;
 
