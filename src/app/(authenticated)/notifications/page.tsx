@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -55,8 +56,10 @@ function formatNotificationTime(dateStr: string): string {
 }
 
 export default function NotificationsPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [expandedAnnouncementIds, setExpandedAnnouncementIds] = useState<Set<string>>(new Set());
 
   const { data: notifications, isLoading, error } = useQuery<UserNotification[]>({
     queryKey: ['notifications'],
@@ -106,6 +109,61 @@ export default function NotificationsPage() {
 
   const handleDelete = (id: string) => {
     deleteMutation.mutate(id);
+  };
+
+  const getNotificationDestination = (notification: UserNotification): string | null => {
+    if (notification.type === 'new_activity' && notification.activity_id) {
+      return `/activities/${notification.activity_id}`;
+    }
+    if (
+      (notification.type === 'new_quiz' || notification.type === 'new_exam') &&
+      notification.quiz_id
+    ) {
+      return `/quizzes/${notification.quiz_id}`;
+    }
+    if (notification.type === 'grade_released') {
+      if (notification.activity_id) {
+        return `/activities/${notification.activity_id}`;
+      }
+      if (notification.quiz_id) {
+        return `/quizzes/${notification.quiz_id}`;
+      }
+      if (notification.course_section_id) {
+        return `/courses/${notification.course_section_id}?tab=grades`;
+      }
+    }
+    if (notification.type === 'system' && notification.course_section_id) {
+      return `/courses/${notification.course_section_id}?tab=grades`;
+    }
+    return null;
+  };
+
+  const handleNotificationClick = (notification: UserNotification) => {
+    const isAnnouncement =
+      notification.type === 'course_announcement' ||
+      notification.type === 'school_announcement';
+
+    if (!notification.is_read) {
+      markAsReadMutation.mutate(notification.id);
+    }
+
+    if (isAnnouncement) {
+      setExpandedAnnouncementIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(notification.id)) {
+          next.delete(notification.id);
+        } else {
+          next.add(notification.id);
+        }
+        return next;
+      });
+      return;
+    }
+
+    const destination = getNotificationDestination(notification);
+    if (destination) {
+      router.push(destination);
+    }
   };
 
   if (isLoading) {
@@ -208,8 +266,11 @@ export default function NotificationsPage() {
               transition={{ delay: index * 0.05 }}
               className={cn(
                 'bg-white rounded-xl shadow-card p-4 flex items-start gap-4 group',
+                'transition-colors',
+                'cursor-pointer hover:bg-slate-50',
                 !notification.is_read && 'border-l-4 border-l-navy-500'
               )}
+              onClick={() => handleNotificationClick(notification)}
             >
               <div
                 className={cn(
@@ -239,15 +300,28 @@ export default function NotificationsPage() {
                     'text-sm mt-1',
                     notification.is_read ? 'text-gray-500' : 'text-gray-600'
                   )}>
-                    {notification.body}
+                    {(notification.type === 'course_announcement' || notification.type === 'school_announcement')
+                      && !expandedAnnouncementIds.has(notification.id)
+                      && notification.body.length > 200
+                      ? `${notification.body.slice(0, 200)}...`
+                      : notification.body}
                   </p>
                 )}
+                {(notification.type === 'course_announcement' || notification.type === 'school_announcement')
+                  && notification.body && (
+                    <p className="text-xs text-navy-600 mt-2">
+                      {expandedAnnouncementIds.has(notification.id) ? 'Click to collapse' : 'Click to expand'}
+                    </p>
+                  )}
               </div>
 
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 {!notification.is_read && (
                   <button
-                    onClick={() => handleMarkAsRead(notification.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMarkAsRead(notification.id);
+                    }}
                     disabled={markAsReadMutation.isPending}
                     className="p-2 text-gray-400 hover:text-green-500 transition-colors"
                     title="Mark as read"
@@ -256,7 +330,10 @@ export default function NotificationsPage() {
                   </button>
                 )}
                 <button
-                  onClick={() => handleDelete(notification.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(notification.id);
+                  }}
                   disabled={deleteMutation.isPending}
                   className="p-2 text-gray-400 hover:text-red-500 transition-colors"
                   title="Delete"

@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { TrendingUp, AlertCircle, Loader2, Edit2, Check, X, Users, BookOpen, Send, RotateCcw, Lock, ShieldCheck } from 'lucide-react';
-import { gradingApi, coursesApi } from '@/lib/api';
+import { TrendingUp, AlertCircle, Loader2, Edit2, Check, X, Users, BookOpen, Send, RotateCcw, ShieldCheck } from 'lucide-react';
+import { gradingApi } from '@/lib/api';
 import { GradeWeightsConfig } from './GradeWeightsConfig';
 import { AdvisoryGradebookView } from './AdvisoryGradebookView';
 import { useIsTeacher } from '@/store/auth';
-import type { SubjectGradeData, GradingPeriod, GradeEntry, GradeLevel, GradeSubmission } from '@/lib/types';
-import { getGradeColorClass, getGradeBgClass, formatGrade, getPeriodLabels, getLetterGrade } from '@/lib/gradeUtils';
+import type { SubjectGradeData, GradeSubmission } from '@/lib/types';
+import { getGradeColorClass, formatGrade, getLetterGrade } from '@/lib/gradeUtils';
 import { cn } from '@/lib/utils';
 
 function LoadingState() {
@@ -63,11 +63,13 @@ function SubmissionStatusBadge({ status }: { status: GradeSubmission['status'] }
 }
 
 // Subject Teacher Gradebook View
-function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId: string; gradeLevel?: GradeLevel }) {
+function SubjectGradebookView({ courseSectionId }: { courseSectionId: string }) {
   const queryClient = useQueryClient();
   const [editingEntry, setEditingEntry] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
-  const [confirmAction, setConfirmAction] = useState<{ type: 'submit' | 'takeBack' | 'submitAll'; periodId?: string } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ type: 'submit' | 'takeBack' | 'submitAll' | 'submitFinal'; periodId?: string } | null>(null);
+  const [creatingEntry, setCreatingEntry] = useState<{ enrollmentId: string; periodId: string } | null>(null);
+  const [createValue, setCreateValue] = useState<string>('');
 
   const { data: grades, isLoading, error, refetch } = useQuery<SubjectGradeData>({
     queryKey: ['subjectGrades', courseSectionId],
@@ -82,6 +84,19 @@ function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId
       queryClient.invalidateQueries({ queryKey: ['subjectGrades', courseSectionId] });
       setEditingEntry(null);
       setEditValue('');
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: ({ enrollmentId, periodId, score }: { enrollmentId: string; periodId: string; score: number }) =>
+      gradingApi.createGradeEntry(enrollmentId, periodId, score),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subjectGrades', courseSectionId] });
+      setCreatingEntry(null);
+      setCreateValue('');
+    },
+    onError: (err: Error) => {
+      alert(`Failed to create grade entry: ${err.message}`);
     },
   });
 
@@ -107,6 +122,18 @@ function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId
     },
     onError: (err: Error) => {
       alert(`Failed to take back grades: ${err.message}`);
+      setConfirmAction(null);
+    },
+  });
+
+  const submitFinalMutation = useMutation({
+    mutationFn: () => gradingApi.bulkPublishFinalGrades(courseSectionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subjectGrades', courseSectionId] });
+      setConfirmAction(null);
+    },
+    onError: (err: Error) => {
+      alert(`Failed to submit final grades: ${err.message}`);
       setConfirmAction(null);
     },
   });
@@ -138,19 +165,67 @@ function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId
     setEditValue('');
   };
 
+  const handleCreateEntry = (enrollmentId: string, periodId: string) => {
+    // Only allow creating when period is in draft status
+    const status = getSubmissionStatus(periodId);
+    if (status !== 'draft') return;
+    setCreatingEntry({ enrollmentId, periodId });
+    setCreateValue('');
+  };
+
+  const handleCreateSave = (enrollmentId: string, periodId: string) => {
+    const value = parseFloat(createValue);
+    if (isNaN(value) || value < 0 || value > 100) {
+      return; // Invalid input
+    }
+    createMutation.mutate({ enrollmentId, periodId, score: value });
+  };
+
+  const handleCreateCancel = () => {
+    setCreatingEntry(null);
+    setCreateValue('');
+  };
+
   if (isLoading) return <LoadingState />;
   if (error) return <ErrorState message="Failed to load grades" onRetry={() => refetch()} />;
 
   const periods = grades?.periods || [];
   const students = grades?.students || [];
   const semesterGroup = grades?.semester_group;
-  const submissions = grades?.submissions || [];
+  const isSemestral = grades?.grade_level === 'Grade 11' || grades?.grade_level === 'Grade 12';
+  const finalPeriodIds = new Set(
+    periods
+      .filter((period) => {
+        if (!isSemestral || semesterGroup === null) return true;
+        if (semesterGroup === 1) return period.period_number <= 2;
+        if (semesterGroup === 2) return period.period_number >= 3;
+        return true;
+      })
+      .map((period) => period.id)
+  );
 
   // Determine semester label for display
   const semesterLabel = semesterGroup === 1 ? '1st Semester' : semesterGroup === 2 ? '2nd Semester' : null;
 
   // Check how many periods are in draft
   const draftPeriods = periods.filter(p => getSubmissionStatus(p.id) === 'draft');
+  const allFinalPublished = (grades?.all_final_published ?? false)
+    || (students.length > 0 && students.every((student) => !!student.is_final_published));
+  const hasDraftPeriods = draftPeriods.length > 0;
+
+  const calculateOptimisticFinalGrade = (
+    studentPeriods: Array<{ period_id: string; score: number | null }>
+  ): number | null => {
+    const scores = studentPeriods
+      .filter((period) => finalPeriodIds.has(period.period_id))
+      .map((period) => period.score)
+      .filter((score): score is number => score !== null);
+
+    if (scores.length === 0) return null;
+
+    const average = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+    return Math.round(average * 100) / 100;
+  };
 
   // Handle case where grading periods haven't been set up yet
   if (periods.length === 0) {
@@ -186,7 +261,11 @@ function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId
     );
   }
 
-  const isAnyMutationPending = submitMutation.isPending || takeBackMutation.isPending;
+  const isAnyMutationPending =
+    submitMutation.isPending
+    || takeBackMutation.isPending
+    || createMutation.isPending
+    || submitFinalMutation.isPending;
 
   return (
     <div className="space-y-4">
@@ -226,11 +305,13 @@ function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId
               {confirmAction.type === 'submit' && 'Submit Period Grades'}
               {confirmAction.type === 'takeBack' && 'Take Back Period Grades'}
               {confirmAction.type === 'submitAll' && 'Submit All Period Grades'}
+              {confirmAction.type === 'submitFinal' && 'Submit Final Grades'}
             </h3>
             <p className="text-gray-600 text-sm mb-4">
               {confirmAction.type === 'submit' && 'Grades will be locked for editing until taken back. The adviser will be able to review and publish them.'}
-              {confirmAction.type === 'takeBack' && 'Grades will be unlocked for editing. You will need to resubmit them when ready.'}
+              {confirmAction.type === 'takeBack' && 'Grades will be unlocked for editing. If already published, the report card will be unpublished and you will need to resubmit when ready.'}
               {confirmAction.type === 'submitAll' && 'All draft period grades will be submitted and locked for editing. The adviser will be able to review and publish them.'}
+              {confirmAction.type === 'submitFinal' && 'Final grades will be submitted using the latest period grades for adviser visibility.'}
             </p>
             <div className="flex gap-3 justify-end">
               <button
@@ -258,6 +339,8 @@ function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId
                     submitMutation.mutate(confirmAction.periodId);
                   } else if (confirmAction.type === 'takeBack' && confirmAction.periodId) {
                     takeBackMutation.mutate(confirmAction.periodId);
+                  } else if (confirmAction.type === 'submitFinal') {
+                    submitFinalMutation.mutate();
                   }
                 }}
                 disabled={isAnyMutationPending}
@@ -294,8 +377,7 @@ function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId
                 {periods.map((period) => {
                   const status = getSubmissionStatus(period.id);
                   const isDraft = status === 'draft';
-                  const isSubmitted = status === 'submitted';
-                  const isPublished = status === 'published';
+                  const isTakeBackAllowed = status === 'submitted' || status === 'published';
 
                   return (
                     <th key={period.id} className="text-center px-4 py-3 text-sm font-semibold text-gray-600 uppercase tracking-wider min-w-[140px]">
@@ -312,7 +394,7 @@ function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId
                             Submit
                           </button>
                         )}
-                        {isSubmitted && (
+                        {isTakeBackAllowed && (
                           <button
                             onClick={() => setConfirmAction({ type: 'takeBack', periodId: period.id })}
                             disabled={isAnyMutationPending}
@@ -322,24 +404,41 @@ function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId
                             Take Back
                           </button>
                         )}
-                        {isPublished && (
-                          <span className="inline-flex items-center gap-1 text-xs text-gray-400" title="Published by adviser. Contact adviser to make changes.">
-                            <Lock className="w-3 h-3" />
-                            Locked
-                          </span>
-                        )}
                       </div>
                     </th>
                   );
                 })}
                 <th className="text-center px-4 py-3 text-sm font-semibold text-gray-600 uppercase tracking-wider min-w-[100px]">
-                  Final
+                  <div className="flex flex-col items-center gap-1">
+                    <span>Final</span>
+                    <span className={cn(
+                      'inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full',
+                      allFinalPublished
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-slate-100 text-slate-600'
+                    )}>
+                      {allFinalPublished ? 'Submitted' : 'Draft'}
+                    </span>
+                    <button
+                      onClick={() => setConfirmAction({ type: 'submitFinal' })}
+                      disabled={isAnyMutationPending || hasDraftPeriods}
+                      title={hasDraftPeriods ? 'Submit all period grades first' : 'Submit final grades'}
+                      className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-navy-600 text-white rounded hover:bg-navy-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Send className="w-3 h-3" />
+                      {allFinalPublished ? 'Resubmit' : 'Submit'}
+                    </button>
+                  </div>
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {students.map((student) => (
-                <tr key={student.enrollment_id} className="hover:bg-gray-50">
+              {students.map((student) => {
+                const optimisticFinalGrade = calculateOptimisticFinalGrade(student.periods || []);
+                const optimisticFinalLetter = optimisticFinalGrade !== null ? getLetterGrade(optimisticFinalGrade) : null;
+
+                return (
+                  <tr key={student.enrollment_id} className="hover:bg-gray-50">
                   <td className="sticky left-0 bg-white z-10 px-4 py-3 font-medium text-navy-800">
                     {student.student_name}
                   </td>
@@ -399,21 +498,59 @@ function SubjectGradebookView({ courseSectionId, gradeLevel }: { courseSectionId
                             )}
                           </div>
                         ) : (
-                          <span className="text-gray-400">--</span>
+                          // No grade entry exists - show clickable placeholder or inline input
+                          isLocked ? (
+                            <span className="text-gray-400">N/A</span>
+                          ) : creatingEntry?.enrollmentId === student.enrollment_id && creatingEntry?.periodId === period.period_id ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                value={createValue}
+                                onChange={(e) => setCreateValue(e.target.value)}
+                                className="w-16 px-2 py-1 text-center border rounded focus:outline-none focus:ring-2 focus:ring-navy-500"
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => handleCreateSave(student.enrollment_id, period.period_id)}
+                                disabled={createMutation.isPending}
+                                className="p-1 text-green-600 hover:bg-green-50 rounded"
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={handleCreateCancel}
+                                className="p-1 text-red-600 hover:bg-red-50 rounded"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                              <button
+                                onClick={() => handleCreateEntry(student.enrollment_id, period.period_id)}
+                                className="text-gray-400 hover:text-navy-600 cursor-pointer hover:underline"
+                                title="Click to enter grade"
+                              >
+                                N/A
+                              </button>
+                          )
                         )}
                       </td>
                     );
                   })}
                   <td className="text-center px-4 py-3">
-                    <span className={cn('font-semibold', getGradeColorClass(student.final_grade))}>
-                      {formatGrade(student.final_grade)}
+                    <span className={cn('font-semibold', getGradeColorClass(optimisticFinalGrade))}>
+                      {formatGrade(optimisticFinalGrade)}
                     </span>
-                    {student.final_grade_letter && (
-                      <span className="ml-2 text-sm text-gray-500">{student.final_grade_letter}</span>
+                    {optimisticFinalLetter && (
+                      <span className="ml-2 text-sm text-gray-500">{optimisticFinalLetter}</span>
                     )}
                   </td>
-                </tr>
-              ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

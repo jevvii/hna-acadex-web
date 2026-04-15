@@ -478,12 +478,12 @@ function StatsCard({ label, value, colorClass, icon: Icon }: { label: string; va
 }
 
 // Student status badge
-function StudentStatusBadge({ status, score }: { status: SubmissionStatus; score?: number }) {
+function StudentStatusBadge({ status, score, maxPoints = 100 }: { status: SubmissionStatus; score?: number; maxPoints?: number }) {
   const configs = {
     not_submitted: { label: 'Not Submitted', className: 'bg-gray-100 text-gray-600 border border-gray-200' },
     submitted: { label: 'Submitted', className: 'bg-blue-50 text-blue-600 border border-blue-200' },
     late: { label: 'Late', className: 'bg-amber-50 text-amber-600 border border-amber-200' },
-    graded: { label: score !== undefined ? `${score}/100` : 'Graded', className: 'bg-emerald-50 text-emerald-600 border border-emerald-200' },
+    graded: { label: score !== undefined ? `${score}/${maxPoints}` : 'Graded', className: 'bg-emerald-50 text-emerald-600 border border-emerald-200' },
   };
   const config = configs[status] || configs.not_submitted;
   return <span className={cn('px-3 py-1 rounded-full text-xs font-medium', config.className)}>{config.label}</span>;
@@ -500,6 +500,9 @@ export default function ActivityDetailsPage() {
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
   const [selectedAttemptIndex, setSelectedAttemptIndex] = useState<number>(0);
+  const [inlineExamScores, setInlineExamScores] = useState<Record<string, string>>({});
+  const [inlineExamErrors, setInlineExamErrors] = useState<Record<string, string>>({});
+  const [inlineExamSavingStudentId, setInlineExamSavingStudentId] = useState<string | null>(null);
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
@@ -579,6 +582,29 @@ export default function ActivityDetailsPage() {
     queryKey: ['activity-submissions', activityId],
     queryFn: () => activitiesApi.getAllSubmissions(activityId),
     enabled: !!activityId && isTeacher,
+  });
+
+  const quickExamGradeMutation = useMutation({
+    mutationFn: async ({ studentId, score }: { studentId: string; score: number }) => {
+      return activitiesApi.gradeStudent(activityId, { student_id: studentId, score });
+    },
+    onMutate: ({ studentId }) => {
+      setInlineExamSavingStudentId(studentId);
+      setInlineExamErrors(prev => ({ ...prev, [studentId]: '' }));
+    },
+    onSuccess: (_, { studentId, score }) => {
+      setInlineExamScores(prev => ({ ...prev, [studentId]: String(score) }));
+      queryClient.invalidateQueries({ queryKey: ['activity-submissions', activityId] });
+      queryClient.invalidateQueries({ queryKey: ['activity', activityId] });
+      queryClient.invalidateQueries({ queryKey: ['course-activities'] });
+    },
+    onError: (err: Error | { message?: string }, { studentId }) => {
+      const errorMessage = err instanceof Error ? err.message : (err as { message?: string }).message;
+      setInlineExamErrors(prev => ({ ...prev, [studentId]: errorMessage || 'Failed to save grade' }));
+    },
+    onSettled: () => {
+      setInlineExamSavingStudentId(null);
+    },
   });
 
   const deleteMutation = useMutation({
@@ -686,6 +712,36 @@ export default function ActivityDetailsPage() {
     updateMutation.mutate();
   };
 
+  const handleInlineExamGrade = useCallback((submission: SubmissionWithStudent) => {
+    if (!activity?.is_exam) return;
+
+    const studentId = submission.student_id;
+    const rawScore = (inlineExamScores[studentId] ?? (submission.score !== undefined && submission.score !== null
+      ? String(submission.score)
+      : '')).trim();
+
+    if (!rawScore) {
+      setInlineExamErrors(prev => ({ ...prev, [studentId]: 'Enter a score before saving.' }));
+      return;
+    }
+
+    const score = Number(rawScore);
+    if (!Number.isFinite(score)) {
+      setInlineExamErrors(prev => ({ ...prev, [studentId]: 'Score must be a valid number.' }));
+      return;
+    }
+    if (score < 0) {
+      setInlineExamErrors(prev => ({ ...prev, [studentId]: 'Score cannot be negative.' }));
+      return;
+    }
+    if (score > activity.points) {
+      setInlineExamErrors(prev => ({ ...prev, [studentId]: `Score cannot exceed ${activity.points}.` }));
+      return;
+    }
+
+    quickExamGradeMutation.mutate({ studentId, score });
+  }, [activity, inlineExamScores, quickExamGradeMutation]);
+
   const timeStatus = activity?.deadline ? getTimeStatus(activity.deadline) : { text: '', color: '', urgent: false };
   const submissionStatus = activity?.my_submission
     ? getSubmissionStatus(activity.my_submission as unknown as Submission)
@@ -735,6 +791,7 @@ export default function ActivityDetailsPage() {
   const attemptsRemaining = attemptLimit - attemptsUsed;
   const canResubmit = hasSubmitted && attemptsRemaining > 0 && activity.my_submission?.status !== 'graded';
   const isGraded = activity.my_submission?.status === 'graded';
+  const isStudentExamView = isStudent && activity.is_exam;
 
   return (
     <div className="min-h-screen bg-slate-50/50">
@@ -764,7 +821,17 @@ export default function ActivityDetailsPage() {
                     </span>
                   )}
                   {/* Status badge - only show for students */}
-                  {isStudent && (isGraded && activity.my_submission ? (
+                  {isStudent && (isStudentExamView ? (
+                    isGraded && activity.my_submission ? (
+                      <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium flex items-center gap-1">
+                        <Award className="w-4 h-4" /> Graded
+                      </span>
+                    ) : (
+                      <span className={cn('px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1', timeStatus.urgent ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700')}>
+                        <Clock className="w-4 h-4" /> {activity.deadline ? timeStatus.text : 'Exam details posted'}
+                      </span>
+                    )
+                  ) : (isGraded && activity.my_submission ? (
                     <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-medium flex items-center gap-1">
                       <Award className="w-4 h-4" /> Graded
                     </span>
@@ -790,7 +857,7 @@ export default function ActivityDetailsPage() {
                         <Clock className="w-4 h-4" /> {timeStatus.text}
                       </span>
                     );
-                  })())}
+                  })()))}
                 </div>
                 <p className="text-gray-600 max-w-3xl">{activity.description || 'No description provided.'}</p>
               </div>
@@ -1087,8 +1154,8 @@ export default function ActivityDetailsPage() {
                     <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
                       <Clock className="w-5 h-5 text-navy-500" />
                       <div>
-                        <p className="text-sm text-gray-500">Due Date</p>
-                        <p className="font-medium text-navy-800">{formatDate(activity.deadline)}</p>
+                        <p className="text-sm text-gray-500">{isStudentExamView ? 'Exam Date' : 'Due Date'}</p>
+                        <p className="font-medium text-navy-800">{activity.deadline ? formatDate(activity.deadline) : (isStudentExamView ? 'To be announced' : 'Not set')}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
@@ -1098,36 +1165,52 @@ export default function ActivityDetailsPage() {
                         <p className="font-medium text-navy-800">{activity.points || 'Not graded'}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                      <RotateCcw className="w-5 h-5 text-navy-500" />
-                      <div>
-                        <p className="text-sm text-gray-500">Attempts Allowed</p>
-                        <p className="font-medium text-navy-800">
-                          {attemptLimit === 1 ? '1 attempt' : `${attemptLimit} attempts`}
-                          {hasSubmitted && attemptsRemaining > 0 && (
-                            <span className="text-sm text-emerald-600 ml-2">({attemptsRemaining} remaining)</span>
-                          )}
-                        </p>
+                    {!isStudentExamView && (
+                      <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                        <RotateCcw className="w-5 h-5 text-navy-500" />
+                        <div>
+                          <p className="text-sm text-gray-500">Attempts Allowed</p>
+                          <p className="font-medium text-navy-800">
+                            {attemptLimit === 1 ? '1 attempt' : `${attemptLimit} attempts`}
+                            {hasSubmitted && attemptsRemaining > 0 && (
+                              <span className="text-sm text-emerald-600 ml-2">({attemptsRemaining} remaining)</span>
+                            )}
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                   <div className="space-y-4">
                     <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
                       <CheckCircle className="w-5 h-5 text-navy-500" />
                       <div>
-                        <p className="text-sm text-gray-500">Submission Type</p>
-                        <p className="font-medium text-navy-800">File Upload</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                      <AlertCircle className="w-5 h-5 text-navy-500" />
-                      <div>
-                        <p className="text-sm text-gray-500">Late Submissions</p>
+                        <p className="text-sm text-gray-500">{isStudentExamView ? 'Exam Type' : 'Submission Type'}</p>
                         <p className="font-medium text-navy-800">
-                          {activity.allow_late_submissions !== false ? 'Allowed' : 'Not Allowed'}
+                          {isStudentExamView
+                            ? (activity.exam_type === 'monthly' ? 'Monthly Exam' : activity.exam_type === 'quarterly' ? 'Quarterly Exam' : 'Exam')
+                            : 'File Upload'}
                         </p>
                       </div>
                     </div>
+                    {isStudentExamView ? (
+                      <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                        <GraduationCap className="w-5 h-5 text-navy-500" />
+                        <div>
+                          <p className="text-sm text-gray-500">Scoring</p>
+                          <p className="font-medium text-navy-800">Teacher-recorded grade</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                        <AlertCircle className="w-5 h-5 text-navy-500" />
+                        <div>
+                          <p className="text-sm text-gray-500">Late Submissions</p>
+                          <p className="font-medium text-navy-800">
+                            {activity.allow_late_submissions !== false ? 'Allowed' : 'Not Allowed'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1147,7 +1230,7 @@ export default function ActivityDetailsPage() {
             )}
 
             {/* Student's Submitted Files - Canvas Style with Attempt History */}
-            {isStudent && activity.my_submissions && activity.my_submissions.length > 0 && (() => {
+            {isStudent && !activity.is_exam && activity.my_submissions && activity.my_submissions.length > 0 && (() => {
               // Get all submissions sorted by attempt (latest first)
               const allAttempts = activity.my_submissions || [];
               const selectedSubmission = allAttempts[selectedAttemptIndex] || allAttempts[0];
@@ -1336,7 +1419,7 @@ export default function ActivityDetailsPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
-                            <StudentStatusBadge status={submission.status} score={submission.score} />
+                            <StudentStatusBadge status={submission.status} score={submission.score} maxPoints={activity.points || 100} />
                             {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                           </div>
                         </button>
@@ -1408,9 +1491,60 @@ export default function ActivityDetailsPage() {
                                   </div>
                                 )}
                                 <div className="mt-4 flex gap-2">
-                                  <button onClick={() => router.push(`/activities/${activityId}/grade/${submission.student_id}`)} className="btn btn-primary text-sm flex-1">
-                                    <Edit3 className="w-4 h-4 mr-1" /> {submission.graded_at ? 'Update Grade' : 'Grade Submission'}
-                                  </button>
+                                  {activity.is_exam ? (
+                                    <div className="w-full rounded-lg border border-purple-200 bg-purple-50 p-3">
+                                      <p className="text-xs text-purple-700 mb-2">
+                                        Quick exam grading (no separate grading page needed)
+                                      </p>
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          max={activity.points}
+                                          step="0.01"
+                                          value={inlineExamScores[submission.student_id] ?? (
+                                            submission.score !== undefined && submission.score !== null
+                                              ? String(submission.score)
+                                              : ''
+                                          )}
+                                          onChange={(e) => {
+                                            const value = e.target.value;
+                                            setInlineExamScores(prev => ({ ...prev, [submission.student_id]: value }));
+                                            setInlineExamErrors(prev => ({ ...prev, [submission.student_id]: '' }));
+                                          }}
+                                          placeholder={`0 - ${activity.points}`}
+                                          className="flex-1 px-3 py-2 bg-white border border-purple-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                                        />
+                                        <button
+                                          onClick={() => handleInlineExamGrade(submission)}
+                                          disabled={inlineExamSavingStudentId === submission.student_id}
+                                          className="btn btn-primary text-sm"
+                                        >
+                                          {inlineExamSavingStudentId === submission.student_id ? (
+                                            <span className="flex items-center gap-1">
+                                              <Loader2 className="w-4 h-4 animate-spin" /> Saving...
+                                            </span>
+                                          ) : (
+                                            <span className="flex items-center gap-1">
+                                              <Save className="w-4 h-4" /> Save Grade
+                                            </span>
+                                          )}
+                                        </button>
+                                      </div>
+                                      <p className="text-xs text-purple-700 mt-2">
+                                        Max points: {activity.points}
+                                      </p>
+                                      {inlineExamErrors[submission.student_id] && (
+                                        <p className="text-xs text-red-600 mt-2">
+                                          {inlineExamErrors[submission.student_id]}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <button onClick={() => router.push(`/activities/${activityId}/grade/${submission.student_id}`)} className="btn btn-primary text-sm flex-1">
+                                      <Edit3 className="w-4 h-4 mr-1" /> {submission.graded_at ? 'Update Grade' : 'Grade Submission'}
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </motion.div>
@@ -1476,7 +1610,28 @@ export default function ActivityDetailsPage() {
                   </>
                 ) : (
                   <>
-                    {activity.my_submission?.status === 'graded' ? (
+                    {isStudentExamView ? (
+                      activity.my_submission?.status === 'graded' ? (
+                        <div className="p-4 bg-emerald-50 rounded-xl text-center">
+                          <p className="text-sm text-emerald-600 mb-1">Your Score</p>
+                          <p className="text-3xl font-bold text-emerald-700">
+                            {activity.my_submission.score}<span className="text-lg text-emerald-500">/{activity.points || 100}</span>
+                          </p>
+                          {activity.my_submission.feedback && (
+                            <div className="mt-3 p-3 bg-white rounded-lg text-left">
+                              <p className="text-xs text-gray-500 mb-1">Feedback</p>
+                              <p className="text-sm text-gray-700">{activity.my_submission.feedback}</p>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="p-4 bg-blue-50 rounded-xl text-center">
+                          <GraduationCap className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                          <p className="font-medium text-blue-800">Exam in class</p>
+                          <p className="text-sm text-blue-600 mt-1">Your teacher will post your score after checking.</p>
+                        </div>
+                      )
+                    ) : activity.my_submission?.status === 'graded' ? (
                       /* Graded - show score */
                       <div className="p-4 bg-emerald-50 rounded-xl text-center">
                         <p className="text-sm text-emerald-600 mb-1">Your Score</p>
@@ -1571,7 +1726,9 @@ export default function ActivityDetailsPage() {
       </div>
 
       {/* Submission Modal */}
-      <SubmissionModal activity={activity} isOpen={isSubmitModalOpen} onClose={() => setIsSubmitModalOpen(false)} />
+      {!activity.is_exam && (
+        <SubmissionModal activity={activity} isOpen={isSubmitModalOpen} onClose={() => setIsSubmitModalOpen(false)} />
+      )}
 
       {/* Tiptap Editor Styles */}
       <style jsx global>{`

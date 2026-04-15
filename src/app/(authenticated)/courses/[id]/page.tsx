@@ -20,6 +20,7 @@ import {
   quizzesApi,
   filesApi,
   gradingApi,
+  announcementsApi,
 } from '@/lib/api';
 import {
   WeeklyModule,
@@ -1991,41 +1992,121 @@ function FilesTab({
 }
 
 // Announcements Tab
-function AnnouncementsTab({ announcements }: { announcements: Announcement[] }) {
-  const sortedAnnouncements = announcements?.sort((a, b) => {
+function AnnouncementsTab({
+  announcements,
+  isTeacher,
+  isCreating,
+  onCreateAnnouncement,
+}: {
+  announcements: Announcement[];
+  isTeacher: boolean;
+  isCreating: boolean;
+  onCreateAnnouncement?: (title: string, body: string) => void;
+}) {
+  const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newBody, setNewBody] = useState('');
+
+  const sortedAnnouncements = [...(announcements || [])].sort((a, b) => {
     // Pinned first, then by date
     if (a.is_published !== b.is_published) return Number(b.is_published) - Number(a.is_published);
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  }) || [];
+  });
 
-  if (!sortedAnnouncements.length) return <EmptyState message="No announcements yet" />;
+  const canSubmit = newTitle.trim().length > 0 && newBody.trim().length > 0 && !isCreating;
+
+  const handleSubmit = () => {
+    if (!canSubmit || !onCreateAnnouncement) return;
+    onCreateAnnouncement(newTitle.trim(), newBody.trim());
+    setNewTitle('');
+    setNewBody('');
+    setIsComposerOpen(false);
+  };
 
   return (
     <div className="space-y-4">
-      {sortedAnnouncements.map((announcement) => (
-        <div key={announcement.id} className={cn(
-          'bg-white rounded-xl shadow-card p-5',
-          announcement.is_published && 'border-l-4 border-gold-500'
-        )}>
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-full bg-navy-100 flex items-center justify-center text-navy-600 font-semibold">
-              {getInitials(announcement.created_by || 'Unknown')}
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <h3 className="font-display font-semibold text-navy-800">{announcement.title}</h3>
-                {announcement.is_published && (
-                  <span className="badge badge-gold text-xs">Pinned</span>
-                )}
+      {isTeacher && (
+        <div className="bg-white rounded-xl shadow-card p-4">
+          {!isComposerOpen ? (
+            <button
+              type="button"
+              onClick={() => setIsComposerOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add Announcement
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                placeholder="Announcement title"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-500"
+              />
+              <textarea
+                value={newBody}
+                onChange={(e) => setNewBody(e.target.value)}
+                rows={4}
+                placeholder="Write your announcement..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-y focus:outline-none focus:ring-2 focus:ring-navy-500"
+              />
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsComposerOpen(false);
+                    setNewTitle('');
+                    setNewBody('');
+                  }}
+                  className="px-4 py-2 text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={!canSubmit}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Megaphone className="w-4 h-4" />}
+                  Post
+                </button>
               </div>
-              <p className="text-sm text-gray-500 mb-2">
-                {announcement.created_by || 'Unknown'} • {formatDate(announcement.created_at)}
-              </p>
-              <p className="text-gray-700">{announcement.body}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {sortedAnnouncements.length === 0 ? (
+        <EmptyState message="No announcements yet" />
+      ) : (
+        sortedAnnouncements.map((announcement) => (
+          <div key={announcement.id} className={cn(
+            'bg-white rounded-xl shadow-card p-5',
+            announcement.is_published && 'border-l-4 border-gold-500'
+          )}>
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-full bg-navy-100 flex items-center justify-center text-navy-600 font-semibold">
+                {getInitials(announcement.created_by || 'Unknown')}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-display font-semibold text-navy-800">{announcement.title}</h3>
+                  {announcement.is_published && (
+                    <span className="badge badge-gold text-xs">Pinned</span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-500 mb-2">
+                  {announcement.created_by || 'Unknown'} • {formatDate(announcement.created_at)}
+                </p>
+                <p className="text-gray-700 whitespace-pre-wrap">{announcement.body}</p>
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        ))
+      )}
     </div>
   );
 }
@@ -2559,14 +2640,6 @@ function GradesTab({ courseId, courseInfo }: { courseId: string; courseInfo?: { 
   const isTeacher = useIsTeacher();
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
-  const searchParams = useSearchParams();
-
-  const defaultSubTab = searchParams.get('subtab') === 'advisory' ? 'advisory' : 'subject';
-  const [gradesSubTab, setGradesSubTab] = useState<'subject' | 'advisory'>(defaultSubTab);
-
-  // Determine roles for this course
-  const isSubjectTeacher = courseInfo?.teacher_id === user?.id;
-  const isAdviserForThisSection = !!user?.advisory_section_id;
 
   // For students, redirect to Report Card page
   if (isStudent) {
@@ -2590,65 +2663,8 @@ function GradesTab({ courseId, courseInfo }: { courseId: string; courseInfo?: { 
     );
   }
 
-  // Determine which sub-tabs to show
-  const showSubjectTab = isSubjectTeacher || !isAdviserForThisSection;
-  const showAdvisoryTab = isAdviserForThisSection;
-  const showBothTabs = showSubjectTab && showAdvisoryTab;
-
-  // Effective tab: if only one tab is available, force it
-  const effectiveTab: 'subject' | 'advisory' = showBothTabs
-    ? gradesSubTab
-    : showAdvisoryTab
-      ? 'advisory'
-      : 'subject';
-
-  // Sub-tab bar (pill style, only when both roles apply)
-  const subTabBar = showBothTabs ? (
-    <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6">
-      <button
-        onClick={() => setGradesSubTab('subject')}
-        className={cn(
-          'px-4 py-2 text-sm font-medium rounded-lg transition-all',
-          effectiveTab === 'subject'
-            ? 'bg-white shadow-sm text-navy-800'
-            : 'text-gray-500 hover:text-gray-700'
-        )}
-      >
-        My Subject
-      </button>
-      <button
-        onClick={() => setGradesSubTab('advisory')}
-        className={cn(
-          'px-4 py-2 text-sm font-medium rounded-lg transition-all',
-          effectiveTab === 'advisory'
-            ? 'bg-white shadow-sm text-navy-800'
-            : 'text-gray-500 hover:text-gray-700'
-        )}
-      >
-        Advisory
-      </button>
-    </div>
-  ) : null;
-
-  // For teachers and admins
-  if (isTeacher || !isStudent) {
-    return (
-      <div>
-        {subTabBar}
-        {effectiveTab === 'subject' ? (
-          <TeacherGradesView courseSectionId={courseId} />
-        ) : (
-          <TeacherGradesView
-            courseSectionId={courseId}
-            isAdvisory
-            sectionId={user?.advisory_section_id}
-          />
-        )}
-      </div>
-    );
-  }
-
-  // Fallback
+  // For teachers and admins - show subject gradebook only
+  // Advisory teachers should access advisory grades from the dashboard
   return <TeacherGradesView courseSectionId={courseId} />;
 }
 
@@ -2657,8 +2673,13 @@ export default function CoursePage() {
   const courseId = params.id as string;
   const isTeacher = useIsTeacher();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState('modules');
+  const initialTab = (() => {
+    const tab = searchParams.get('tab');
+    return tab && tabs.some((item) => item.id === tab) ? tab : 'modules';
+  })();
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [previewFile, setPreviewFile] = useState<CourseFile | null>(null);
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
@@ -2708,6 +2729,24 @@ export default function CoursePage() {
   const handleDeleteFile = (file: CourseFile) => {
     deleteFileMutation.mutate(file.id);
   };
+
+  const createAnnouncementMutation = useMutation({
+    mutationFn: ({ title, body }: { title: string; body: string }) =>
+      announcementsApi.createAnnouncement({
+        course_section_id: courseId,
+        school_wide: false,
+        audience: 'all',
+        title,
+        body,
+        is_published: true,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['courseContent', courseId] });
+    },
+    onError: (err) => {
+      logger.error('Failed to create announcement:', err);
+    },
+  });
 
   // Update file week assignment
   const handleUpdateFileWeek = async (file: CourseFile, weekId: string | null) => {
@@ -2804,7 +2843,16 @@ export default function CoursePage() {
           />
         );
       case 'announcements':
-        return <AnnouncementsTab announcements={announcements} />;
+        return (
+          <AnnouncementsTab
+            announcements={announcements}
+            isTeacher={isTeacher}
+            isCreating={createAnnouncementMutation.isPending}
+            onCreateAnnouncement={(title, body) =>
+              createAnnouncementMutation.mutate({ title, body })
+            }
+          />
+        );
       case 'attendance':
         return <AttendanceTab courseId={courseId} />;
       case 'grades':

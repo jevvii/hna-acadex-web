@@ -105,7 +105,7 @@ export function getLetterGrade(score: number | null | undefined): string {
  */
 export function formatGrade(score: number | null | undefined): string {
   if (score === null || score === undefined) {
-    return '--';
+    return 'N/A';
   }
   return score.toFixed(1);
 }
@@ -164,7 +164,7 @@ export function getGradeColorClasses(score: number | null): {
  * Returns DepEd letter grade description.
  */
 export function getDepEdLetterGrade(score: number | null): string {
-  if (score === null) return '--';
+  if (score === null) return 'N/A';
   if (score >= 90) return 'Outstanding';
   if (score >= 85) return 'Very Satisfactory';
   if (score >= 80) return 'Satisfactory';
@@ -176,7 +176,7 @@ export function getDepEdLetterGrade(score: number | null): string {
  * Returns short DepEd letter grade abbreviation.
  */
 export function getShortDepEdLetterGrade(score: number | null): string {
-  if (score === null) return '--';
+  if (score === null) return 'N/A';
   if (score >= 90) return 'O';
   if (score >= 85) return 'VS';
   if (score >= 80) return 'S';

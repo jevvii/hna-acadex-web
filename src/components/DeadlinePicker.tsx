@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { StaticDateTimePicker } from '@mui/x-date-pickers/StaticDateTimePicker';
@@ -11,13 +11,10 @@ import { CssBaseline } from '@mui/material';
 import dayjs, { Dayjs } from 'dayjs';
 import { Calendar } from 'lucide-react';
 
-// MUI dark theme matching the navy modal aesthetic
 const muiTheme = createTheme({
   palette: {
     mode: 'dark',
-    primary: {
-      main: '#60a5fa',
-    },
+    primary: { main: '#60a5fa' },
     background: {
       paper: '#1e293b',
       default: '#1e293b',
@@ -29,10 +26,11 @@ const muiTheme = createTheme({
     },
   },
   components: {
-    MuiTypography: {
+    MuiPaper: {
       styleOverrides: {
         root: {
-          color: '#f1f5f9',
+          backgroundColor: '#1e293b',
+          borderRadius: 16,
         },
       },
     },
@@ -44,196 +42,124 @@ const muiTheme = createTheme({
         },
       },
     },
-    MuiPaper: {
-      styleOverrides: {
-        root: {
-          backgroundColor: '#1e293b',
-          borderRadius: '16px',
-        },
-      },
-    },
-    MuiIconButton: {
-      styleOverrides: {
-        root: {
-          color: '#f1f5f9',
-          '&:hover': {
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-          },
-        },
-      },
-    },
   },
 });
 
+function PickerShell({ children }: { children: ReactNode }) {
+  return (
+    <ThemeProvider theme={muiTheme}>
+      <CssBaseline />
+      <LocalizationProvider dateAdapter={AdapterDayjs}>
+        {children}
+      </LocalizationProvider>
+    </ThemeProvider>
+  );
+}
+
+function formatDate(date: Dayjs | null): string {
+  if (!date) return '';
+  return date.format('MMM D, YYYY h:mm A');
+}
+
 type PickerView = DateOrTimeViewWithMeridiem;
 
-// Internal picker modal component
-function DatePickerModal({
+function ClockDateTimeInlinePicker({
+  value,
+  onChange,
+  minDate,
+  view,
+  onViewChange,
+}: {
+  value: Dayjs;
+  onChange: (date: Dayjs) => void;
+  minDate?: Dayjs;
+  view: PickerView;
+  onViewChange: (view: PickerView) => void;
+}) {
+  return (
+    <div className="mt-2 rounded-xl overflow-hidden border border-slate-700 bg-slate-900/60">
+      <StaticDateTimePicker
+        value={value}
+        onChange={(newValue) => {
+          if (newValue) onChange(newValue);
+        }}
+        minDate={minDate}
+        ampm
+        view={view}
+        onViewChange={(newView) => onViewChange(newView)}
+        views={['day', 'hours', 'minutes']}
+        viewRenderers={{
+          hours: renderTimeViewClock,
+          minutes: renderTimeViewClock,
+          seconds: renderTimeViewClock,
+        }}
+        slotProps={{
+          actionBar: { actions: [] },
+          day: {
+            sx: {
+              color: '#f1f5f9',
+              '&:hover': { backgroundColor: '#334155' },
+              '&.Mui-selected': {
+                backgroundColor: '#60a5fa !important',
+                color: '#ffffff',
+              },
+              '&.MuiPickersDay-today': {
+                border: '1px solid #60a5fa',
+                color: '#60a5fa',
+              },
+            },
+          },
+          calendarHeader: {
+            sx: {
+              '& .MuiPickersCalendarHeader-label': { color: '#f1f5f9' },
+              '& .MuiPickersCalendarHeader-switchViewButton': { color: '#f1f5f9' },
+              '& .MuiIconButton-root': { color: '#f1f5f9' },
+            },
+          },
+        }}
+      />
+    </div>
+  );
+}
+
+function ClockDateTimeModal({
   isOpen,
-  initialValue,
-  onConfirm,
+  pendingDate,
+  onPendingDateChange,
   onCancel,
+  onConfirm,
+  minDate,
 }: {
   isOpen: boolean;
-  initialValue: Dayjs | null;
-  onConfirm: (date: Dayjs) => void;
+  pendingDate: Dayjs;
+  onPendingDateChange: (date: Dayjs) => void;
   onCancel: () => void;
+  onConfirm: () => void;
+  minDate?: Dayjs;
 }) {
-  const [pendingDate, setPendingDate] = useState<Dayjs | null>(initialValue ?? dayjs());
   const [pickerView, setPickerView] = useState<PickerView>('day');
-  const [ampm, setAmpm] = useState<'AM' | 'PM'>('AM');
 
-  // Sync pendingDate when initialValue changes
-  useEffect(() => {
-    if (initialValue) {
-      setPendingDate(initialValue);
-      setAmpm(initialValue.hour() >= 12 ? 'PM' : 'AM');
-    }
-  }, [initialValue]);
-
-  // Reset view when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setPickerView('day');
-    }
-  }, [isOpen]);
-
-  // Sync AM/PM when pendingDate changes
-  useEffect(() => {
-    if (pendingDate) {
-      setAmpm(pendingDate.hour() >= 12 ? 'PM' : 'AM');
-    }
-  }, [pendingDate]);
-
-  const handleAmpmChange = useCallback((value: 'AM' | 'PM') => {
-    setAmpm(value);
-    if (!pendingDate) return;
-
-    const hour = pendingDate.hour();
-    if (value === 'AM' && hour >= 12) {
-      setPendingDate(pendingDate.subtract(12, 'hour'));
-    } else if (value === 'PM' && hour < 12) {
-      setPendingDate(pendingDate.add(12, 'hour'));
-    }
-  }, [pendingDate]);
-
-  const handlePickerChange = useCallback((newValue: Dayjs | null) => {
-    setPendingDate(newValue);
-  }, []);
-
-  const handleViewChange = useCallback((newView: PickerView) => {
-    setPickerView(newView);
-  }, []);
-
-  const handleAccept = useCallback(() => {
-    onConfirm(pendingDate ?? dayjs());
-  }, [pendingDate, onConfirm]);
-
-  const handleBackdropClick = useCallback((e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onCancel();
-    }
-  }, [onCancel]);
-
-  const isTimeView = pickerView === 'hours' || pickerView === 'minutes';
-
-  const formatTimeDisplay = (date: Dayjs | null): string => {
-    if (!date) return '--:--';
-    const hours = date.hour();
-    const minutes = date.minute();
-    const h = hours % 12 || 12;
-    const m = minutes.toString().padStart(2, '0');
-    return `${h}:${m}`;
-  };
+  const isDateView = pickerView === 'day';
 
   if (!isOpen) return null;
-
   return (
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60"
-      onClick={handleBackdropClick}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="rounded-2xl shadow-2xl overflow-hidden"
-        style={{ backgroundColor: '#1e293b' }}
+        className="rounded-2xl shadow-2xl overflow-hidden bg-slate-800"
       >
-        <StaticDateTimePicker
-          value={pendingDate ?? dayjs()}
-          onChange={handlePickerChange}
-          onViewChange={handleViewChange}
+        <ClockDateTimeInlinePicker
+          value={pendingDate}
+          onChange={onPendingDateChange}
+          minDate={minDate}
           view={pickerView}
-          minDate={dayjs()}
-          ampm={true}
-          views={['day', 'hours', 'minutes']}
-          viewRenderers={{
-            hours: renderTimeViewClock,
-            minutes: renderTimeViewClock,
-            seconds: renderTimeViewClock,
-          }}
-          slotProps={{
-            actionBar: { actions: [] },
-            toolbar: { hidden: true },
-            day: {
-              sx: {
-                color: '#f1f5f9',
-                '&:hover': { backgroundColor: '#334155' },
-                '&.Mui-selected': {
-                  backgroundColor: '#60a5fa !important',
-                  color: '#ffffff',
-                },
-                '&.MuiPickersDay-today': {
-                  border: '1px solid #60a5fa',
-                  color: '#60a5fa',
-                },
-              },
-            },
-            calendarHeader: {
-              sx: {
-                '& .MuiPickersCalendarHeader-label': { color: '#f1f5f9' },
-                '& .MuiPickersCalendarHeader-switchViewButton': { color: '#f1f5f9' },
-                '& .MuiIconButton-root': { color: '#f1f5f9' },
-              },
-            },
-          }}
-          sx={{
-            '& .MuiTimePickerToolbar-ampmSelection': { display: 'none !important' },
-            '& .MuiToggleButtonGroup-root': { display: 'none !important' },
-          }}
+          onViewChange={setPickerView}
         />
-
-        {isTimeView && (
-          <div className="flex items-center justify-center gap-3 px-4 py-2 bg-slate-800/50">
-            <span className="text-2xl font-light text-white">
-              {formatTimeDisplay(pendingDate)}
-            </span>
-            <div className="flex flex-col gap-0.5">
-              <button
-                type="button"
-                onClick={() => handleAmpmChange('AM')}
-                className={`px-2 py-0.5 text-xs font-semibold rounded transition-all ${
-                  ampm === 'AM'
-                    ? 'text-white bg-slate-600'
-                    : 'text-slate-500 hover:text-slate-300 hover:bg-slate-700/50'
-                }`}
-              >
-                AM
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAmpmChange('PM')}
-                className={`px-2 py-0.5 text-xs font-semibold rounded transition-all ${
-                  ampm === 'PM'
-                    ? 'text-white bg-slate-600'
-                    : 'text-slate-500 hover:text-slate-300 hover:bg-slate-700/50'
-                }`}
-              >
-                PM
-              </button>
-            </div>
-          </div>
-        )}
-
         <div className="flex justify-end gap-3 px-4 pb-4 pt-2">
           <button
             type="button"
@@ -242,40 +168,30 @@ function DatePickerModal({
           >
             Cancel
           </button>
-          {isTimeView ? (
-            <button
-              type="button"
-              onClick={handleAccept}
-              className="px-4 py-1.5 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors rounded-lg"
-            >
-              OK
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setPickerView('hours')}
-              className="px-4 py-1.5 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors rounded-lg"
-            >
-              Next
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => {
+              if (isDateView) {
+                setPickerView('hours');
+                return;
+              }
+              onConfirm();
+            }}
+            className="px-4 py-1.5 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors rounded-lg"
+          >
+            {isDateView ? 'Next' : 'OK'}
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-// Simple self-contained deadline picker for quiz/activity forms
 export interface DeadlinePickerProps {
-  /** Label for the checkbox (e.g. "Set Open Date", "Set Close Date") */
   label: string;
-  /** Current date value from parent */
   value: Dayjs | null;
-  /** Called when user confirms a date or clears it */
   onChange: (date: Dayjs | null) => void;
-  /** Whether the checkbox starts checked */
   defaultChecked?: boolean;
-  /** Whether the picker is disabled */
   disabled?: boolean;
 }
 
@@ -287,128 +203,91 @@ export function DeadlinePicker({
   disabled = false,
 }: DeadlinePickerProps) {
   const [hasDeadline, setHasDeadline] = useState(defaultChecked || !!value);
-  const [confirmedDate, setConfirmedDate] = useState<Dayjs | null>(value);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [pendingDate, setPendingDate] = useState<Dayjs>(value ?? dayjs());
 
-  // Sync confirmedDate with value prop
-  useEffect(() => {
-    if (value) {
-      setConfirmedDate(value);
-      setHasDeadline(true);
-    }
-  }, [value]);
+  const effectiveHasDeadline = hasDeadline || !!value;
+  const selectedDate = value ?? pendingDate;
 
-  // Handle checkbox toggle
   const handleCheckboxToggle = useCallback((checked: boolean) => {
     setHasDeadline(checked);
-    if (checked) {
-      // Open picker with default or existing date
-      setIsPickerOpen(true);
-    } else {
-      // Clear the date
+    if (!checked) {
       setIsPickerOpen(false);
-      setConfirmedDate(null);
       onChange(null);
+      return;
     }
-  }, [onChange]);
-
-  // Handle clicking the date display
-  const handleDateClick = useCallback(() => {
-    if (hasDeadline) {
-      setIsPickerOpen(true);
-    }
-  }, [hasDeadline]);
-
-  // Handle date confirmation
-  const handleConfirm = useCallback((date: Dayjs) => {
-    setConfirmedDate(date);
-    onChange(date);
-    setIsPickerOpen(false);
-  }, [onChange]);
-
-  // Handle cancel
-  const handleCancel = useCallback(() => {
-    setIsPickerOpen(false);
-  }, []);
-
-  // Format date for display
-  const formatDeadline = (date: Dayjs | null): string => {
-    if (!date) return '';
-    return date.format('MMM D, YYYY h:mm A');
-  };
+    setPendingDate(value ?? dayjs());
+    setIsPickerOpen(true);
+  }, [onChange, value]);
 
   return (
-    <ThemeProvider theme={muiTheme}>
-      <CssBaseline />
-      <LocalizationProvider dateAdapter={AdapterDayjs}>
-        <div className="space-y-3">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={hasDeadline}
-              onChange={(e) => handleCheckboxToggle(e.target.checked)}
-              disabled={disabled}
-              className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
-            />
-            <span className="text-sm font-medium text-gray-700">{label}</span>
-          </label>
+    <PickerShell>
+      <div className="space-y-3">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={effectiveHasDeadline}
+            onChange={(e) => handleCheckboxToggle(e.target.checked)}
+            disabled={disabled}
+            className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
+          />
+          <span className="text-sm font-medium text-gray-700">{label}</span>
+        </label>
 
-          {hasDeadline && (
+        {effectiveHasDeadline && (
+          <>
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-navy-600" />
               <button
                 type="button"
-                onClick={handleDateClick}
+                onClick={() => {
+                  setPendingDate(selectedDate);
+                  setIsPickerOpen(true);
+                }}
                 className="flex-1 text-left px-3 py-2 border border-gray-300 rounded-lg hover:border-navy-500 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors bg-white"
               >
-                {confirmedDate ? (
-                  <span className="text-gray-900">{formatDeadline(confirmedDate)}</span>
+                {selectedDate ? (
+                  <span className="text-gray-900">{formatDate(selectedDate)}</span>
                 ) : (
                   <span className="text-gray-400">Click to select date...</span>
                 )}
               </button>
             </div>
-          )}
-        </div>
+          </>
+        )}
+      </div>
 
-        <DatePickerModal
+      {isPickerOpen && (
+        <ClockDateTimeModal
           isOpen={isPickerOpen}
-          initialValue={confirmedDate}
-          onConfirm={handleConfirm}
-          onCancel={handleCancel}
+          pendingDate={pendingDate}
+          onPendingDateChange={setPendingDate}
+          onCancel={() => setIsPickerOpen(false)}
+          onConfirm={() => {
+            onChange(pendingDate);
+            setIsPickerOpen(false);
+          }}
+          minDate={dayjs()}
         />
-      </LocalizationProvider>
-    </ThemeProvider>
+      )}
+    </PickerShell>
   );
 }
 
-/**
- * Legacy deadline picker for activity creation with "Allow Late Submissions" option.
- * For simpler use cases, use the DeadlinePicker component instead.
- */
 export interface DeadlinePickerTriggerProps {
-  /** Current confirmed deadline value from parent */
   value: Dayjs | null;
-  /** Called when deadline is confirmed (after clicking OK) */
   onChange: (value: Dayjs | null) => void;
-  /** Whether deadline checkbox is checked */
   hasDeadline: boolean;
-  /** Called when hasDeadline checkbox changes */
   onHasDeadlineChange?: (value: boolean) => void;
-  /** Label for the checkbox */
   checkboxLabel?: string;
-  /** Whether to show the allow late submissions checkbox */
   showAllowLate?: boolean;
-  /** Current allow late submissions value */
   allowLate?: boolean;
-  /** Called when allow late submissions changes */
   onAllowLateChange?: (value: boolean) => void;
-  /** Whether the deadline input is disabled */
   disabled?: boolean;
 }
 
 export function DeadlinePickerTrigger({
-  value: confirmedDate,
+  value,
   onChange,
   hasDeadline,
   onHasDeadlineChange,
@@ -419,262 +298,142 @@ export function DeadlinePickerTrigger({
   disabled = false,
 }: DeadlinePickerTriggerProps) {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const [pendingDate, setPendingDate] = useState<Dayjs | null>(null);
-  const [pickerView, setPickerView] = useState<PickerView>('day');
-  const [ampm, setAmpm] = useState<'AM' | 'PM'>('AM');
+  const [pendingDate, setPendingDate] = useState<Dayjs>(value ?? dayjs());
+  const selectedDate = value ?? pendingDate;
 
-  useEffect(() => {
-    if (pendingDate) {
-      setAmpm(pendingDate.hour() >= 12 ? 'PM' : 'AM');
-    }
-  }, [pendingDate]);
-
-  const handleAmpmChange = useCallback((value: 'AM' | 'PM') => {
-    setAmpm(value);
-    if (!pendingDate) return;
-    const hour = pendingDate.hour();
-    if (value === 'AM' && hour >= 12) {
-      setPendingDate(pendingDate.subtract(12, 'hour'));
-    } else if (value === 'PM' && hour < 12) {
-      setPendingDate(pendingDate.add(12, 'hour'));
-    }
-  }, [pendingDate]);
-
-  const handleCheckboxToggle = useCallback((checked: boolean) => {
+  const handleToggle = useCallback((checked: boolean) => {
     onHasDeadlineChange?.(checked);
-    if (checked) {
-      const base = confirmedDate ?? dayjs();
-      setAmpm(base.hour() >= 12 ? 'PM' : 'AM');
-      setPickerView('day');
-      setPendingDate(base);
-      setIsPickerOpen(true);
-    } else {
+    if (!checked) {
       setIsPickerOpen(false);
-      setPendingDate(null);
       onChange(null);
+      return;
     }
-  }, [confirmedDate, onChange, onHasDeadlineChange]);
-
-  const handleDateClick = useCallback(() => {
-    if (hasDeadline) {
-      const base = confirmedDate ?? dayjs();
-      setAmpm(base.hour() >= 12 ? 'PM' : 'AM');
-      setPickerView('day');
-      setPendingDate(base);
-      setIsPickerOpen(true);
-    }
-  }, [hasDeadline, confirmedDate]);
-
-  const handlePickerChange = useCallback((newValue: Dayjs | null) => {
-    setPendingDate(newValue);
-  }, []);
-
-  const handleViewChange = useCallback((newView: PickerView) => {
-    setPickerView(newView);
-  }, []);
-
-  const handleAccept = useCallback(() => {
-    const finalValue = pendingDate ?? dayjs();
-    onChange(finalValue);
-    setIsPickerOpen(false);
-  }, [pendingDate, onChange]);
-
-  const handleCancel = useCallback(() => {
-    setIsPickerOpen(false);
-    setPendingDate(null);
-    setPickerView('day');
-    if (!confirmedDate) {
-      onHasDeadlineChange?.(false);
-    }
-  }, [confirmedDate, onHasDeadlineChange]);
-
-  const handleBackdropClick = useCallback((e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      handleCancel();
-    }
-  }, [handleCancel]);
-
-  const formatDeadline = (date: Dayjs | null): string => {
-    if (!date) return '';
-    return date.format('MMM D, YYYY h:mm A');
-  };
-
-  const isTimeView = pickerView === 'hours' || pickerView === 'minutes';
-
-  const formatTimeDisplay = (date: Dayjs | null): string => {
-    if (!date) return '--:--';
-    const hours = date.hour();
-    const minutes = date.minute();
-    const h = hours % 12 || 12;
-    const m = minutes.toString().padStart(2, '0');
-    return `${h}:${m}`;
-  };
+    setPendingDate(value ?? dayjs());
+    setIsPickerOpen(true);
+  }, [onChange, onHasDeadlineChange, value]);
 
   return (
-    <ThemeProvider theme={muiTheme}>
-      <CssBaseline />
-      <LocalizationProvider dateAdapter={AdapterDayjs}>
-        <div className="space-y-3">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={hasDeadline}
-              onChange={(e) => handleCheckboxToggle(e.target.checked)}
-              disabled={disabled}
-              className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
-            />
-            <span className="text-sm font-medium text-gray-700">{checkboxLabel}</span>
-          </label>
+    <PickerShell>
+      <div className="space-y-3">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={hasDeadline}
+            onChange={(e) => handleToggle(e.target.checked)}
+            disabled={disabled}
+            className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
+          />
+          <span className="text-sm font-medium text-gray-700">{checkboxLabel}</span>
+        </label>
 
-          {hasDeadline && (
-            <>
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-navy-600" />
-                <button
-                  type="button"
-                  onClick={handleDateClick}
-                  className="flex-1 text-left px-3 py-2 border border-gray-300 rounded-lg hover:border-navy-500 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors bg-white"
-                >
-                  {confirmedDate ? (
-                    <span className="text-gray-900">{formatDeadline(confirmedDate)}</span>
-                  ) : (
-                    <span className="text-gray-400">Click to select deadline...</span>
-                  )}
-                </button>
-              </div>
-
-              {showAllowLate && (
-                <label className="flex items-center gap-2 cursor-pointer ml-6">
-                  <input
-                    type="checkbox"
-                    checked={allowLate}
-                    onChange={(e) => onAllowLateChange?.(e.target.checked)}
-                    disabled={disabled}
-                    className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
-                  />
-                  <span className="text-sm text-gray-600">Allow Late Submissions</span>
-                </label>
-              )}
-            </>
-          )}
-        </div>
-
-        {isPickerOpen && (
-          <div
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60"
-            onClick={handleBackdropClick}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="rounded-2xl shadow-2xl overflow-hidden"
-              style={{ backgroundColor: '#1e293b' }}
-            >
-              <StaticDateTimePicker
-                value={pendingDate ?? dayjs()}
-                onChange={handlePickerChange}
-                onViewChange={handleViewChange}
-                view={pickerView}
-                minDate={dayjs()}
-                ampm={true}
-                views={['day', 'hours', 'minutes']}
-                viewRenderers={{
-                  hours: renderTimeViewClock,
-                  minutes: renderTimeViewClock,
-                  seconds: renderTimeViewClock,
+        {hasDeadline && (
+          <>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-navy-600" />
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingDate(selectedDate);
+                  setIsPickerOpen(true);
                 }}
-                slotProps={{
-                  actionBar: { actions: [] },
-                  toolbar: { hidden: true },
-                  day: {
-                    sx: {
-                      color: '#f1f5f9',
-                      '&:hover': { backgroundColor: '#334155' },
-                      '&.Mui-selected': {
-                        backgroundColor: '#60a5fa !important',
-                        color: '#ffffff',
-                      },
-                      '&.MuiPickersDay-today': {
-                        border: '1px solid #60a5fa',
-                        color: '#60a5fa',
-                      },
-                    },
-                  },
-                  calendarHeader: {
-                    sx: {
-                      '& .MuiPickersCalendarHeader-label': { color: '#f1f5f9' },
-                      '& .MuiPickersCalendarHeader-switchViewButton': { color: '#f1f5f9' },
-                      '& .MuiIconButton-root': { color: '#f1f5f9' },
-                    },
-                  },
-                }}
-                sx={{
-                  '& .MuiTimePickerToolbar-ampmSelection': { display: 'none !important' },
-                  '& .MuiToggleButtonGroup-root': { display: 'none !important' },
-                }}
-              />
-
-              {isTimeView && (
-                <div className="flex items-center justify-center gap-3 px-4 py-2 bg-slate-800/50">
-                  <span className="text-2xl font-light text-white">
-                    {formatTimeDisplay(pendingDate)}
-                  </span>
-                  <div className="flex flex-col gap-0.5">
-                    <button
-                      type="button"
-                      onClick={() => handleAmpmChange('AM')}
-                      className={`px-2 py-0.5 text-xs font-semibold rounded transition-all ${
-                        ampm === 'AM'
-                          ? 'text-white bg-slate-600'
-                          : 'text-slate-500 hover:text-slate-300 hover:bg-slate-700/50'
-                      }`}
-                    >
-                      AM
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAmpmChange('PM')}
-                      className={`px-2 py-0.5 text-xs font-semibold rounded transition-all ${
-                        ampm === 'PM'
-                          ? 'text-white bg-slate-600'
-                          : 'text-slate-500 hover:text-slate-300 hover:bg-slate-700/50'
-                      }`}
-                    >
-                      PM
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-3 px-4 pb-4 pt-2">
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="px-4 py-1.5 text-sm text-slate-400 hover:text-white transition-colors rounded-lg"
-                >
-                  Cancel
-                </button>
-                {isTimeView ? (
-                  <button
-                    type="button"
-                    onClick={handleAccept}
-                    className="px-4 py-1.5 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors rounded-lg"
-                  >
-                    OK
-                  </button>
+                className="flex-1 text-left px-3 py-2 border border-gray-300 rounded-lg hover:border-navy-500 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors bg-white"
+              >
+                {selectedDate ? (
+                  <span className="text-gray-900">{formatDate(selectedDate)}</span>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setPickerView('hours')}
-                    className="px-4 py-1.5 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors rounded-lg"
-                  >
-                    Next
-                  </button>
+                  <span className="text-gray-400">Click to select deadline...</span>
                 )}
-              </div>
+              </button>
             </div>
-          </div>
+
+            {showAllowLate && (
+              <label className="flex items-center gap-2 cursor-pointer ml-6">
+                <input
+                  type="checkbox"
+                  checked={allowLate}
+                  onChange={(e) => onAllowLateChange?.(e.target.checked)}
+                  disabled={disabled}
+                  className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
+                />
+                <span className="text-sm text-gray-600">Allow Late Submissions</span>
+              </label>
+            )}
+          </>
         )}
-      </LocalizationProvider>
-    </ThemeProvider>
+      </div>
+
+      {isPickerOpen && (
+        <ClockDateTimeModal
+          isOpen={isPickerOpen}
+          pendingDate={pendingDate}
+          onPendingDateChange={setPendingDate}
+          onCancel={() => {
+            setIsPickerOpen(false);
+            if (!value) onHasDeadlineChange?.(false);
+          }}
+          onConfirm={() => {
+            onChange(pendingDate);
+            setIsPickerOpen(false);
+          }}
+          minDate={dayjs()}
+        />
+      )}
+    </PickerShell>
+  );
+}
+
+export interface DateTimePickerTriggerProps {
+  label: string;
+  value: Dayjs;
+  onChange: (value: Dayjs) => void;
+  disabled?: boolean;
+  minDate?: Dayjs;
+}
+
+export function DateTimePickerTrigger({
+  label,
+  value,
+  onChange,
+  disabled = false,
+  minDate,
+}: DateTimePickerTriggerProps) {
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const [pendingDate, setPendingDate] = useState<Dayjs>(value);
+
+  return (
+    <PickerShell>
+      <div>
+        <label className="text-sm font-medium text-gray-700">{label}</label>
+        <div className="flex items-center gap-2 mt-1">
+          <Calendar className="w-4 h-4 text-navy-600" />
+          <button
+            type="button"
+            onClick={() => {
+              if (disabled) return;
+              setPendingDate(value);
+              setIsPickerOpen(true);
+            }}
+            className="flex-1 text-left px-3 py-2 border border-gray-300 rounded-lg hover:border-navy-500 focus:border-navy-500 focus:ring-1 focus:ring-navy-500 outline-none transition-colors bg-white"
+            disabled={disabled}
+          >
+            <span className="text-gray-900">{formatDate(value)}</span>
+          </button>
+        </div>
+      </div>
+
+      {isPickerOpen && (
+        <ClockDateTimeModal
+          isOpen={isPickerOpen}
+          pendingDate={pendingDate}
+          onPendingDateChange={setPendingDate}
+          onCancel={() => setIsPickerOpen(false)}
+          onConfirm={() => {
+            onChange(pendingDate);
+            setIsPickerOpen(false);
+          }}
+          minDate={minDate}
+        />
+      )}
+    </PickerShell>
   );
 }

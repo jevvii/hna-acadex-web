@@ -205,7 +205,23 @@ export default function QuizBuilderPage() {
     setSaveError(null);
 
     try {
-      await quizzesApi.bulkUpdateQuestions(quizId, questions);
+      const savedQuestions = await quizzesApi.bulkUpdateQuestions(quizId, questions);
+      setQuestions(savedQuestions);
+
+      if (savedQuestions.length === 0) {
+        setActiveQuestionId(null);
+      } else if (activeQuestionId) {
+        const activeSortOrder = questions.find(q => q.id === activeQuestionId)?.sort_order;
+        const nextActive =
+          savedQuestions.find(q => q.id === activeQuestionId) ||
+          (activeSortOrder !== undefined
+            ? savedQuestions.find(q => q.sort_order === activeSortOrder)
+            : undefined);
+        setActiveQuestionId(nextActive?.id ?? savedQuestions[0].id);
+      } else {
+        setActiveQuestionId(savedQuestions[0].id);
+      }
+
       setHasChanges(false);
       queryClient.invalidateQueries({ queryKey: ['quizQuestions', quizId] });
 
@@ -218,7 +234,14 @@ export default function QuizBuilderPage() {
     } finally {
       setIsSaving(false);
     }
-  }, [quizId, questions, isSaving, router, queryClient]);
+  }, [quizId, questions, isSaving, router, queryClient, activeQuestionId]);
+
+  const handleBackToQuiz = useCallback(() => {
+    if (hasChanges && !window.confirm('You have unsaved changes. Leave quiz builder without saving?')) {
+      return;
+    }
+    router.push(`/quizzes/${quizId}`);
+  }, [hasChanges, quizId, router]);
 
   // Guard against undefined quizId
   if (!quizId) {
@@ -244,7 +267,7 @@ export default function QuizBuilderPage() {
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => router.push(`/quizzes/${quizId}`)}
+              onClick={handleBackToQuiz}
               className="flex items-center gap-1 text-slate-500 hover:text-slate-700 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />

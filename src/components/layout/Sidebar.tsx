@@ -2,8 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore, useUserRole } from '@/store/auth';
 import { cn, getInitials } from '@/lib/utils';
+import { notificationsApi } from '@/lib/api';
+import type { UserNotification } from '@/lib/types';
 import {
   LayoutDashboard,
   Calendar,
@@ -31,8 +34,16 @@ export function Sidebar() {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const role = useUserRole();
+  const { data: notifications } = useQuery<UserNotification[]>({
+    queryKey: ['notifications'],
+    queryFn: () => notificationsApi.getNotifications(),
+  });
 
   const navItems = role === 'student' ? studentNavItems : teacherNavItems;
+  const notificationList: UserNotification[] = Array.isArray(notifications)
+    ? notifications
+    : (notifications as unknown as { results?: UserNotification[] })?.results ?? [];
+  const unreadCount = notificationList.filter((notification) => !notification.is_read).length;
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-[var(--border-default)] flex flex-col z-50">
@@ -66,12 +77,24 @@ export function Sidebar() {
                     ? 'bg-navy-600 text-white'
                     : 'text-gray-500 hover:bg-navy-50 hover:text-navy-600'
                 )}
-              >
-                <Icon className="w-5 h-5" />
-                {item.label}
-              </Link>
-            );
-          })}
+                >
+                  <div className="relative">
+                    <Icon className="w-5 h-5" />
+                    {item.href === '/notifications' && unreadCount > 0 && (
+                      <span
+                        className={cn(
+                          'absolute -top-1.5 -right-2 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full text-[10px] leading-[1.1rem] text-center font-semibold',
+                          isActive ? 'bg-white text-navy-700' : 'bg-red-500 text-white'
+                        )}
+                      >
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    )}
+                  </div>
+                  {item.label}
+                </Link>
+              );
+            })}
         </div>
       </nav>
 

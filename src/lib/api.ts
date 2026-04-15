@@ -201,6 +201,9 @@ export const activitiesApi = {
   gradeSubmission: async (submissionId: string, data: { score: number; feedback?: string }) => {
     return api.patch(`/activity-submissions/${submissionId}/grade/`, data);
   },
+  gradeStudent: async (activityId: string, data: { student_id: string; score: number; feedback?: string }) => {
+    return api.patch(`/activities/${activityId}/grade-student/`, data);
+  },
   createActivity: async (courseSectionId: string, formData: FormData) => {
     formData.append('course_section_id', courseSectionId);
     return api.postForm('/activities/', formData);
@@ -251,6 +254,7 @@ export const quizzesApi = {
     instructions?: string;
     time_limit_minutes?: number;
     attempt_limit: number;
+    score_selection_policy?: 'highest' | 'latest';
     weekly_module_id?: string;
     open_at?: string;
     close_at?: string;
@@ -427,10 +431,10 @@ export const notificationsApi = {
     return api.get('/notifications/');
   },
   markAsRead: async (notificationId: string) => {
-    return api.patch(`/notifications/${notificationId}/`, { is_read: true });
+    return api.post(`/notifications/${notificationId}/mark_read/`);
   },
   markAllAsRead: async () => {
-    return api.post('/notifications/mark-all-read/');
+    return api.post('/notifications/mark_all_read/');
   },
   deleteNotification: async (notificationId: string) => {
     return api.delete(`/notifications/${notificationId}/`);
@@ -579,6 +583,15 @@ export const gradingApi = {
     return api.patch(`/grade-entries/${entryId}/`, data);
   },
 
+  // Create a new grade entry with manual override score
+  createGradeEntry: async (enrollmentId: string, gradingPeriodId: string, overrideScore: number | null): Promise<GradeEntry> => {
+    return api.post('/grade-entries/', {
+      enrollment_id: enrollmentId,
+      grading_period_id: gradingPeriodId,
+      override_score: overrideScore,
+    });
+  },
+
   // Publish/unpublish a single grade entry
   publishGradeEntry: async (entryId: string, isPublished: boolean): Promise<GradeEntry> => {
     return api.post(`/grade-entries/${entryId}/publish/`, { is_published: isPublished });
@@ -618,6 +631,14 @@ export const gradingApi = {
   },
   unpublishReportCard: async (sectionId: string, gradingPeriodId: string): Promise<SectionReportCard> => {
     return api.post(`/advisory/${sectionId}/report-card/unpublish/`, { grading_period_id: gradingPeriodId });
+  },
+  sendAdvisorySubjectReminders: async (
+    sectionId: string,
+    courseSectionId?: string
+  ): Promise<{ sent_count: number; skipped_count: number; subjects: string[] }> => {
+    return api.post(`/advisory/${sectionId}/subject-reminders/`, courseSectionId
+      ? { course_section_id: courseSectionId }
+      : {});
   },
 
   // Adviser override

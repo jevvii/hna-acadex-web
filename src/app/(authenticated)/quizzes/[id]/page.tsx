@@ -326,7 +326,7 @@ export default function QuizDetailsPage() {
   const isTeacher = useIsTeacher();
 
   const [isStartingQuiz, setIsStartingQuiz] = useState(false);
-  const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
+  const [expandedAttemptId, setExpandedAttemptId] = useState<string | null>(null);
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
@@ -929,11 +929,11 @@ export default function QuizDetailsPage() {
                 </div>
                 <div className="divide-y divide-gray-100">
                   {gradingList.map((attempt: { attempt_id: string; student_id: string; student_name?: string; student_email?: string; score?: number; max_score?: number; submitted_at?: string; time_taken_seconds?: number; pending_manual_grading?: boolean }) => {
-                    const isExpanded = expandedStudentId === attempt.student_id;
+                    const isExpanded = expandedAttemptId === attempt.attempt_id;
                     return (
-                      <div key={attempt.student_id} className="hover:bg-slate-50/50 transition-colors">
+                      <div key={attempt.attempt_id} className="hover:bg-slate-50/50 transition-colors">
                         <button
-                          onClick={() => setExpandedStudentId(isExpanded ? null : attempt.student_id)}
+                          onClick={() => setExpandedAttemptId(isExpanded ? null : attempt.attempt_id)}
                           className="w-full flex items-center justify-between p-4"
                         >
                           <div className="flex items-center gap-3">

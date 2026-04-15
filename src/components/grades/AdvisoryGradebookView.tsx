@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   useQuery,
@@ -31,6 +32,11 @@ import {
   SubjectSubmissionPanel,
   ReportCardPublicationPanel,
 } from './';
+
+const EMPTY_STUDENTS: AdvisoryGradeData['students'] = [];
+const EMPTY_PERIODS: AdvisoryGradeData['periods'] = [];
+const EMPTY_SUBMISSION_STATUSES: AdvisoryGradeData['submission_status'] = [];
+const EMPTY_REPORT_CARD_STATUSES: AdvisoryGradeData['report_card_status'] = [];
 
 // ---------------------------------------------------------------------------
 // Loading State
@@ -89,11 +95,9 @@ function ErrorState({
 function StatsBar({
   students,
   submissionStatuses,
-  reportCardStatuses,
 }: {
   students: AdvisoryGradeData['students'];
   submissionStatuses: AdvisorySubmissionStatus[];
-  reportCardStatuses: AdvisoryReportCardStatus[];
 }) {
   // Calculate stats
   const stats = useMemo(() => {
@@ -280,6 +284,7 @@ export function AdvisoryGradebookView({
 }: {
   sectionId: string;
 }) {
+  const router = useRouter();
   const queryClient = useQueryClient();
 
   // Filter states
@@ -346,30 +351,32 @@ export function AdvisoryGradebookView({
     },
   });
 
-  if (isPending) return <LoadingState />;
-  if (error)
-    return (
-      <ErrorState
-        message="Failed to load advisory grades"
-        onRetry={() => refetch()}
-      />
-    );
+  const reminderMutation = useMutation({
+    mutationFn: ({ subjectId }: { subjectId?: string }) =>
+      gradingApi.sendAdvisorySubjectReminders(sectionId, subjectId),
+    onSuccess: (result, variables) => {
+      if (result.sent_count > 0) {
+        alert(
+          variables.subjectId
+            ? `Reminder sent to subject teacher. (${result.sent_count})`
+            : `Reminders sent to ${result.sent_count} subject teacher(s).`
+        );
+      } else {
+        alert('No pending subject submissions to remind.');
+      }
+    },
+    onError: (err: Error) => {
+      alert(`Failed to send reminder: ${err.message}`);
+    },
+  });
 
-  const students = data?.students || [];
-  const periods = data?.periods || [];
-  const submissionStatuses = data?.submission_status || [];
-  const reportCardStatuses = data?.report_card_status || [];
+  const students = data?.students ?? EMPTY_STUDENTS;
+  const periods = data?.periods ?? EMPTY_PERIODS;
+  const submissionStatuses = data?.submission_status ?? EMPTY_SUBMISSION_STATUSES;
+  const reportCardStatuses = data?.report_card_status ?? EMPTY_REPORT_CARD_STATUSES;
   const subjects = students[0]?.subjects || [];
 
-  const reportCardMap = new Map<string, AdvisoryReportCardStatus>();
-  reportCardStatuses.forEach((r) =>
-    reportCardMap.set(r.grading_period_id, r)
-  );
-
-  const isPeriodPublished = (periodId: string): boolean =>
-    reportCardMap.get(periodId)?.is_published ?? false;
-
-  // Filter students
+  // Keep hooks unconditional across loading/error states.
   const filteredStudents = useMemo(() => {
     return students.filter((student) => {
       // Search filter
@@ -410,10 +417,28 @@ export function AdvisoryGradebookView({
     });
   }, [students, searchQuery, filterStatus, filterSubject]);
 
+  if (isPending) return <LoadingState />;
+  if (error)
+    return (
+      <ErrorState
+        message="Failed to load advisory grades"
+        onRetry={() => refetch()}
+      />
+    );
+
+  const reportCardMap = new Map<string, AdvisoryReportCardStatus>();
+  reportCardStatuses.forEach((r) =>
+    reportCardMap.set(r.grading_period_id, r)
+  );
+
+  const isPeriodPublished = (periodId: string): boolean =>
+    reportCardMap.get(periodId)?.is_published ?? false;
+
   const isAnyMutationPending =
     publishMutation.isPending ||
     unpublishMutation.isPending ||
-    overrideMutation.isPending;
+    overrideMutation.isPending ||
+    reminderMutation.isPending;
 
   if (periods.length === 0) {
     return (
@@ -501,7 +526,6 @@ export function AdvisoryGradebookView({
           <StatsBar
             students={students}
             submissionStatuses={submissionStatuses}
-            reportCardStatuses={reportCardStatuses}
           />
         </div>
       </motion.div>
@@ -510,16 +534,17 @@ export function AdvisoryGradebookView({
       <SubjectSubmissionPanel
         subjects={submissionStatuses}
         onViewGrades={(subjectId) => {
-          // Navigate to subject grades view
-          console.log('View grades for', subjectId);
+          router.push(`/courses/${subjectId}`);
         }}
         onSendReminder={(subjectId) => {
-          // Send reminder to subject teacher
-          console.log('Send reminder for', subjectId);
+          if (!reminderMutation.isPending) {
+            reminderMutation.mutate({ subjectId });
+          }
         }}
         onSendReminderToAll={() => {
-          // Send reminder to all pending subject teachers
-          console.log('Send reminder to all');
+          if (!reminderMutation.isPending) {
+            reminderMutation.mutate({});
+          }
         }}
       />
 

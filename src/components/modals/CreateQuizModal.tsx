@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils';
 import { quizzesApi } from '@/lib/api';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { DeadlinePicker } from '@/components/DeadlinePicker';
-import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -73,12 +72,30 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
     return html;
   }, [editor]);
 
+  const resetForm = useCallback(() => {
+    setTitle('');
+    setAttemptLimit('1');
+    setTimeLimit('');
+    setScorePolicy('highest');
+    setSelectedModuleId('');
+    setOpenDate(null);
+    setCloseDate(null);
+    setError('');
+    editor?.commands.clearContent();
+  }, [editor]);
+
+  const handleClose = useCallback(() => {
+    resetForm();
+    onClose();
+  }, [resetForm, onClose]);
+
   const createMutation = useMutation({
     mutationFn: async () => {
       return quizzesApi.quickCreate(courseId, {
         title,
         instructions: getInstructionsHtml(),
         attempt_limit: parseInt(attemptLimit),
+        score_selection_policy: scorePolicy,
         time_limit_minutes: timeLimit ? parseInt(timeLimit) : undefined,
         weekly_module_id: selectedModuleId || undefined,
         open_at: openDate?.toISOString(),
@@ -88,8 +105,7 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
     },
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['courseContent', courseId] });
-      resetForm();
-      onClose();
+      handleClose();
       // Redirect to quiz builder - response is { quiz: {...}, questions: [...] }
       const quizId = response.quiz?.id || response.id;
       if (quizId) {
@@ -101,18 +117,6 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
       setError(errorMessage || 'Failed to create quiz');
     },
   });
-
-  const resetForm = () => {
-    setTitle('');
-    setAttemptLimit('1');
-    setTimeLimit('');
-    setScorePolicy('highest');
-    setSelectedModuleId('');
-    setOpenDate(null);
-    setCloseDate(null);
-    setError('');
-    editor?.commands.clearContent();
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,7 +136,7 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50" onClick={handleClose} />
 
       {/* Modal */}
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
@@ -140,7 +144,7 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
         <div className="flex items-center justify-between px-6 py-4 bg-navy-600 text-white">
           <h2 className="text-lg font-semibold">Create Quiz</h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-1 hover:bg-white/20 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
@@ -369,7 +373,7 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
           <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
             >
               Cancel
