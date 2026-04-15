@@ -3,98 +3,28 @@
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
-import { ClipboardList, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { gradingApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { getGradeColorClasses, formatGrade, getDepEdLetterGrade } from '@/lib/gradeUtils';
 import type { StudentReportCard } from '@/lib/types';
 
-function ReportCardCardLoading() {
-  return (
-    <div className="group">
-      <div className="block bg-white rounded-2xl shadow-card overflow-hidden">
-        <div className="h-32 bg-gradient-to-r from-navy-600 to-navy-800 relative overflow-hidden">
-          <div className="absolute inset-0 opacity-20">
-            <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <pattern id="grid-rc-loading" width="20" height="20" patternUnits="userSpaceOnUse">
-                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="white" strokeWidth="0.5" />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#grid-rc-loading)" />
-            </svg>
-          </div>
-          <div className="relative z-10 p-6">
-            <div className="h-3 w-24 bg-white/20 rounded animate-pulse" />
-            <div className="h-6 w-36 bg-white/20 rounded mt-2 animate-pulse" />
-          </div>
-        </div>
-        <div className="p-5">
-          <div className="flex items-center justify-center py-6">
-            <Loader2 className="w-6 h-6 text-navy-600 animate-spin" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ReportCardCardError({ onRetry }: { onRetry: () => void }) {
-  return (
-    <motion.div whileHover={{ y: -4 }} className="group">
-      <div className="block bg-white rounded-2xl shadow-card overflow-hidden">
-        <div className="h-32 bg-gradient-to-r from-navy-600 to-navy-800 relative overflow-hidden">
-          <div className="absolute inset-0 opacity-20">
-            <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <pattern id="grid-rc-error" width="20" height="20" patternUnits="userSpaceOnUse">
-                  <path d="M 20 0 L 0 0 0 20" fill="none" stroke="white" strokeWidth="0.5" />
-                </pattern>
-              </defs>
-              <rect width="100%" height="100%" fill="url(#grid-rc-error)" />
-            </svg>
-          </div>
-          <div className="relative z-10 p-6">
-            <span className="text-white/80 text-xs font-semibold uppercase tracking-wider">Report Card</span>
-            <h3 className="text-white font-display text-xl font-semibold mt-1">My Report Card</h3>
-          </div>
-        </div>
-        <div className="p-5">
-          <div className="flex flex-col items-center justify-center py-4 text-gray-500">
-            <AlertCircle className="w-8 h-8 mb-2" />
-            <p className="text-sm">Failed to load report card</p>
-            <button
-              onClick={onRetry}
-              className="mt-2 text-sm text-navy-600 hover:text-navy-800 underline"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
 export function ReportCardCard() {
-  const { data: reportCard, isPending, error, refetch } = useQuery<StudentReportCard>({
+  const { data: reportCard, isPending, error } = useQuery<StudentReportCard>({
     queryKey: ['studentReportCard'],
     queryFn: () => gradingApi.getStudentReportCard(),
     enabled: true,
   });
 
-  if (isPending) {
-    return <ReportCardCardLoading />;
-  }
-
-  if (error) {
-    return <ReportCardCardError onRetry={() => refetch()} />;
+  if (isPending || error) {
+    return null;
   }
 
   const latestPublishedPeriod = getLatestPublishedPeriod(reportCard);
   const isPublished = !!reportCard && !!latestPublishedPeriod;
-
-  const strandPart = reportCard?.strand ? ` - ${reportCard.strand}` : '';
+  if (!isPublished) {
+    return null;
+  }
 
   // Get the period label and average for the published state
   const periodLabel = latestPublishedPeriod?.label ?? '';
@@ -146,72 +76,59 @@ export function ReportCardCard() {
 
       {/* Body */}
       <div className="p-5">
-        {isPublished ? (
-          <>
-            {/* Period badge */}
-            <span className={cn(
-              'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold mb-3',
-              'bg-green-50 text-green-700 border border-green-200',
-            )}>
-              {periodLabel} Published
-            </span>
+        {/* Period badge */}
+        <span className={cn(
+          'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold mb-3',
+          'bg-green-50 text-green-700 border border-green-200',
+        )}>
+          {periodLabel} Published
+        </span>
 
-            {/* Subject grades preview */}
-            <div className="space-y-1.5 mb-3">
-              {displaySubjects.map((subject) => {
-                const colorClasses = getGradeColorClasses(subject.score);
-                return (
-                  <div key={subject.course_title} className="flex items-center justify-between">
-                    <span className="text-sm text-gray-700 truncate pr-2">{subject.course_title}</span>
-                    <span className={cn('text-sm font-semibold tabular-nums', colorClasses.text)}>
-                      {formatGrade(subject.score)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {remainingCount > 0 && (
-              <p className="text-xs text-slate-400 mb-3">
-                And {remainingCount} more subject{remainingCount !== 1 ? 's' : ''}
-              </p>
-            )}
-
-            {/* Overall average */}
-            <div className={cn(
-              'flex items-center justify-between px-3 py-2.5 rounded-lg border',
-              averageColorClasses.bg,
-              averageColorClasses.border,
-            )}>
-              <span className="text-sm font-medium text-gray-700">
-                {periodLabel} Average
-              </span>
-              <div className="flex items-center gap-2">
-                <span className={cn('text-lg font-bold tabular-nums', averageColorClasses.text)}>
-                  {formatGrade(periodAverage)}
-                </span>
-                <span className={cn('text-xs font-medium px-1.5 py-0.5 rounded', averageColorClasses.bg, averageColorClasses.text)}>
-                  {letterGrade}
+        {/* Subject grades preview */}
+        <div className="space-y-1.5 mb-3">
+          {displaySubjects.map((subject) => {
+            const colorClasses = getGradeColorClasses(subject.score);
+            return (
+              <div key={subject.course_title} className="flex items-center justify-between">
+                <span className="text-sm text-gray-700 truncate pr-2">{subject.course_title}</span>
+                <span className={cn('text-sm font-semibold tabular-nums', colorClasses.text)}>
+                  {formatGrade(subject.score)}
                 </span>
               </div>
-            </div>
+            );
+          })}
+        </div>
 
-            {/* Footer */}
-            <div className="flex items-center gap-2 mt-4 text-navy-600 group-hover:text-navy-800 transition-colors">
-              <span className="text-sm font-medium">View Report Card</span>
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </>
-        ) : (
-          /* Empty / unpublished state */
-          <div className="flex flex-col items-center justify-center py-6 text-center">
-            <ClipboardList className="w-8 h-8 text-slate-300 mb-2" />
-            <p className="text-sm text-slate-500">
-              Your report card hasn&apos;t been published yet.
-              Check back after your adviser releases grades.
-            </p>
-          </div>
+        {remainingCount > 0 && (
+          <p className="text-xs text-slate-400 mb-3">
+            And {remainingCount} more subject{remainingCount !== 1 ? 's' : ''}
+          </p>
         )}
+
+        {/* Overall average */}
+        <div className={cn(
+          'flex items-center justify-between px-3 py-2.5 rounded-lg border',
+          averageColorClasses.bg,
+          averageColorClasses.border,
+        )}>
+          <span className="text-sm font-medium text-gray-700">
+            {periodLabel} Average
+          </span>
+          <div className="flex items-center gap-2">
+            <span className={cn('text-lg font-bold tabular-nums', averageColorClasses.text)}>
+              {formatGrade(periodAverage)}
+            </span>
+            <span className={cn('text-xs font-medium px-1.5 py-0.5 rounded', averageColorClasses.bg, averageColorClasses.text)}>
+              {letterGrade}
+            </span>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center gap-2 mt-4 text-navy-600 group-hover:text-navy-800 transition-colors">
+          <span className="text-sm font-medium">View Report Card</span>
+          <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+        </div>
       </div>
     </>
   );
@@ -221,18 +138,12 @@ export function ReportCardCard() {
       whileHover={{ y: -4 }}
       className="group"
     >
-      {isPublished ? (
-        <Link
-          href="/report-card"
-          className="block bg-white rounded-2xl shadow-card overflow-hidden hover:shadow-card-hover transition-all duration-300"
-        >
-          {cardContent}
-        </Link>
-      ) : (
-        <div className="block bg-white rounded-2xl shadow-card overflow-hidden cursor-default">
-          {cardContent}
-        </div>
-      )}
+      <Link
+        href="/report-card"
+        className="block bg-white rounded-2xl shadow-card overflow-hidden hover:shadow-card-hover transition-all duration-300"
+      >
+        {cardContent}
+      </Link>
     </motion.div>
   );
 }

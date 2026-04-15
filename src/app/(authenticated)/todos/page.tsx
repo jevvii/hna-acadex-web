@@ -33,6 +33,16 @@ function formatDueDate(dateStr?: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+function toPlainText(value?: string): string {
+  if (!value) return '';
+  if (!value.includes('<')) return value.trim();
+  if (typeof window === 'undefined') {
+    return value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  const doc = new DOMParser().parseFromString(value, 'text/html');
+  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
 export default function TodosPage() {
   const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState('pending');
@@ -75,12 +85,18 @@ export default function TodosPage() {
     ? todos
     : (todos as unknown as { results?: TodoItem[] })?.results ?? [];
 
-  const filteredTodos = todoList.filter((todo: TodoItem) => {
-    if (activeFilter === 'all') return true;
-    if (activeFilter === 'pending') return !todo.is_done;
-    if (activeFilter === 'completed') return todo.is_done;
-    return true;
-  });
+  const filteredTodos = todoList
+    .filter((todo: TodoItem) => {
+      if (activeFilter === 'all') return true;
+      if (activeFilter === 'pending') return !todo.is_done;
+      if (activeFilter === 'completed') return todo.is_done;
+      return true;
+    })
+    .sort((a: TodoItem, b: TodoItem) => {
+      const aTime = new Date(a.created_at).getTime();
+      const bTime = new Date(b.created_at).getTime();
+      return bTime - aTime;
+    });
 
   const toggleTodo = (id: string, currentStatus: boolean) => {
     toggleMutation.mutate({ id, is_done: !currentStatus });
@@ -227,9 +243,11 @@ export default function TodosPage() {
                 )}>
                   {todo.title}
                 </h3>
-                {todo.description && (
-                  <p className="text-sm text-gray-500 mt-0.5">{todo.description}</p>
-                )}
+                {(() => {
+                  const descriptionText = toPlainText(todo.description);
+                  if (!descriptionText) return null;
+                  return <p className="text-sm text-gray-500 mt-0.5">{descriptionText}</p>;
+                })()}
                 <div className="flex items-center gap-3 mt-2">
                   <span className={cn(
                     'text-xs font-medium px-2 py-0.5 rounded-full',

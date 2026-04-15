@@ -95,6 +95,7 @@ function ClockDateTimeInlinePicker({
         }}
         slotProps={{
           actionBar: { actions: [] },
+          toolbar: { hidden: true },
           day: {
             sx: {
               color: '#f1f5f9',
@@ -140,6 +141,19 @@ function ClockDateTimeModal({
   const [pickerView, setPickerView] = useState<PickerView>('day');
 
   const isDateView = pickerView === 'day';
+  const isTimeView = pickerView === 'hours' || pickerView === 'minutes';
+  const meridiem = pendingDate.hour() >= 12 ? 'PM' : 'AM';
+
+  const handleMeridiemChange = (nextMeridiem: 'AM' | 'PM') => {
+    const hour = pendingDate.hour();
+    if (nextMeridiem === 'AM' && hour >= 12) {
+      onPendingDateChange(pendingDate.subtract(12, 'hour'));
+      return;
+    }
+    if (nextMeridiem === 'PM' && hour < 12) {
+      onPendingDateChange(pendingDate.add(12, 'hour'));
+    }
+  };
 
   if (!isOpen) return null;
   return (
@@ -160,6 +174,39 @@ function ClockDateTimeModal({
           view={pickerView}
           onViewChange={setPickerView}
         />
+        {isTimeView && (
+          <div className="flex items-center justify-center gap-3 px-4 py-2 bg-slate-800/50">
+            <span className="text-2xl font-light text-white">
+              {pendingDate.format('h:mm')}
+            </span>
+            <div className="flex flex-col gap-0.5">
+              <button
+                type="button"
+                onClick={() => handleMeridiemChange('AM')}
+                aria-pressed={meridiem === 'AM'}
+                className={`px-2 py-0.5 text-xs font-semibold rounded transition-all ${
+                  meridiem === 'AM'
+                    ? 'bg-white text-slate-900'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                }`}
+              >
+                AM
+              </button>
+              <button
+                type="button"
+                onClick={() => handleMeridiemChange('PM')}
+                aria-pressed={meridiem === 'PM'}
+                className={`px-2 py-0.5 text-xs font-semibold rounded transition-all ${
+                  meridiem === 'PM'
+                    ? 'bg-white text-slate-900'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                }`}
+              >
+                PM
+              </button>
+            </div>
+          </div>
+        )}
         <div className="flex justify-end gap-3 px-4 pb-4 pt-2">
           <button
             type="button"

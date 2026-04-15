@@ -535,8 +535,9 @@ export default function CalendarPage() {
                 <input
                   value={eventForm.title}
                   onChange={(event) => setEventForm((prev) => ({ ...prev, title: event.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-500"
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-500"
                   placeholder="Enter event title"
+                  style={{ colorScheme: 'light' }}
                   required
                 />
               </div>
@@ -546,8 +547,9 @@ export default function CalendarPage() {
                 <textarea
                   value={eventForm.description}
                   onChange={(event) => setEventForm((prev) => ({ ...prev, description: event.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm h-24 resize-none focus:outline-none focus:ring-2 focus:ring-navy-500"
+                  className="mt-1 h-24 w-full resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-navy-500"
                   placeholder="Optional event notes"
+                  style={{ colorScheme: 'light' }}
                 />
               </div>
 
@@ -558,7 +560,8 @@ export default function CalendarPage() {
                   <select
                     value={eventForm.eventType}
                     onChange={(event) => setEventForm((prev) => ({ ...prev, eventType: event.target.value as EventType }))}
-                    className="w-full rounded-lg border border-slate-300 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-navy-500 bg-white"
+                    className="w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-navy-500"
+                    style={{ colorScheme: 'light' }}
                   >
                     {Object.entries(eventTypeLabels).map(([value, label]) => (
                       <option key={value} value={value}>
