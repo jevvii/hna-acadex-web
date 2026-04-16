@@ -90,9 +90,7 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
       if (hasDeadline && deadline) {
         formData.append('deadline', deadline.toISOString());
       }
-      if (selectedModuleId) {
-        formData.append('weekly_module_id', selectedModuleId);
-      }
+      formData.append('weekly_module_id', selectedModuleId);
       formData.append('component_type', isExam ? (examType === 'monthly' ? 'written_works' : 'quarterly_assessment') : (componentType || ''));
       formData.append('is_exam', String(isExam));
       formData.append('exam_type', isExam ? (examType || '') : '');
@@ -134,6 +132,10 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
     }
     if (!points || parseInt(points) <= 0) {
       setError('Points must be greater than 0');
+      return;
+    }
+    if (!selectedModuleId) {
+      setError('Please select a week topic');
       return;
     }
     if (!isExam && !componentType) {
@@ -298,21 +300,9 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
             {/* Week Topic */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Week Topic
+                Week Topic <span className="text-red-500">*</span>
               </label>
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedModuleId('')}
-                  className={cn(
-                    'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
-                    !selectedModuleId
-                      ? 'bg-navy-600 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  )}
-                >
-                  Unassigned
-                </button>
                 {modules.map((m) => (
                   <button
                     key={m.id}
@@ -329,6 +319,11 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
                   </button>
                 ))}
               </div>
+              {modules.length === 0 && (
+                <p className="mt-2 text-xs text-amber-700">
+                  Create a week/topic first before creating an assignment.
+                </p>
+              )}
             </div>
 
             {/* Points and Attempts */}

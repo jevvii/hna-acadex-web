@@ -95,7 +95,7 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
         attempt_limit: parseInt(attemptLimit),
         score_selection_policy: scorePolicy,
         time_limit_minutes: timeLimit ? parseInt(timeLimit) : undefined,
-        weekly_module_id: selectedModuleId || undefined,
+        weekly_module_id: selectedModuleId,
         open_at: openDate?.toISOString(),
         close_at: closeDate?.toISOString(),
         is_published: false,
@@ -125,6 +125,10 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
     }
     if (!attemptLimit || parseInt(attemptLimit) <= 0) {
       setError('Attempt limit must be greater than 0');
+      return;
+    }
+    if (!selectedModuleId) {
+      setError('Please select a week topic');
       return;
     }
     createMutation.mutate();
@@ -267,21 +271,9 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
             {/* Week Topic */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Week Topic
+                Week Topic <span className="text-red-500">*</span>
               </label>
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedModuleId('')}
-                  className={cn(
-                    'px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
-                    !selectedModuleId
-                      ? 'bg-navy-600 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  )}
-                >
-                  Unassigned
-                </button>
                 {modules.map((m) => (
                   <button
                     key={m.id}
@@ -298,6 +290,11 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
                   </button>
                 ))}
               </div>
+              {modules.length === 0 && (
+                <p className="mt-2 text-xs text-amber-700">
+                  Create a week/topic first before creating a quiz.
+                </p>
+              )}
             </div>
 
             {/* Attempts and Time Limit */}
