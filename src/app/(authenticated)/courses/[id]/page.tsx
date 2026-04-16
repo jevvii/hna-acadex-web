@@ -14,6 +14,7 @@ import { cn, getInitials, toMediaProxyUrl } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import {
   coursesApi,
+  modulesApi,
   attendanceApi,
   gradesApi,
   activitiesApi,
@@ -151,6 +152,7 @@ function ModulesTab({
   onToggleActivityPublish,
   onToggleQuizPublish,
   onToggleFileVisibility,
+  onUpdateModule,
   onPreviewFile,
   onDownloadFile,
 }: {
@@ -162,12 +164,16 @@ function ModulesTab({
   onToggleActivityPublish?: (activity: Activity) => void;
   onToggleQuizPublish?: (quiz: Quiz) => void;
   onToggleFileVisibility?: (file: CourseFile) => void;
+  onUpdateModule?: (module: WeeklyModule, changes: { title: string; is_exam_week: boolean }) => void;
   onPreviewFile?: (file: CourseFile) => void;
   onDownloadFile?: (file: CourseFile) => void;
 }) {
   const router = useRouter();
   // Track which modules are expanded - all expanded by default when modules load
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
+  const [editingModule, setEditingModule] = useState<WeeklyModule | null>(null);
+  const [moduleTitleDraft, setModuleTitleDraft] = useState('');
+  const [moduleIsExamWeekDraft, setModuleIsExamWeekDraft] = useState(false);
 
   // Expand all modules when data loads
   useEffect(() => {
@@ -186,6 +192,23 @@ function ModulesTab({
       }
       return next;
     });
+  };
+
+  const openModuleEditor = (module: WeeklyModule) => {
+    setEditingModule(module);
+    setModuleTitleDraft(module.title);
+    setModuleIsExamWeekDraft(module.is_exam_week);
+  };
+
+  const handleSaveModule = () => {
+    if (!editingModule || !onUpdateModule) return;
+    const nextTitle = moduleTitleDraft.trim();
+    if (!nextTitle) return;
+    onUpdateModule(editingModule, {
+      title: nextTitle,
+      is_exam_week: moduleIsExamWeekDraft,
+    });
+    setEditingModule(null);
   };
 
   // Get activity icon config based on status
@@ -318,9 +341,18 @@ function ModulesTab({
         return (
           <div key={module.id} className="bg-white rounded-2xl shadow-card overflow-hidden flex flex-col">
             {/* Module Header */}
-            <button
+            <div
+              role="button"
+              tabIndex={0}
+              aria-expanded={expandedModules.has(module.id)}
               onClick={() => toggleModule(module.id)}
-              className="w-full flex items-center justify-between p-5 bg-gray-50/50 hover:bg-gray-100/50 transition-colors"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  toggleModule(module.id);
+                }
+              }}
+              className="w-full flex items-center justify-between p-5 bg-gray-50/50 hover:bg-gray-100/50 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-4">
                 <div className="w-11 h-11 rounded-xl bg-navy-600 flex items-center justify-center shadow-sm">
@@ -336,6 +368,18 @@ function ModulesTab({
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                {isTeacher && onUpdateModule && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openModuleEditor(module);
+                    }}
+                    className="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                  >
+                    Edit Week
+                  </button>
+                )}
                 {module.is_exam_week && (
                   <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-600 uppercase tracking-wide">
                     Exam Week
@@ -348,7 +392,7 @@ function ModulesTab({
                   )}
                 />
               </div>
-            </button>
+            </div>
 
             {/* Module Items */}
             <AnimatePresence initial={false}>
@@ -525,6 +569,56 @@ function ModulesTab({
           </div>
         );
       })}
+      <Dialog.Root open={!!editingModule} onOpenChange={(open) => { if (!open) setEditingModule(null); }}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" />
+          <Dialog.Content className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 bg-white rounded-2xl shadow-2xl z-50 md:w-full md:max-w-md overflow-hidden">
+            <div className="p-5 border-b border-gray-100">
+              <Dialog.Title className="text-lg font-semibold text-navy-900">Edit Module Week</Dialog.Title>
+              <Dialog.Description className="text-sm text-gray-500 mt-1">
+                Update the week title or mark it as an exam week.
+              </Dialog.Description>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Week Title</label>
+                <input
+                  value={moduleTitleDraft}
+                  onChange={(e) => setModuleTitleDraft(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-500"
+                  placeholder="e.g. Oral Communication Foundations"
+                />
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={moduleIsExamWeekDraft}
+                  onChange={(e) => setModuleIsExamWeekDraft(e.target.checked)}
+                  className="w-4 h-4 text-navy-600 border-gray-300 rounded focus:ring-navy-500"
+                />
+                <span className="text-sm text-gray-700">Mark as Exam Week</span>
+              </label>
+            </div>
+            <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setEditingModule(null)}
+                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveModule}
+                disabled={!moduleTitleDraft.trim()}
+                className="px-4 py-2 bg-navy-600 text-white rounded-lg hover:bg-navy-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }
@@ -714,8 +808,6 @@ function AssignmentsTab({
     }).length,
   };
 
-  if (!assignments.length) return <EmptyState message="No assignments available" />;
-
   return (
     <div className="space-y-6">
       {/* Filter Tabs and Add Button */}
@@ -761,8 +853,9 @@ function AssignmentsTab({
       </div>
 
       {/* Assignment Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        {filteredAssignments.map((activity: Activity) => {
+      {filteredAssignments.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          {filteredAssignments.map((activity: Activity) => {
           const config = getAssignmentConfig(activity);
           const submission = activity.my_submission;
           const isOverdue = activity.deadline && new Date(activity.deadline) < new Date() && !submission;
@@ -969,19 +1062,20 @@ function AssignmentsTab({
               </div>
             </div>
           );
-        })}
-      </div>
-
-      {filteredAssignments.length === 0 && (
+          })}
+        </div>
+      ) : (
         <div className="text-center py-12 bg-white rounded-2xl border-2 border-dashed border-gray-200">
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <FileText className="w-8 h-8 text-gray-400" />
           </div>
           <h3 className="font-display font-semibold text-lg text-navy-800 mb-1">
-            No {filter === 'all' ? '' : filter} assignments
+            {assignments.length === 0 ? 'No assignments available' : `No ${filter === 'all' ? '' : filter} assignments`}
           </h3>
           <p className="text-gray-500">
-            {filter === 'pending' ? 'All caught up! No pending assignments.' :
+            {assignments.length === 0 ? (
+              isTeacher ? 'Create your first assignment for this subject.' : 'No assignments have been posted yet.'
+            ) : filter === 'pending' ? 'All caught up! No pending assignments.' :
              filter === 'submitted' ? 'No submissions yet.' :
              filter === 'graded' ? 'No graded assignments yet.' :
              'No assignments available.'}
@@ -1080,7 +1174,6 @@ function QuizzesTab({ quizzes, isTeacher, onAddQuiz, onTogglePublish }: { quizze
   const publishedQuizzes = isTeacher
     ? (quizzes || [])
     : (quizzes?.filter((q) => q.is_published) || []);
-  if (!publishedQuizzes.length) return <EmptyState message="No quizzes available" />;
 
   return (
     <div className="space-y-5">
@@ -1097,7 +1190,7 @@ function QuizzesTab({ quizzes, isTeacher, onAddQuiz, onTogglePublish }: { quizze
         </div>
       )}
 
-      {publishedQuizzes.map((quiz) => {
+      {publishedQuizzes.length > 0 ? publishedQuizzes.map((quiz) => {
         const config = getQuizConfig(quiz);
         const Icon = config.icon;
         const attemptsRemaining = quiz.attempt_limit - (quiz.my_attempt?.attempts_used || 0);
@@ -1268,7 +1361,17 @@ function QuizzesTab({ quizzes, isTeacher, onAddQuiz, onTogglePublish }: { quizze
             </div>
           </div>
         );
-      })}
+      }) : (
+        <div className="text-center py-12 bg-white rounded-2xl border-2 border-dashed border-gray-200">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <ClipboardCheck className="w-8 h-8 text-gray-400" />
+          </div>
+          <h3 className="font-display font-semibold text-lg text-navy-800 mb-1">No quizzes available</h3>
+          <p className="text-gray-500">
+            {isTeacher ? 'Create your first quiz for this subject.' : 'No quizzes have been posted yet.'}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -2767,6 +2870,21 @@ export default function CoursePage() {
     }
   };
 
+  const handleUpdateModule = async (
+    module: WeeklyModule,
+    changes: { title: string; is_exam_week: boolean }
+  ) => {
+    try {
+      await modulesApi.updateModule(module.id, {
+        title: changes.title,
+        is_exam_week: changes.is_exam_week,
+      });
+      queryClient.invalidateQueries({ queryKey: ['courseContent', courseId] });
+    } catch (error) {
+      logger.error('Failed to update module week settings:', error);
+    }
+  };
+
   // Download file
   const handleDownloadFile = async (file: CourseFile) => {
     try {
@@ -2844,6 +2962,7 @@ export default function CoursePage() {
           onToggleActivityPublish={toggleActivityPublish}
           onToggleQuizPublish={toggleQuizPublish}
           onToggleFileVisibility={toggleFileVisibility}
+          onUpdateModule={handleUpdateModule}
           onPreviewFile={(file) => setPreviewFile(file)}
           onDownloadFile={handleDownloadFile}
         />;
@@ -2879,7 +2998,16 @@ export default function CoursePage() {
       case 'grades':
         return <GradesTab courseId={courseId} courseInfo={courseInfo as any} />;
       default:
-        return <ModulesTab modules={modules} activities={activities} quizzes={quizzes} files={files} onPreviewFile={(file) => setPreviewFile(file)} onDownloadFile={handleDownloadFile} />;
+        return <ModulesTab
+          modules={modules}
+          activities={activities}
+          quizzes={quizzes}
+          files={files}
+          isTeacher={isTeacher}
+          onUpdateModule={handleUpdateModule}
+          onPreviewFile={(file) => setPreviewFile(file)}
+          onDownloadFile={handleDownloadFile}
+        />;
     }
   };
 

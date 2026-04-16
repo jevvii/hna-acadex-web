@@ -7,7 +7,6 @@ import { motion } from 'framer-motion';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
-import Underline from '@tiptap/extension-underline';
 import { useIsTeacher } from '@/store/auth';
 import { cn, resolveFileUrl } from '@/lib/utils';
 import { activitiesApi } from '@/lib/api';
@@ -153,7 +152,6 @@ export default function GradeSubmissionPage() {
         placeholder: 'Enter feedback for the student...',
         emptyEditorClass: 'is-editor-empty',
       }),
-      Underline,
     ],
     content: '',
     editorProps: {

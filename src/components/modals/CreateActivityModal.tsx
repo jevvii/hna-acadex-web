@@ -4,7 +4,6 @@ import { useState, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
-import Underline from '@tiptap/extension-underline';
 import { X } from 'lucide-react';
 import { Dayjs } from 'dayjs';
 import { cn } from '@/lib/utils';
@@ -58,7 +57,6 @@ export function CreateActivityModal({ isOpen, onClose, courseId, modules }: Crea
         placeholder: 'Enter activity description...',
         emptyEditorClass: 'is-editor-empty',
       }),
-      Underline,
     ],
     content: '',
     editorProps: {

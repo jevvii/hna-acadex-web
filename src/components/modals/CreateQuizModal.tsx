@@ -11,7 +11,6 @@ import type { Dayjs } from 'dayjs';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
-import Underline from '@tiptap/extension-underline';
 
 interface WeeklyModule {
   id: string;
@@ -55,7 +54,6 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
         placeholder: 'Enter quiz instructions...',
         emptyEditorClass: 'is-editor-empty',
       }),
-      Underline,
     ],
     content: '',
     editorProps: {

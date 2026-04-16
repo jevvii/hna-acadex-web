@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
-import Underline from '@tiptap/extension-underline';
 import { cn } from '@/lib/utils';
 import { Question, QuizQuestionType } from '@/lib/types';
 import { MCQEditor } from './editors/MCQEditor';
@@ -49,7 +48,6 @@ export function QuestionEditor({ question, onUpdate, onDelete, onDuplicate }: Qu
         placeholder: 'Enter your question...',
         emptyEditorClass: 'is-editor-empty',
       }),
-      Underline,
     ],
     content: question.text,
     editorProps: {

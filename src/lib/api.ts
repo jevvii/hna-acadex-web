@@ -179,6 +179,12 @@ export const modulesApi = {
   getModules: async (courseSectionId: string): Promise<WeeklyModule[]> => {
     return api.get(`/course-modules/?course_section=${courseSectionId}`);
   },
+  updateModule: async (
+    moduleId: string,
+    data: Partial<Pick<WeeklyModule, 'title' | 'description' | 'is_exam_week' | 'is_published' | 'sort_order'>>
+  ): Promise<WeeklyModule> => {
+    return api.patch(`/course-modules/${moduleId}/`, data);
+  },
 };
 
 // Activities API - uses activities endpoint with course_section filter

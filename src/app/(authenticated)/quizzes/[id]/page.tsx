@@ -8,7 +8,6 @@ import * as Popover from '@radix-ui/react-popover';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
-import Underline from '@tiptap/extension-underline';
 import { format, isBefore, isAfter, differenceInMinutes } from 'date-fns';
 import dayjs, { Dayjs } from 'dayjs';
 import { cn } from '@/lib/utils';
@@ -434,7 +433,6 @@ export default function QuizDetailsPage() {
         placeholder: 'Enter quiz instructions...',
         emptyEditorClass: 'is-editor-empty',
       }),
-      Underline,
     ],
     content: '',
     editorProps: {

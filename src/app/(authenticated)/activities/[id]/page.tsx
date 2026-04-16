@@ -9,7 +9,6 @@ import * as Popover from '@radix-ui/react-popover';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
-import Underline from '@tiptap/extension-underline';
 import { differenceInDays, differenceInHours } from 'date-fns';
 import dayjs, { Dayjs } from 'dayjs';
 import { useIsStudent, useIsTeacher } from '@/store/auth';
@@ -627,7 +626,6 @@ export default function ActivityDetailsPage() {
         placeholder: 'Enter activity description...',
         emptyEditorClass: 'is-editor-empty',
       }),
-      Underline,
     ],
     content: '',
     editorProps: {
