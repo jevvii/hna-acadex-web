@@ -862,6 +862,9 @@ export default function ActivityDetailsPage() {
   const canResubmit = hasSubmitted && attemptsRemaining > 0 && activity.my_submission?.status !== 'graded';
   const isGraded = activity.my_submission?.status === 'graded';
   const isStudentExamView = isStudent && activity.is_exam;
+  const activityTabPath = activity.course_section_id
+    ? `/courses/${activity.course_section_id}?tab=activities`
+    : '/courses';
 
   return (
     <div className="min-h-screen bg-slate-50/50">
@@ -869,7 +872,7 @@ export default function ActivityDetailsPage() {
       <div className="bg-white border-b border-gray-200">
         <div className="px-4 lg:px-8 py-6">
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-            <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-500 hover:text-navy-600 mb-4 transition-colors">
+            <button onClick={() => router.push(activityTabPath)} className="flex items-center gap-2 text-gray-500 hover:text-navy-600 mb-4 transition-colors">
               <ChevronLeft className="w-4 h-4" /> Back
             </button>
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">

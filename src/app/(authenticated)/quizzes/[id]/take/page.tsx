@@ -168,6 +168,66 @@ function MultipleChoiceQuestion({
   );
 }
 
+// Multiple Select Question
+function MultiSelectQuestion({
+  question,
+  choices,
+  value,
+  onChange,
+}: {
+  question: string;
+  choices: { id: string; choice_text: string }[];
+  value?: string[];
+  onChange: (choiceIds: string[]) => void;
+}) {
+  const selectedIds = value || [];
+
+  const toggleChoice = (choiceId: string) => {
+    if (selectedIds.includes(choiceId)) {
+      onChange(selectedIds.filter((id) => id !== choiceId));
+      return;
+    }
+    onChange([...selectedIds, choiceId]);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="prose prose-slate max-w-none text-lg text-navy-800" dangerouslySetInnerHTML={{ __html: question }} />
+      <div className="space-y-2">
+        {choices.map((choice) => {
+          const isSelected = selectedIds.includes(choice.id);
+          return (
+            <button
+              key={choice.id}
+              onClick={() => toggleChoice(choice.id)}
+              className={cn(
+                'w-full text-left p-4 rounded-xl border-2 transition-all',
+                isSelected
+                  ? 'border-navy-600 bg-navy-50'
+                  : 'border-gray-200 hover:border-navy-300 hover:bg-gray-50'
+              )}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className={cn(
+                    'w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5',
+                    isSelected
+                      ? 'border-navy-600 bg-navy-600'
+                      : 'border-gray-300'
+                  )}
+                >
+                  {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
+                </div>
+                <span className="text-gray-700">{choice.choice_text}</span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // True/False Question
 function TrueFalseQuestion({
   question,
@@ -323,14 +383,12 @@ function QuestionRenderer({
         />
       );
     case 'multi_select':
-      // Multi-select uses the same component but allows multiple selections
-      // For now, treat same as multiple_choice (student selects one option at a time)
       return (
-        <MultipleChoiceQuestion
+        <MultiSelectQuestion
           question={question.question_text}
           choices={questionWithChoices.choices || []}
-          value={value as string | undefined}
-          onChange={onChange as (choiceId: string) => void}
+          value={value as string[] | undefined}
+          onChange={onChange as (choiceIds: string[]) => void}
         />
       );
     case 'true_false':
@@ -397,6 +455,14 @@ export default function QuizTakingPage() {
     enabled: !!quizId,
     retry: false,
   });
+  const { data: quiz } = useQuery({
+    queryKey: ['quiz', quizId],
+    queryFn: () => quizzesApi.getQuiz(quizId),
+    enabled: !!quizId,
+  });
+  const quizTabPath = quiz?.course_section_id
+    ? `/courses/${quiz.course_section_id}?tab=quizzes`
+    : '/courses';
 
   // Initialize state when data loads
   useEffect(() => {
@@ -413,7 +479,9 @@ export default function QuizTakingPage() {
         const restoredAnswers: Record<string, unknown> = {};
         for (const ans of quizData.answers) {
           if (ans.question_id) {
-            if (ans.selected_choice_id) {
+            if (Array.isArray(ans.selected_choice_ids)) {
+              restoredAnswers[ans.question_id] = ans.selected_choice_ids;
+            } else if (ans.selected_choice_id) {
               restoredAnswers[ans.question_id] = ans.selected_choice_id;
             } else if (ans.text_answer) {
               restoredAnswers[ans.question_id] = ans.text_answer;
@@ -460,6 +528,35 @@ export default function QuizTakingPage() {
     };
   }, [timeRemaining]);
 
+  // Disable copying, pasting, and context menu while taking a quiz.
+  useEffect(() => {
+    const preventDefault = (event: Event) => {
+      event.preventDefault();
+    };
+    const preventClipboardHotkeys = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      if ((event.ctrlKey || event.metaKey) && ['c', 'v', 'x'].includes(key)) {
+        event.preventDefault();
+      }
+    };
+
+    document.addEventListener('copy', preventDefault);
+    document.addEventListener('cut', preventDefault);
+    document.addEventListener('paste', preventDefault);
+    document.addEventListener('contextmenu', preventDefault);
+    document.addEventListener('dragstart', preventDefault);
+    document.addEventListener('keydown', preventClipboardHotkeys);
+
+    return () => {
+      document.removeEventListener('copy', preventDefault);
+      document.removeEventListener('cut', preventDefault);
+      document.removeEventListener('paste', preventDefault);
+      document.removeEventListener('contextmenu', preventDefault);
+      document.removeEventListener('dragstart', preventDefault);
+      document.removeEventListener('keydown', preventClipboardHotkeys);
+    };
+  }, []);
+
   // Auto-save mutation
   const saveProgressMutation = useMutation({
     mutationFn: () => {
@@ -492,7 +589,7 @@ export default function QuizTakingPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quiz', quizId] });
-      router.push(`/quizzes/${quizId}`);
+      router.push(quizTabPath);
     },
   });
 
@@ -502,6 +599,7 @@ export default function QuizTakingPage() {
   const answeredQuestions = new Set(
     Object.entries(answers)
       .filter(([_, value]) => {
+        if (Array.isArray(value)) return value.length > 0;
         if (typeof value === 'string') return value.length > 0;
         if (typeof value === 'object' && value !== null) return Object.keys(value).length > 0;
         return value !== undefined && value !== null;
@@ -518,7 +616,12 @@ export default function QuizTakingPage() {
   // Transform answers from internal format to API format
   const transformAnswersForApi = useCallback(() => {
     const questionsMap = new Map(questions.map(q => [q.id, q]));
-    const answersArray: Array<{ question_id: string; selected_choice_id?: string; text_answer?: string }> = [];
+    const answersArray: Array<{
+      question_id: string;
+      selected_choice_id?: string;
+      selected_choice_ids?: string[];
+      text_answer?: string;
+    }> = [];
 
     for (const [questionId, value] of Object.entries(answers)) {
       const question = questionsMap.get(questionId);
@@ -543,8 +646,16 @@ export default function QuizTakingPage() {
           question_id: questionId,
           text_answer: value as string,
         });
+      } else if (question.question_type === 'multi_select') {
+        const selectedChoiceIds = Array.isArray(value)
+          ? (value as string[])
+          : (value ? [value as string] : []);
+        answersArray.push({
+          question_id: questionId,
+          selected_choice_ids: selectedChoiceIds,
+        });
       } else {
-        // MCQ and Multi-select: value is choice ID
+        // MCQ: value is choice ID
         answersArray.push({
           question_id: questionId,
           selected_choice_id: value as string,
@@ -603,7 +714,7 @@ export default function QuizTakingPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => router.push(`/quizzes/${quizId}`)}
+                onClick={() => router.push(quizTabPath)}
                 className="flex items-center gap-2 text-gray-600 hover:text-navy-600"
               >
                 <ChevronLeft className="w-5 h-5" />

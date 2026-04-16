@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -392,7 +392,7 @@ export default function QuizDetailsPage() {
   const isTeacher = useIsTeacher();
 
   const [isStartingQuiz, setIsStartingQuiz] = useState(false);
-  const [expandedAttemptId, setExpandedAttemptId] = useState<string | null>(null);
+  const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
@@ -460,6 +460,61 @@ export default function QuizDetailsPage() {
   const gradingList = Array.isArray(gradingData)
     ? gradingData
     : (gradingData as unknown as { results?: unknown[] })?.results ?? [];
+
+  const groupedGradingList = useMemo(() => {
+    const grouped = new Map<
+      string,
+      {
+        student_id: string;
+        student_name?: string;
+        student_email?: string;
+        attempts: Array<{
+          attempt_id: string;
+          student_id: string;
+          student_name?: string;
+          student_email?: string;
+          score?: number;
+          max_score?: number;
+          submitted_at?: string;
+          time_taken_seconds?: number;
+          pending_manual_grading?: boolean;
+        }>;
+      }
+    >();
+
+    (gradingList as Array<{
+      attempt_id: string;
+      student_id: string;
+      student_name?: string;
+      student_email?: string;
+      score?: number;
+      max_score?: number;
+      submitted_at?: string;
+      time_taken_seconds?: number;
+      pending_manual_grading?: boolean;
+    }>).forEach((attempt) => {
+      const existing = grouped.get(attempt.student_id);
+      if (existing) {
+        existing.attempts.push(attempt);
+        return;
+      }
+      grouped.set(attempt.student_id, {
+        student_id: attempt.student_id,
+        student_name: attempt.student_name,
+        student_email: attempt.student_email,
+        attempts: [attempt],
+      });
+    });
+
+    return Array.from(grouped.values()).map((student) => ({
+      ...student,
+      attempts: [...student.attempts].sort((a, b) => {
+        const aTime = a.submitted_at ? new Date(a.submitted_at).getTime() : 0;
+        const bTime = b.submitted_at ? new Date(b.submitted_at).getTime() : 0;
+        return bTime - aTime;
+      }),
+    }));
+  }, [gradingList]);
 
   const takeQuizMutation = useMutation({
     mutationFn: () => quizzesApi.takeQuiz(quizId),
@@ -618,7 +673,8 @@ export default function QuizDetailsPage() {
   // Calculate max points for display
   const maxPoints = quiz?.points ?? quiz?.my_attempt?.max_score;
 
-  const stats = gradingData ? calculateQuizStats(gradingData, quiz?.student_count) : null;
+  const stats = gradingList.length > 0 ? calculateQuizStats(gradingList as QuizAttemptStats[], quiz?.student_count) : null;
+  const quizTabPath = quiz?.course_section_id ? `/courses/${quiz.course_section_id}?tab=quizzes` : '/courses';
 
   if (isLoading) return <LoadingState />;
   if (error || !quiz) return <ErrorState message="Failed to load quiz details" onRetry={refetch} />;
@@ -645,7 +701,7 @@ export default function QuizDetailsPage() {
         </div>
         <div className="relative px-4 lg:px-8 py-8 text-white">
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-            <button onClick={() => router.back()} className="flex items-center gap-2 text-white/80 hover:text-white mb-4 transition-colors">
+            <button onClick={() => router.push(quizTabPath)} className="flex items-center gap-2 text-white/80 hover:text-white mb-4 transition-colors">
               <ChevronLeft className="w-4 h-4" /> Back
             </button>
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
@@ -981,7 +1037,7 @@ export default function QuizDetailsPage() {
             )}
 
             {/* Teacher Student Attempts - only show when not editing */}
-            {isTeacher && !isEditing && gradingList.length > 0 && (
+            {isTeacher && !isEditing && groupedGradingList.length > 0 && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6 border-b border-gray-100">
                   <div className="flex items-center justify-between">
@@ -989,54 +1045,66 @@ export default function QuizDetailsPage() {
                       <Users className="w-5 h-5 text-navy-600" />
                       Student Attempts
                     </h2>
-                    <span className="text-sm text-gray-500">{gradingList.filter((a: { score?: number }) => a.score !== undefined).length} of {gradingList.length} graded</span>
+                    <span className="text-sm text-gray-500">
+                      {gradingList.filter((a: { score?: number }) => a.score !== undefined).length} graded attempts
+                    </span>
                   </div>
                 </div>
                 <div className="divide-y divide-gray-100">
-                  {gradingList.map((attempt: { attempt_id: string; student_id: string; student_name?: string; student_email?: string; score?: number; max_score?: number; submitted_at?: string; time_taken_seconds?: number; pending_manual_grading?: boolean }) => {
-                    const isExpanded = expandedAttemptId === attempt.attempt_id;
+                  {groupedGradingList.map((student) => {
+                    const isExpanded = expandedStudentId === student.student_id;
+                    const latestAttempt = student.attempts[0];
                     return (
-                      <div key={attempt.attempt_id} className="hover:bg-slate-50/50 transition-colors">
+                      <div key={student.student_id} className="hover:bg-slate-50/50 transition-colors">
                         <button
-                          onClick={() => setExpandedAttemptId(isExpanded ? null : attempt.attempt_id)}
+                          onClick={() => setExpandedStudentId(isExpanded ? null : student.student_id)}
                           className="w-full flex items-center justify-between p-4"
                         >
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-navy-100 to-navy-200 flex items-center justify-center">
-                              <span className="text-navy-700 font-semibold text-sm">{(attempt.student_name || 'U').charAt(0).toUpperCase()}</span>
+                              <span className="text-navy-700 font-semibold text-sm">{(student.student_name || 'U').charAt(0).toUpperCase()}</span>
                             </div>
                             <div className="text-left">
-                              <p className="font-medium text-navy-800">{attempt.student_name || 'Unknown Student'}</p>
-                              <p className="text-xs text-gray-500">{attempt.student_email}</p>
+                              <p className="font-medium text-navy-800">{student.student_name || 'Unknown Student'}</p>
+                              <p className="text-xs text-gray-500">{student.student_email}</p>
+                              <p className="text-xs text-gray-400 mt-0.5">{student.attempts.length} attempt{student.attempts.length !== 1 ? 's' : ''}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
-                            <QuizStudentStatusBadge status={attempt.score !== undefined ? 'graded' : 'submitted'} score={attempt.score} maxScore={attempt.max_score || quiz.points} />
+                            <QuizStudentStatusBadge status={latestAttempt?.score !== undefined ? 'graded' : 'submitted'} score={latestAttempt?.score} maxScore={latestAttempt?.max_score || quiz.points} />
                             {isExpanded ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                           </div>
                         </button>
                         <AnimatePresence>
                           {isExpanded && (
                             <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
-                              <div className="px-4 pb-4 pt-0 border-t border-gray-100">
-                                {attempt.submitted_at && (
-                                  <div className="py-2 text-sm text-gray-600">
-                                    <span className="font-medium">Submitted:</span> {formatDate(attempt.submitted_at)}
+                              <div className="px-4 pb-4 pt-2 border-t border-gray-100 space-y-3">
+                                {student.attempts.map((attempt, index) => (
+                                  <div key={attempt.attempt_id} className="rounded-lg border border-gray-200 p-3 bg-white">
+                                    <div className="flex items-center justify-between gap-3">
+                                      <p className="text-sm font-semibold text-navy-800">Attempt {student.attempts.length - index}</p>
+                                      <QuizStudentStatusBadge status={attempt.score !== undefined ? 'graded' : 'submitted'} score={attempt.score} maxScore={attempt.max_score || quiz.points} />
+                                    </div>
+                                    {attempt.submitted_at && (
+                                      <div className="py-2 text-sm text-gray-600">
+                                        <span className="font-medium">Submitted:</span> {formatDate(attempt.submitted_at)}
+                                      </div>
+                                    )}
+                                    {attempt.time_taken_seconds && (
+                                      <div className="pb-2 text-sm text-gray-600">
+                                        <span className="font-medium">Time Taken:</span> {Math.round(attempt.time_taken_seconds / 60)} minutes
+                                      </div>
+                                    )}
+                                    {attempt.pending_manual_grading && (
+                                      <div className="mt-2 p-2 bg-amber-50 rounded-lg border border-amber-200">
+                                        <p className="text-sm text-amber-800"><AlertCircle className="w-4 h-4 inline mr-1" />Requires manual grading</p>
+                                      </div>
+                                    )}
+                                    <button onClick={() => router.push(`/quizzes/${quizId}/grade/${attempt.attempt_id}`)} className="mt-3 w-full flex items-center justify-center gap-2 btn btn-primary">
+                                      <Edit3 className="w-4 h-4" />{attempt.score !== undefined ? 'Update Grade' : 'Grade Submission'}
+                                    </button>
                                   </div>
-                                )}
-                                {attempt.time_taken_seconds && (
-                                  <div className="py-2 text-sm text-gray-600">
-                                    <span className="font-medium">Time Taken:</span> {Math.round(attempt.time_taken_seconds / 60)} minutes
-                                  </div>
-                                )}
-                                {attempt.pending_manual_grading && (
-                                  <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
-                                    <p className="text-sm text-amber-800"><AlertCircle className="w-4 h-4 inline mr-1" />Requires manual grading</p>
-                                  </div>
-                                )}
-                                <button onClick={() => router.push(`/quizzes/${quizId}/grade/${attempt.attempt_id}`)} className="mt-3 w-full flex items-center justify-center gap-2 btn btn-primary">
-                                  <Edit3 className="w-4 h-4" />{attempt.score !== undefined ? 'Update Grade' : 'Grade Submission'}
-                                </button>
+                                ))}
                               </div>
                             </motion.div>
                           )}
@@ -1105,12 +1173,22 @@ export default function QuizDetailsPage() {
                         </button>
                       </>
                     ) : (
-                      <button
-                        onClick={enterEditMode}
-                        className="w-full btn btn-primary flex items-center justify-center gap-2"
-                      >
-                        <Edit3 className="w-4 h-4" /> Edit Quiz
-                      </button>
+                      <>
+                        <button
+                          onClick={enterEditMode}
+                          className="w-full btn btn-primary flex items-center justify-center gap-2"
+                        >
+                          <Edit3 className="w-4 h-4" /> Edit Quiz
+                        </button>
+                        {!quiz.is_published && (
+                          <button
+                            onClick={() => router.push(`/quizzes/${quizId}/build`)}
+                            className="w-full btn btn-outline flex items-center justify-center gap-2"
+                          >
+                            <FileText className="w-4 h-4" /> Edit Questions
+                          </button>
+                        )}
+                      </>
                     )}
                     <button
                       onClick={() => {

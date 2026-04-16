@@ -233,16 +233,16 @@ export const quizzesApi = {
   getQuiz: async (quizId: string): Promise<Quiz> => {
     return api.get(`/quizzes/${quizId}/`);
   },
-  takeQuiz: async (quizId: string): Promise<{ attempt_id: string; attempt_number: number; questions: QuizQuestion[]; time_remaining_seconds?: number; answers?: Array<{ question_id: string; selected_choice_id?: string; text_answer?: string }> }> => {
+  takeQuiz: async (quizId: string): Promise<{ attempt_id: string; attempt_number: number; questions: QuizQuestion[]; time_remaining_seconds?: number; answers?: Array<{ question_id: string; selected_choice_id?: string; selected_choice_ids?: string[]; text_answer?: string }> }> => {
     return api.get(`/quizzes/${quizId}/take/`);
   },
   getLatestAttempt: async (quizId: string): Promise<QuizAttempt | null> => {
     return api.get(`/quizzes/${quizId}/my-latest-attempt/`);
   },
-  saveProgress: async (quizId: string, attemptId: string, answers: Array<{ question_id: string; selected_choice_id?: string; text_answer?: string }>) => {
+  saveProgress: async (quizId: string, attemptId: string, answers: Array<{ question_id: string; selected_choice_id?: string; selected_choice_ids?: string[]; text_answer?: string }>) => {
     return api.post(`/quizzes/${quizId}/save-progress/`, { attempt_id: attemptId, answers });
   },
-  submitAttempt: async (quizId: string, attemptId: string | null, answers: Array<{ question_id: string; selected_choice_id?: string; text_answer?: string }>) => {
+  submitAttempt: async (quizId: string, attemptId: string | null, answers: Array<{ question_id: string; selected_choice_id?: string; selected_choice_ids?: string[]; text_answer?: string }>) => {
     const payload: Record<string, unknown> = { answers };
     if (attemptId) {
       payload.attempt_id = attemptId;
@@ -264,6 +264,7 @@ export const quizzesApi = {
     weekly_module_id?: string;
     open_at?: string;
     close_at?: string;
+    is_published?: boolean;
     questions: QuizQuestion[];
   }) => {
     return api.post('/quizzes/quick-create/', { course_section_id: courseSectionId, ...data });

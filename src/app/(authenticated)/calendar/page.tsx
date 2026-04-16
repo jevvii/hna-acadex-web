@@ -37,6 +37,7 @@ const eventTypeLabels: Record<EventType, string> = {
   holiday: 'Holiday',
   school_event: 'School Event',
 };
+const creatableEventTypes: EventType[] = ['deadline', 'exam', 'personal', 'school_event'];
 
 interface EventFormState {
   title: string;
@@ -160,6 +161,9 @@ export default function CalendarPage() {
     mutationFn: async () => {
       if (!eventForm.title.trim()) {
         throw new Error('Event title is required.');
+      }
+      if (eventForm.eventType === 'holiday') {
+        throw new Error('Holiday events are system-managed and cannot be added manually.');
       }
 
       const startAt = eventForm.allDay
@@ -571,9 +575,9 @@ export default function CalendarPage() {
                     className="w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-navy-500"
                     style={{ colorScheme: 'light' }}
                   >
-                    {Object.entries(eventTypeLabels).map(([value, label]) => (
+                    {creatableEventTypes.map((value) => (
                       <option key={value} value={value}>
-                        {label}
+                        {eventTypeLabels[value]}
                       </option>
                     ))}
                   </select>

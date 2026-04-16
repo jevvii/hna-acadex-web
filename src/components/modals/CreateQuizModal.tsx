@@ -98,6 +98,7 @@ export function CreateQuizModal({ isOpen, onClose, courseId, modules }: CreateQu
         weekly_module_id: selectedModuleId || undefined,
         open_at: openDate?.toISOString(),
         close_at: closeDate?.toISOString(),
+        is_published: false,
         questions: [],
       });
     },

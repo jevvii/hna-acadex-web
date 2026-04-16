@@ -402,6 +402,9 @@ export default function ActivitySubmissionPage() {
     queryFn: () => activitiesApi.getActivity(activityId),
     enabled: !!activityId,
   });
+  const activityTabPath = activity?.course_section_id
+    ? `/courses/${activity.course_section_id}?tab=activities`
+    : '/courses';
 
   const submitMutation = useMutation({
     mutationFn: async () => {
@@ -414,7 +417,7 @@ export default function ActivitySubmissionPage() {
       // Refetch activity data to ensure fresh submission status before navigation
       await queryClient.refetchQueries({ queryKey: ['activity', activityId] });
       queryClient.invalidateQueries({ queryKey: ['activities'] });
-      router.push(`/activities/${activityId}`);
+      router.push(activityTabPath);
     },
   });
 
@@ -480,7 +483,7 @@ export default function ActivitySubmissionPage() {
           <div className="flex items-start justify-between">
             <div>
               <button
-                onClick={() => router.push(`/activities/${activityId}`)}
+                onClick={() => router.push(activityTabPath)}
                 className="flex items-center gap-2 text-gray-500 hover:text-navy-600 mb-2 transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />

@@ -174,6 +174,9 @@ export default function GradeSubmissionPage() {
     queryFn: () => activitiesApi.getAllSubmissions(activityId),
     enabled: !!activityId && isTeacher,
   });
+  const activityTabPath = activity?.course_section_id
+    ? `/courses/${activity.course_section_id}?tab=activities`
+    : '/courses';
 
   // Filter for the specific student's submissions
   const studentSubmissions = (submissions as SubmissionWithStudent[]).filter(
@@ -229,16 +232,16 @@ export default function GradeSubmissionPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activity-submissions', activityId] });
       queryClient.invalidateQueries({ queryKey: ['activity', activityId] });
-      router.push(`/activities/${activityId}`);
+      router.push(activityTabPath);
     },
   });
 
   // Redirect non-teachers
   useEffect(() => {
     if (isTeacher === false) {
-      router.push(`/activities/${activityId}`);
+      router.push(activityTabPath);
     }
-  }, [isTeacher, router, activityId]);
+  }, [isTeacher, router, activityTabPath]);
 
   // Loading state
   if (activityLoading || submissionsLoading) {
@@ -266,7 +269,7 @@ export default function GradeSubmissionPage() {
       <div className="min-h-screen flex flex-col items-center justify-center p-8 text-gray-500">
         <AlertCircle className="w-12 h-12 mb-3 text-amber-500" />
         <p className="mb-4">No submission found for this student</p>
-        <button onClick={() => router.push(`/activities/${activityId}`)} className="btn btn-outline">
+        <button onClick={() => router.push(activityTabPath)} className="btn btn-outline">
           Back to Activity
         </button>
       </div>
@@ -286,7 +289,7 @@ export default function GradeSubmissionPage() {
         <div className="px-4 lg:px-8 py-6">
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
             <button
-              onClick={() => router.push(`/activities/${activityId}`)}
+              onClick={() => router.push(activityTabPath)}
               className="flex items-center gap-2 text-gray-500 hover:text-navy-600 mb-4 transition-colors"
             >
               <ChevronLeft className="w-4 h-4" /> Back to Activity
@@ -599,7 +602,7 @@ export default function GradeSubmissionPage() {
               {/* Submit Button */}
               <div className="flex gap-3">
                 <button
-                  onClick={() => router.push(`/activities/${activityId}`)}
+                  onClick={() => router.push(activityTabPath)}
                   className="flex-1 px-4 py-2.5 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium"
                 >
                   Cancel

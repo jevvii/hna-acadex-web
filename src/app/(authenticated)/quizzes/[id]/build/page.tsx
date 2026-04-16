@@ -107,6 +107,9 @@ export default function QuizBuilderPage() {
     queryFn: () => quizzesApi.getQuiz(quizId),
     enabled: !!quizId,
   });
+  const quizTabPath = quiz?.course_section_id
+    ? `/courses/${quiz.course_section_id}?tab=quizzes`
+    : '/courses';
 
   // Fetch existing questions - only run when quizId is available
   const { data: existingQuestions, isLoading } = useQuery({
@@ -191,7 +194,7 @@ export default function QuizBuilderPage() {
     setHasChanges(true);
   }, [questions]);
 
-  const handleSave = useCallback(async (redirect: boolean) => {
+  const handleSave = useCallback(async () => {
     if (isSaving) return;
 
     // Validate that all questions have text
@@ -224,24 +227,21 @@ export default function QuizBuilderPage() {
 
       setHasChanges(false);
       queryClient.invalidateQueries({ queryKey: ['quizQuestions', quizId] });
-
-      if (redirect) {
-        router.push(`/quizzes/${quizId}`);
-      }
+      router.push(quizTabPath);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save. Check connection and retry.';
       setSaveError(message);
     } finally {
       setIsSaving(false);
     }
-  }, [quizId, questions, isSaving, router, queryClient, activeQuestionId]);
+  }, [quizId, questions, isSaving, router, queryClient, activeQuestionId, quizTabPath]);
 
   const handleBackToQuiz = useCallback(() => {
     if (hasChanges && !window.confirm('You have unsaved changes. Leave quiz builder without saving?')) {
       return;
     }
-    router.push(`/quizzes/${quizId}`);
-  }, [hasChanges, quizId, router]);
+    router.push(quizTabPath);
+  }, [hasChanges, router, quizTabPath]);
 
   // Guard against undefined quizId
   if (!quizId) {
@@ -281,19 +281,7 @@ export default function QuizBuilderPage() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => handleSave(false)}
-              disabled={isSaving || !hasChanges}
-              className={cn(
-                'px-4 py-2 text-sm font-medium rounded-lg transition-colors',
-                hasChanges
-                  ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-              )}
-            >
-              {isSaving ? 'Saving...' : 'Save Draft'}
-            </button>
-            <button
-              onClick={() => handleSave(true)}
+              onClick={handleSave}
               disabled={isSaving || questions.length === 0}
               className={cn(
                 'px-4 py-2 text-sm font-medium rounded-lg transition-colors',
@@ -302,7 +290,7 @@ export default function QuizBuilderPage() {
                   : 'bg-navy-300 text-white cursor-not-allowed'
               )}
             >
-              {isSaving ? 'Saving...' : 'Save & Finish'}
+              {isSaving ? 'Saving...' : 'Save Questions'}
             </button>
           </div>
         </div>

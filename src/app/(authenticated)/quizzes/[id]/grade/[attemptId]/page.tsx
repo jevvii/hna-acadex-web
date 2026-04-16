@@ -33,7 +33,9 @@ interface GradingAnswer {
   question_type: QuizQuestionType;
   points: number;
   selected_choice_id?: string;
+  selected_choice_ids?: string[];
   selected_choice_text?: string;
+  selected_choice_texts?: string[];
   text_answer?: string;
   is_correct?: boolean;
   points_awarded?: number;
@@ -57,9 +59,9 @@ interface QuizGradingAttemptWithAnswers {
 }
 
 // Question types that are auto-graded
-const AUTO_GRADED_TYPES: QuizQuestionType[] = ['multiple_choice', 'true_false', 'identification'];
+const AUTO_GRADED_TYPES: QuizQuestionType[] = ['multiple_choice', 'multi_select', 'true_false', 'identification'];
 // Question types that need manual grading
-const MANUAL_GRADED_TYPES: QuizQuestionType[] = ['essay', 'multi_select'];
+const MANUAL_GRADED_TYPES: QuizQuestionType[] = ['essay'];
 
 function isAutoGraded(type: QuizQuestionType): boolean {
   return AUTO_GRADED_TYPES.includes(type);
@@ -90,6 +92,9 @@ export default function QuizManualGradingPage() {
     queryFn: () => quizzesApi.getQuiz(quizId),
     enabled: !!quizId,
   });
+  const quizTabPath = quiz?.course_section_id
+    ? `/courses/${quiz.course_section_id}?tab=quizzes`
+    : '/courses';
 
   // Fetch grading list
   const { data: gradingData, isLoading: gradingLoading } = useQuery({
@@ -164,9 +169,9 @@ export default function QuizManualGradingPage() {
   // Redirect non-teachers
   useEffect(() => {
     if (isTeacher === false) {
-      router.push(`/quizzes/${quizId}`);
+      router.push(quizTabPath);
     }
-  }, [isTeacher, router, quizId]);
+  }, [isTeacher, router, quizTabPath]);
 
   // Loading state
   if (quizLoading || gradingLoading) {
@@ -194,7 +199,7 @@ export default function QuizManualGradingPage() {
       <div className="min-h-screen flex flex-col items-center justify-center p-8 text-gray-500">
         <AlertCircle className="w-12 h-12 mb-3 text-amber-500" />
         <p className="mb-4">No submission found for this student</p>
-        <button onClick={() => router.push(`/quizzes/${quizId}`)} className="btn btn-outline">
+        <button onClick={() => router.push(quizTabPath)} className="btn btn-outline">
           Back to Quiz
         </button>
       </div>
@@ -227,7 +232,7 @@ export default function QuizManualGradingPage() {
         <div className="px-4 lg:px-8 py-6">
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
             <button
-              onClick={() => router.push(`/quizzes/${quizId}`)}
+              onClick={() => router.push(quizTabPath)}
               className="flex items-center gap-2 text-gray-500 hover:text-navy-600 mb-4 transition-colors"
             >
               <ChevronLeft className="w-4 h-4" /> Back to Quiz
@@ -284,7 +289,7 @@ export default function QuizManualGradingPage() {
                 <div>
                   <p className="font-medium text-amber-800">Manual Grading Required</p>
                   <p className="text-sm text-amber-700 mt-1">
-                    Some questions require manual grading. Please review and assign scores for essay and multi-select questions below.
+                    Some questions require manual grading. Please review and assign scores for essay questions below.
                   </p>
                 </div>
               </motion.div>
@@ -362,8 +367,12 @@ export default function QuizManualGradingPage() {
                           </div>
                         ) : answer.question_type === 'multi_select' ? (
                           <div className="text-gray-700">
-                            {answer.selected_choice_text ? (
-                              <p>{answer.selected_choice_text}</p>
+                            {answer.selected_choice_texts && answer.selected_choice_texts.length > 0 ? (
+                              <ul className="list-disc pl-5 space-y-1">
+                                {answer.selected_choice_texts.map((text, idx) => (
+                                  <li key={`${answer.answer_id}-${idx}`}>{text}</li>
+                                ))}
+                              </ul>
                             ) : (
                               <p className="text-gray-400 italic">No selections made</p>
                             )}
@@ -560,7 +569,7 @@ export default function QuizManualGradingPage() {
 
               {/* Back Button */}
               <button
-                onClick={() => router.push(`/quizzes/${quizId}`)}
+                onClick={() => router.push(quizTabPath)}
                 className="w-full mt-6 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium text-gray-700"
               >
                 Back to Quiz
