@@ -83,6 +83,16 @@ function eventColor(event: CalendarEvent): string {
   return event.color || eventTypeColors[event.event_type] || '#94A3B8';
 }
 
+function toPlainText(value?: string): string {
+  if (!value) return '';
+  if (!value.includes('<')) return value.trim();
+  if (typeof window === 'undefined') {
+    return value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  const doc = new DOMParser().parseFromString(value, 'text/html');
+  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
+}
+
 export default function CalendarPage() {
   const queryClient = useQueryClient();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -424,12 +434,14 @@ export default function CalendarPage() {
                 })}
               </h3>
               {selectedDateEvents.length > 0 ? (
-                selectedDateEvents.map((event) => (
+                selectedDateEvents.map((event) => {
+                  const descriptionText = toPlainText(event.description);
+                  return (
                   <div key={event.id} className="rounded-xl border border-slate-200 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-semibold text-navy-800">{event.title}</p>
-                        {event.description && <p className="text-sm text-slate-600 mt-1">{event.description}</p>}
+                        {descriptionText && <p className="text-sm text-slate-600 mt-1">{descriptionText}</p>}
                       </div>
                       <span
                         className="text-xs font-medium px-2 py-1 rounded-full text-white"
@@ -440,7 +452,7 @@ export default function CalendarPage() {
                     </div>
                     <p className="text-xs text-slate-500 mt-2">{eventTimeLabel(event)}</p>
                   </div>
-                ))
+                )})
               ) : (
                 <p className="text-slate-500 py-4 text-center">No events for this day</p>
               )}
@@ -460,7 +472,9 @@ export default function CalendarPage() {
               </h3>
               <div className="space-y-3">
                 {selectedDateEvents.length > 0 ? (
-                  selectedDateEvents.map((event) => (
+                  selectedDateEvents.map((event) => {
+                    const descriptionText = toPlainText(event.description);
+                    return (
                     <div key={event.id} className="flex gap-3 p-3 rounded-xl bg-gray-50">
                       <div
                         className="w-1 rounded-full"
@@ -468,13 +482,13 @@ export default function CalendarPage() {
                       />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-navy-800 truncate">{event.title}</p>
-                        {event.description && (
-                          <p className="text-sm text-gray-500 line-clamp-2">{event.description}</p>
+                        {descriptionText && (
+                          <p className="text-sm text-gray-500 line-clamp-2">{descriptionText}</p>
                         )}
                         <p className="text-xs text-gray-400 mt-1">{eventTimeLabel(event)}</p>
                       </div>
                     </div>
-                  ))
+                  )})
                 ) : (
                   <p className="text-gray-500 text-center py-4">No events for this date</p>
                 )}
