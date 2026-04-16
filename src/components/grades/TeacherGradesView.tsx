@@ -77,11 +77,16 @@ function SubjectGradebookView({ courseSectionId }: { courseSectionId: string }) 
     enabled: !!courseSectionId,
   });
 
+  const invalidateGradeViews = () => {
+    queryClient.invalidateQueries({ queryKey: ['subjectGrades', courseSectionId] });
+    queryClient.invalidateQueries({ queryKey: ['advisoryGrades'] });
+  };
+
   const updateMutation = useMutation({
     mutationFn: ({ entryId, value }: { entryId: string; value: number | null }) =>
       gradingApi.updateGradeEntry(entryId, { override_score: value }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subjectGrades', courseSectionId] });
+      invalidateGradeViews();
       setEditingEntry(null);
       setEditValue('');
     },
@@ -91,7 +96,7 @@ function SubjectGradebookView({ courseSectionId }: { courseSectionId: string }) 
     mutationFn: ({ enrollmentId, periodId, score }: { enrollmentId: string; periodId: string; score: number }) =>
       gradingApi.createGradeEntry(enrollmentId, periodId, score),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subjectGrades', courseSectionId] });
+      invalidateGradeViews();
       setCreatingEntry(null);
       setCreateValue('');
     },
@@ -104,7 +109,7 @@ function SubjectGradebookView({ courseSectionId }: { courseSectionId: string }) 
     mutationFn: (periodId: string) =>
       gradingApi.submitPeriodGrades(courseSectionId, periodId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subjectGrades', courseSectionId] });
+      invalidateGradeViews();
       setConfirmAction(null);
     },
     onError: (err: Error) => {
@@ -117,7 +122,7 @@ function SubjectGradebookView({ courseSectionId }: { courseSectionId: string }) 
     mutationFn: (periodId: string) =>
       gradingApi.takeBackPeriodGrades(courseSectionId, periodId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subjectGrades', courseSectionId] });
+      invalidateGradeViews();
       setConfirmAction(null);
     },
     onError: (err: Error) => {
@@ -129,7 +134,7 @@ function SubjectGradebookView({ courseSectionId }: { courseSectionId: string }) 
   const submitFinalMutation = useMutation({
     mutationFn: () => gradingApi.bulkPublishFinalGrades(courseSectionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subjectGrades', courseSectionId] });
+      invalidateGradeViews();
       setConfirmAction(null);
     },
     onError: (err: Error) => {
@@ -141,7 +146,7 @@ function SubjectGradebookView({ courseSectionId }: { courseSectionId: string }) 
   const takeBackFinalMutation = useMutation({
     mutationFn: () => gradingApi.takeBackFinalGrades(courseSectionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subjectGrades', courseSectionId] });
+      invalidateGradeViews();
       setConfirmAction(null);
     },
     onError: (err: Error) => {
@@ -344,7 +349,7 @@ function SubjectGradebookView({ courseSectionId }: { courseSectionId: string }) 
                       for (const period of draftPeriods) {
                         await gradingApi.submitPeriodGrades(courseSectionId, period.id);
                       }
-                      queryClient.invalidateQueries({ queryKey: ['subjectGrades', courseSectionId] });
+                      invalidateGradeViews();
                       setConfirmAction(null);
                     };
                     submitDrafts().catch((err: Error) => {

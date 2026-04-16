@@ -301,6 +301,11 @@ export function AdvisoryGradebookView({
     queryKey: ['advisoryGrades', sectionId],
     queryFn: () => gradingApi.getAdvisoryGrades(sectionId),
     enabled: !!sectionId,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    refetchInterval: 30000,
   });
 
   const publishMutation = useMutation({
