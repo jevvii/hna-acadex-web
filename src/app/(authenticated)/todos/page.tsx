@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Calendar, CheckCircle2, Circle, AlertCircle, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Calendar, CheckCircle2, Circle, AlertCircle, Trash2, Loader2, Lock, ArrowRightCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { todoApi } from '@/lib/api';
 import { TodoItem } from '@/lib/types';
@@ -13,12 +14,6 @@ const filterTabs = [
   { id: 'pending', label: 'Pending' },
   { id: 'completed', label: 'Completed' },
 ];
-
-const priorityColors: Record<string, string> = {
-  high: 'bg-red-100 text-red-700',
-  medium: 'bg-yellow-100 text-yellow-700',
-  low: 'bg-green-100 text-green-700',
-};
 
 function formatDueDate(dateStr?: string): string {
   if (!dateStr) return 'No due date';
@@ -44,6 +39,7 @@ function toPlainText(value?: string): string {
 }
 
 export default function TodosPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [activeFilter, setActiveFilter] = useState('pending');
   const [newTaskTitle, setNewTaskTitle] = useState('');
@@ -52,6 +48,8 @@ export default function TodosPage() {
   const { data: todos, isLoading, error } = useQuery({
     queryKey: ['todos'],
     queryFn: () => todoApi.getTodos(),
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
   });
 
   // Toggle todo mutation
@@ -121,6 +119,37 @@ export default function TodosPage() {
   const isOverdue = (todo: TodoItem): boolean => {
     if (todo.is_done || !todo.due_at) return false;
     return new Date(todo.due_at) < new Date();
+  };
+
+  const isGenerated = (todo: TodoItem): boolean =>
+    Boolean(
+      todo.activity_id ||
+      todo.quiz_id ||
+      todo.target_path ||
+      (todo.source_type && todo.source_type !== 'manual') ||
+      todo.is_generated
+    );
+
+  const isActivityTodo = (todo: TodoItem): boolean =>
+    todo.source_type === 'activity' ||
+    Boolean(todo.activity_id || todo.target_path?.startsWith('/activities/'));
+
+  const isQuizTodo = (todo: TodoItem): boolean =>
+    todo.source_type === 'quiz' ||
+    Boolean(todo.quiz_id || todo.target_path?.startsWith('/quizzes/'));
+
+  const isLocked = (todo: TodoItem): boolean =>
+    Boolean(
+      todo.is_locked ||
+      (isGenerated(todo) && todo.is_available === false) ||
+      (isGenerated(todo) && !todo.is_done && isOverdue(todo))
+    );
+
+  const todoTargetPath = (todo: TodoItem): string | null => {
+    if (todo.target_path) return todo.target_path;
+    if (todo.activity_id) return `/activities/${todo.activity_id}`;
+    if (todo.quiz_id) return `/quizzes/${todo.quiz_id}`;
+    return null;
   };
 
   if (isLoading) {
@@ -210,35 +239,63 @@ export default function TodosPage() {
         transition={{ delay: 0.3 }}
         className="space-y-3"
       >
-        <AnimatePresence mode="popLayout">
-          {filteredTodos?.map((todo: TodoItem, index: number) => (
+        <AnimatePresence initial={false} mode="sync">
+          {filteredTodos?.map((todo: TodoItem) => {
+            const generatedTodo = isGenerated(todo);
+            const lockedTodo = isLocked(todo);
+            const targetPath = todoTargetPath(todo);
+            const canOpenGenerated = generatedTodo && !lockedTodo && Boolean(targetPath);
+            const dueLabel = lockedTodo && !todo.is_done
+              ? 'Locked'
+              : isOverdue(todo)
+                ? 'Overdue'
+                : formatDueDate(todo.due_at);
+
+            return (
             <motion.div
               key={todo.id}
-              layout
+              layout="position"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: -100 }}
-              transition={{ delay: index * 0.05 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              onClick={canOpenGenerated ? () => router.push(targetPath as string) : undefined}
               className={cn(
-                'bg-white rounded-xl shadow-card p-4 flex items-start gap-4 group',
+                'rounded-xl shadow-card p-4 flex items-start gap-4',
+                lockedTodo ? 'bg-slate-100 border border-slate-200' : 'bg-white',
+                canOpenGenerated && 'cursor-pointer hover:shadow-lg transition-shadow',
+                !generatedTodo && 'group',
                 todo.is_done && 'opacity-60'
               )}
             >
-              <button
-                onClick={() => toggleTodo(todo.id, todo.is_done)}
-                disabled={toggleMutation.isPending}
-                className="mt-0.5 text-gray-400 hover:text-navy-600 transition-colors"
-              >
-                {todo.is_done ? (
-                  <CheckCircle2 className="w-6 h-6 text-green-500" />
-                ) : (
-                  <Circle className="w-6 h-6" />
-                )}
-              </button>
+              {generatedTodo ? (
+                <div className="mt-0.5 text-gray-400">
+                  {todo.is_done ? (
+                    <CheckCircle2 className="w-6 h-6 text-green-500" />
+                  ) : lockedTodo ? (
+                    <Lock className="w-5 h-5 text-slate-500" />
+                  ) : (
+                    <ArrowRightCircle className="w-5 h-5 text-navy-500" />
+                  )}
+                </div>
+              ) : (
+                <button
+                  onClick={() => toggleTodo(todo.id, todo.is_done)}
+                  disabled={toggleMutation.isPending}
+                  className="mt-0.5 text-gray-400 hover:text-navy-600 transition-colors"
+                >
+                  {todo.is_done ? (
+                    <CheckCircle2 className="w-6 h-6 text-green-500" />
+                  ) : (
+                    <Circle className="w-6 h-6" />
+                  )}
+                </button>
+              )}
 
               <div className="flex-1">
                 <h3 className={cn(
                   'font-medium text-navy-800',
+                  lockedTodo && !todo.is_done && 'text-slate-500',
                   todo.is_done && 'line-through text-gray-500'
                 )}>
                   {todo.title}
@@ -251,31 +308,48 @@ export default function TodosPage() {
                 <div className="flex items-center gap-3 mt-2">
                   <span className={cn(
                     'text-xs font-medium px-2 py-0.5 rounded-full',
-                    isOverdue(todo) ? 'bg-red-100 text-red-700' : 'text-gray-500'
+                    lockedTodo && !todo.is_done
+                      ? 'bg-slate-200 text-slate-600'
+                      : isOverdue(todo)
+                        ? 'bg-red-100 text-red-700'
+                        : 'text-gray-500'
                   )}>
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
-                      {isOverdue(todo) ? 'Overdue' : formatDueDate(todo.due_at)}
+                      {dueLabel}
                     </span>
                   </span>
-                  {todo.activity_id && (
-                    <span className="text-xs text-navy-600 bg-navy-50 px-2 py-0.5 rounded-full">Assignment</span>
+                  {isActivityTodo(todo) && (
+                    <span className={cn(
+                      'text-xs px-2 py-0.5 rounded-full',
+                      lockedTodo ? 'text-slate-600 bg-slate-200' : 'text-navy-600 bg-navy-50'
+                    )}>
+                      Assignment
+                    </span>
                   )}
-                  {todo.quiz_id && (
-                    <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">Quiz</span>
+                  {isQuizTodo(todo) && (
+                    <span className={cn(
+                      'text-xs px-2 py-0.5 rounded-full',
+                      lockedTodo ? 'text-slate-600 bg-slate-200' : 'text-orange-600 bg-orange-50'
+                    )}>
+                      Quiz
+                    </span>
                   )}
                 </div>
               </div>
 
-              <button
-                onClick={() => deleteTodo(todo.id)}
-                disabled={deleteMutation.isPending}
-                className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500 transition-all"
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
+              {!generatedTodo && (
+                <button
+                  onClick={() => deleteTodo(todo.id)}
+                  disabled={deleteMutation.isPending}
+                  className="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-red-500 transition-all"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              )}
             </motion.div>
-          ))}
+            );
+          })}
         </AnimatePresence>
 
         {filteredTodos?.length === 0 && (

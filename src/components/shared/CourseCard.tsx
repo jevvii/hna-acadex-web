@@ -1,6 +1,6 @@
 'use client';
 
-import { memo } from 'react';
+import { CSSProperties, memo } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Layers, User, Users } from 'lucide-react';
@@ -46,6 +46,32 @@ function resolveCardGradient(colorOverlay: string | undefined, index: number): s
   }
 
   return COURSE_FALLBACK_BACKGROUNDS[index % COURSE_FALLBACK_BACKGROUNDS.length];
+}
+
+function getCardBackgroundLayers(coverImageUrl: string | undefined, gradient: string): {
+  baseStyle: CSSProperties;
+  tintStyle: CSSProperties | null;
+} {
+  const hasCoverImage = Boolean(coverImageUrl?.trim());
+  return {
+    baseStyle: hasCoverImage
+      ? {
+          backgroundImage: `url("${coverImageUrl}")`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }
+      : {
+          background: gradient,
+        },
+    tintStyle: hasCoverImage
+      ? {
+          background: gradient,
+          mixBlendMode: 'multiply',
+          opacity: 0.88,
+        }
+      : null,
+  };
 }
 
 function getBadgeStyles(variant: CardBadgeVariant): string {
@@ -111,6 +137,7 @@ function getTeacherGradingMeta(course: TeacherCourse): string {
 
 export const StudentCourseCard = memo(function StudentCourseCard({ course, index }: StudentCourseCardProps) {
   const gradient = resolveCardGradient(course.color_overlay, index);
+  const backgroundLayers = getCardBackgroundLayers(course.cover_image_url, gradient);
   const badge = getStudentBadge(course);
 
   return (
@@ -119,7 +146,8 @@ export const StudentCourseCard = memo(function StudentCourseCard({ course, index
         href={`/courses/${course.course_section_id}`}
         className="block relative h-[200px] rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-200"
       >
-        <div className="absolute inset-0" style={{ background: gradient }} />
+        <div className="absolute inset-0" style={backgroundLayers.baseStyle} />
+        {backgroundLayers.tintStyle && <div className="absolute inset-0" style={backgroundLayers.tintStyle} />}
         <div className="absolute inset-0" style={{ background: CARD_OVERLAY }} />
 
         <div
@@ -157,6 +185,7 @@ export const StudentCourseCard = memo(function StudentCourseCard({ course, index
 
 export const TeacherCourseCard = memo(function TeacherCourseCard({ course, index }: TeacherCourseCardProps) {
   const gradient = resolveCardGradient(course.color_overlay, index);
+  const backgroundLayers = getCardBackgroundLayers(course.cover_image_url, gradient);
   const advisorySectionId = useAuthStore((state) => state.user?.advisory_section_id);
   const advisorySectionName = useAuthStore((state) => state.user?.advisory_section_name);
   const hasAdvisory = Boolean(advisorySectionId);
@@ -173,7 +202,8 @@ export const TeacherCourseCard = memo(function TeacherCourseCard({ course, index
         href={`/courses/${course.course_section_id}`}
         className="block relative h-[200px] rounded-2xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-200"
       >
-        <div className="absolute inset-0" style={{ background: gradient }} />
+        <div className="absolute inset-0" style={backgroundLayers.baseStyle} />
+        {backgroundLayers.tintStyle && <div className="absolute inset-0" style={backgroundLayers.tintStyle} />}
         <div className="absolute inset-0" style={{ background: CARD_OVERLAY }} />
 
         <div

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,7 +13,6 @@ import {
   FileText,
   GraduationCap,
   Calendar,
-  AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { notificationsApi } from '@/lib/api';
@@ -88,16 +87,22 @@ export default function NotificationsPage() {
   });
 
   // Normalize notifications to array (handle paginated response { results: [...] })
-  const notificationList: UserNotification[] = Array.isArray(notifications)
-    ? notifications
-    : (notifications as unknown as { results?: UserNotification[] })?.results ?? [];
+  const notificationList: UserNotification[] = useMemo(() => {
+    const list: UserNotification[] = Array.isArray(notifications)
+      ? notifications
+      : (notifications as unknown as { results?: UserNotification[] })?.results ?? [];
+    return [...list].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [notifications]);
 
-  const filteredNotifications = notificationList.filter((n) => {
-    if (filter === 'unread') return !n.is_read;
-    return true;
-  });
+  const filteredNotifications = useMemo(
+    () => notificationList.filter((n) => (filter === 'unread' ? !n.is_read : true)),
+    [notificationList, filter]
+  );
 
-  const unreadCount = notificationList.filter((n) => !n.is_read).length;
+  const unreadCount = useMemo(
+    () => notificationList.filter((n) => !n.is_read).length,
+    [notificationList]
+  );
 
   const handleMarkAsRead = (id: string) => {
     markAsReadMutation.mutate(id);
@@ -255,15 +260,15 @@ export default function NotificationsPage() {
         transition={{ delay: 0.2 }}
         className="space-y-3"
       >
-        <AnimatePresence mode="popLayout">
-          {filteredNotifications?.map((notification, index: number) => (
+        <AnimatePresence initial={false} mode="sync">
+          {filteredNotifications?.map((notification) => (
             <motion.div
               key={notification.id}
-              layout
+              layout="position"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: -100 }}
-              transition={{ delay: index * 0.05 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
               className={cn(
                 'bg-white rounded-xl shadow-card p-4 flex items-start gap-4 group',
                 'transition-colors',

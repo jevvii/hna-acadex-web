@@ -86,6 +86,7 @@ export interface Course {
   code: string;
   title: string;
   description?: string;
+  category?: string;
   cover_image_url?: string;
   color_overlay?: string;
   grade_level?: GradeLevel;
@@ -151,6 +152,7 @@ export interface StudentCourse {
   section_id?: string;
   course_code: string;
   course_title: string;
+  category?: string;
   cover_image_url?: string;
   color_overlay?: string;
   section_name: string;
@@ -173,6 +175,7 @@ export interface TeacherCourse {
   section_id?: string;
   course_code: string;
   course_title: string;
+  category?: string;
   cover_image_url?: string;
   color_overlay?: string;
   section_name: string;
@@ -408,6 +411,11 @@ export interface TodoItem {
   activity_id?: string;
   quiz_id?: string;
   course_section_id?: string;
+  source_type?: 'manual' | 'activity' | 'quiz';
+  is_generated?: boolean;
+  is_locked?: boolean;
+  is_available?: boolean;
+  target_path?: string;
   completed_at?: string;
   created_at: string;
 }

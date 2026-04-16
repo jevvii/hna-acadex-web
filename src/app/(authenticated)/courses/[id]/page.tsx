@@ -106,6 +106,13 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, '').trim();
 }
 
+function getApplicableSubjectTrack(category?: string): 'Core' | 'Applied' | 'Specialized' | null {
+  if (category === 'shs_core') return 'Core';
+  if (category === 'shs_applied') return 'Applied';
+  if (category === 'shs_specialized') return 'Specialized';
+  return null;
+}
+
 function LoadingState() {
   return (
     <div className="flex items-center justify-center py-12">
@@ -2671,7 +2678,9 @@ function GradesTab({ courseId, courseInfo }: { courseId: string; courseInfo?: { 
 export default function CoursePage() {
   const params = useParams();
   const courseId = params.id as string;
+  const isStudent = useIsStudent();
   const isTeacher = useIsTeacher();
+  const user = useAuthStore((state) => state.user);
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -2799,6 +2808,18 @@ export default function CoursePage() {
   const teacherName = courseDetail?.teacher?.full_name || (courseInfo as any)?.teacher_name || 'Teacher';
   const gradeLevel = courseDetail?.section?.grade_level || courseInfo?.grade_level;
   const strand = courseDetail?.section?.strand || courseInfo?.strand;
+  const sectionId = courseDetail?.section?.id || (courseInfo as any)?.section_id;
+  const subjectCategory = courseDetail?.course?.category || (courseInfo as any)?.category;
+  const subjectTrackLabel = getApplicableSubjectTrack(subjectCategory);
+  const isAdvisorySubject = Boolean(
+    isTeacher
+    && user?.advisory_section_id
+    && (
+      (sectionId && sectionId === user.advisory_section_id)
+      || (user.advisory_section_name && sectionName === user.advisory_section_name)
+    )
+  );
+  const teacherMetaLabel = isAdvisorySubject ? 'Advisory Subject' : teacherName;
   const studentCount = (courseDetail as any)?.student_count || (courseInfo as any)?.student_count;
 
   // Extract content from the API response
@@ -2893,18 +2914,29 @@ export default function CoursePage() {
               {courseTitle}
             </h1>
             <div className="flex items-center gap-6 text-sm text-white/90">
-              <span className="flex items-center gap-2">
-                <User className="w-4 h-4" />
-                {teacherName}
-              </span>
-              <span className="flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                {(courseDetail as any)?.student_count ? `${(courseDetail as any).student_count} Students` : (courseInfo as any)?.student_count ? `${(courseInfo as any).student_count} Students` : 'Students'}
-              </span>
+              {isStudent ? (
+                <span>{teacherMetaLabel}</span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  {teacherMetaLabel}
+                </span>
+              )}
+              {!isStudent && (
+                <span className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  {(courseDetail as any)?.student_count ? `${(courseDetail as any).student_count} Students` : (courseInfo as any)?.student_count ? `${(courseInfo as any).student_count} Students` : 'Students'}
+                </span>
+              )}
               <span className="flex items-center gap-2">
                 <Layers className="w-4 h-4" />
                 {gradeLevel} - {strand}
               </span>
+              {subjectTrackLabel && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-white/15 border border-white/25 text-white">
+                  {subjectTrackLabel}
+                </span>
+              )}
             </div>
           </motion.div>
         </div>
