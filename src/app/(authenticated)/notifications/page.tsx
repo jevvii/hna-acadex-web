@@ -120,10 +120,10 @@ export default function NotificationsPage() {
     if (notification.type === 'new_activity' && notification.activity_id) {
       return `/activities/${notification.activity_id}`;
     }
-    if (
-      (notification.type === 'new_quiz' || notification.type === 'new_exam') &&
-      notification.quiz_id
-    ) {
+    if (notification.type === 'new_exam' && notification.activity_id) {
+      return `/activities/${notification.activity_id}`;
+    }
+    if ((notification.type === 'new_quiz' || notification.type === 'new_exam') && notification.quiz_id) {
       return `/quizzes/${notification.quiz_id}`;
     }
     if (notification.type === 'grade_released') {
@@ -143,16 +143,19 @@ export default function NotificationsPage() {
     return null;
   };
 
+  const isExpandableNotification = (notification: UserNotification): boolean =>
+    notification.type === 'course_announcement' ||
+    notification.type === 'school_announcement' ||
+    (notification.type === 'system' && notification.title.startsWith('Today in Calendar:'));
+
   const handleNotificationClick = (notification: UserNotification) => {
-    const isAnnouncement =
-      notification.type === 'course_announcement' ||
-      notification.type === 'school_announcement';
+    const isExpandable = isExpandableNotification(notification);
 
     if (!notification.is_read) {
       markAsReadMutation.mutate(notification.id);
     }
 
-    if (isAnnouncement) {
+    if (isExpandable) {
       setExpandedAnnouncementIds((prev) => {
         const next = new Set(prev);
         if (next.has(notification.id)) {
@@ -305,14 +308,14 @@ export default function NotificationsPage() {
                     'text-sm mt-1',
                     notification.is_read ? 'text-gray-500' : 'text-gray-600'
                   )}>
-                    {(notification.type === 'course_announcement' || notification.type === 'school_announcement')
+                    {isExpandableNotification(notification)
                       && !expandedAnnouncementIds.has(notification.id)
                       && notification.body.length > 200
                       ? `${notification.body.slice(0, 200)}...`
                       : notification.body}
                   </p>
                 )}
-                {(notification.type === 'course_announcement' || notification.type === 'school_announcement')
+                {isExpandableNotification(notification)
                   && notification.body && (
                     <p className="text-xs text-navy-600 mt-2">
                       {expandedAnnouncementIds.has(notification.id) ? 'Click to collapse' : 'Click to expand'}

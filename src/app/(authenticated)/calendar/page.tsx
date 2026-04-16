@@ -8,7 +8,6 @@ import {
   Calendar as CalendarIcon,
   ChevronLeft,
   ChevronRight,
-  Clock,
   Loader2,
   Plus,
   Tag,
@@ -77,6 +76,10 @@ function eventTimeLabel(event: CalendarEvent): string {
     hour: 'numeric',
     minute: '2-digit',
   });
+}
+
+function eventColor(event: CalendarEvent): string {
+  return event.color || eventTypeColors[event.event_type] || '#94A3B8';
 }
 
 export default function CalendarPage() {
@@ -349,8 +352,9 @@ export default function CalendarPage() {
                             key={event.id}
                             className={cn(
                               'text-[10px] sm:text-[11px] truncate px-1.5 py-0.5 rounded',
-                              isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700',
+                              'text-white',
                             )}
+                            style={{ backgroundColor: eventColor(event) }}
                           >
                             {event.title}
                           </div>
@@ -387,8 +391,12 @@ export default function CalendarPage() {
                     <p className="font-semibold text-navy-800 mb-2">{date.getDate()}</p>
                     <div className="space-y-1">
                       {dayEvents.slice(0, 4).map((event) => (
-                        <div key={event.id} className="text-[11px] text-slate-700 truncate">
-                          {event.title}
+                        <div key={event.id} className="flex items-center gap-1.5 text-[11px] text-slate-700 truncate">
+                          <span
+                            className="inline-block w-2 h-2 rounded-full shrink-0"
+                            style={{ backgroundColor: eventColor(event) }}
+                          />
+                          <span className="truncate">{event.title}</span>
                         </div>
                       ))}
                       {dayEvents.length === 0 && (
@@ -421,7 +429,7 @@ export default function CalendarPage() {
                       </div>
                       <span
                         className="text-xs font-medium px-2 py-1 rounded-full text-white"
-                        style={{ backgroundColor: eventTypeColors[event.event_type] }}
+                        style={{ backgroundColor: eventColor(event) }}
                       >
                         {eventTypeLabels[event.event_type]}
                       </span>
@@ -452,7 +460,7 @@ export default function CalendarPage() {
                     <div key={event.id} className="flex gap-3 p-3 rounded-xl bg-gray-50">
                       <div
                         className="w-1 rounded-full"
-                        style={{ backgroundColor: eventTypeColors[event.event_type] || '#94A3B8' }}
+                        style={{ backgroundColor: eventColor(event) }}
                       />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-navy-800 truncate">{event.title}</p>
@@ -478,7 +486,7 @@ export default function CalendarPage() {
                   <div key={event.id} className="flex gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors">
                     <div
                       className="w-1 rounded-full"
-                      style={{ backgroundColor: eventTypeColors[event.event_type] || '#94A3B8' }}
+                      style={{ backgroundColor: eventColor(event) }}
                     />
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-navy-800 truncate">{event.title}</p>

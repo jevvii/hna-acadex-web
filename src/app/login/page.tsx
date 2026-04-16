@@ -33,7 +33,7 @@ export default function LoginPage() {
       } else {
         router.push('/');
       }
-    } catch (err) {
+    } catch {
       // Error is handled by the store
     }
   };
@@ -61,7 +61,7 @@ export default function LoginPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.6 }}
           >
-            <h1 className="font-display text-5xl font-bold mb-6 leading-tight">
+            <h1 className="font-display text-5xl font-bold mb-6 leading-tight text-white tracking-wide drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)]">
               HNA Acadex
             </h1>
             <p className="text-xl text-navy-100 mb-8 font-light">
@@ -109,7 +109,7 @@ export default function LoginPage() {
         >
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
-            <h1 className="font-display text-3xl font-bold text-navy-600">HNA Acadex</h1>
+            <h1 className="font-display text-3xl font-bold text-navy-800 tracking-wide drop-shadow-[0_2px_10px_rgba(15,23,42,0.2)]">HNA Acadex</h1>
             <p className="text-gray-500 mt-2">Sign in to continue</p>
           </div>
 
@@ -210,12 +210,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <p className="text-center text-sm text-gray-500 mt-6">
-            Don&apos;t have an account?{' '}
-            <Link href="/register" className="text-navy-600 font-medium hover:text-navy-800 transition-colors">
-              Contact your administrator
-            </Link>
-          </p>
         </motion.div>
       </div>
     </div>
