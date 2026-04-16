@@ -635,6 +635,36 @@ export const gradingApi = {
   unpublishReportCard: async (sectionId: string, gradingPeriodId: string): Promise<SectionReportCard> => {
     return api.post(`/advisory/${sectionId}/report-card/unpublish/`, { grading_period_id: gradingPeriodId });
   },
+  downloadAdvisorySf9: async (
+    sectionId: string,
+    studentId?: string
+  ): Promise<{ blob: Blob; filename: string }> => {
+    const params = new URLSearchParams();
+    if (studentId) params.append('student_id', studentId);
+    const query = params.toString();
+    const res = await fetch(`${API_BASE_URL}/advisory/${sectionId}/report-card/sf9/export/${query ? `?${query}` : ''}`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      let detail = 'Failed to generate SF9.';
+      try {
+        const parsed = text ? JSON.parse(text) : null;
+        detail = parsed?.detail || parsed?.message || detail;
+      } catch {
+        detail = text || detail;
+      }
+      throw new Error(detail);
+    }
+
+    const blob = await res.blob();
+    const disposition = res.headers.get('content-disposition') || '';
+    const match = disposition.match(/filename="?([^";]+)"?/i);
+    const filename = match?.[1] || (studentId ? 'sf9.xlsx' : 'sf9-bulk.zip');
+    return { blob, filename };
+  },
   sendAdvisorySubjectReminders: async (
     sectionId: string,
     courseSectionId?: string

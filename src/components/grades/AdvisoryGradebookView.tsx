@@ -18,6 +18,7 @@ import {
   Filter,
   Loader2,
   ChevronDown,
+  FileDown,
 } from 'lucide-react';
 import { gradingApi } from '@/lib/api';
 import type {
@@ -289,6 +290,7 @@ export function AdvisoryGradebookView({
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterSubject, setFilterSubject] = useState('all');
+  const [selectedSf9StudentId, setSelectedSf9StudentId] = useState('');
   const [confirmAction, setConfirmAction] = useState<{
     type: 'publish' | 'unpublish';
     periodId: string;
@@ -368,6 +370,24 @@ export function AdvisoryGradebookView({
     },
   });
 
+  const sf9ExportMutation = useMutation({
+    mutationFn: ({ studentId }: { studentId?: string }) =>
+      gradingApi.downloadAdvisorySf9(sectionId, studentId),
+    onSuccess: ({ blob, filename }) => {
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    },
+    onError: (err: Error) => {
+      alert(`Failed to generate SF9: ${err.message}`);
+    },
+  });
+
   const students = data?.students ?? EMPTY_STUDENTS;
   const periods = data?.periods ?? EMPTY_PERIODS;
   const submissionStatuses = data?.submission_status ?? EMPTY_SUBMISSION_STATUSES;
@@ -412,6 +432,18 @@ export function AdvisoryGradebookView({
       return true;
     });
   }, [students, searchQuery, filterStatus, filterSubject]);
+
+  const allStudentsCleared = useMemo(
+    () =>
+      students.length > 0 &&
+      students.every(
+        (student) =>
+          student.final_average !== null &&
+          student.subjects.length > 0 &&
+          student.subjects.every((subject) => subject.final_grade !== null)
+      ),
+    [students]
+  );
 
   if (isPending) return <LoadingState />;
   if (error)
@@ -575,6 +607,62 @@ export function AdvisoryGradebookView({
         isPublishPending={publishMutation.isPending}
         isUnpublishPending={unpublishMutation.isPending}
       />
+
+      {/* SF9 Export Panel */}
+      <section className="mb-8">
+        <h3 className="font-display text-xl font-bold text-navy-900 mb-4 flex items-center gap-2">
+          <FileDown className="w-5 h-5 text-navy-600" />
+          SF9 Export
+        </h3>
+        <div className="bg-white rounded-2xl shadow-card p-6 space-y-4">
+          <p className="text-sm text-slate-600">
+            Generate ready-made SF9 files per student, or export all students in bulk when everyone is cleared.
+          </p>
+          <div className="flex flex-col md:flex-row md:items-center gap-3">
+            <select
+              value={selectedSf9StudentId}
+              onChange={(e) => setSelectedSf9StudentId(e.target.value)}
+              className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-navy-500"
+            >
+              <option value="">Select student for individual export</option>
+              {students.map((student) => (
+                <option key={student.student_id} value={student.student_id}>
+                  {student.student_name}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={() => {
+                if (!selectedSf9StudentId || sf9ExportMutation.isPending) return;
+                sf9ExportMutation.mutate({ studentId: selectedSf9StudentId });
+              }}
+              disabled={!selectedSf9StudentId || sf9ExportMutation.isPending}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-navy-300 text-navy-700 text-sm font-medium hover:bg-navy-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {sf9ExportMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+              Generate Student SF9
+            </button>
+
+            <button
+              onClick={() => {
+                if (!allStudentsCleared || sf9ExportMutation.isPending) return;
+                sf9ExportMutation.mutate({});
+              }}
+              disabled={!allStudentsCleared || sf9ExportMutation.isPending}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-navy-600 text-white text-sm font-medium hover:bg-navy-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {sf9ExportMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+              Generate Bulk SF9
+            </button>
+          </div>
+          {!allStudentsCleared && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+              Bulk export is enabled only when all students have complete final grades in all subjects.
+            </p>
+          )}
+        </div>
+      </section>
 
       {/* Student Grade List */}
       <section>
