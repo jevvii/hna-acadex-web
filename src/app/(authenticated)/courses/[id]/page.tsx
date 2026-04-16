@@ -1325,6 +1325,14 @@ function QuizzesTab({ quizzes, isTeacher, onAddQuiz, onTogglePublish }: { quizze
                       {quiz.is_published ? 'Unpublish' : 'Publish'}
                     </button>
                   )}
+                  {!quiz.is_published && (
+                    <button
+                      onClick={() => router.push(`/quizzes/${quiz.id}/build`)}
+                      className="px-4 py-2.5 rounded-xl text-sm font-semibold bg-white text-navy-700 border border-navy-200 hover:bg-navy-50 transition-colors"
+                    >
+                      Edit Questions
+                    </button>
+                  )}
                   <button
                     onClick={() => router.push(`/quizzes/${quiz.id}`)}
                     className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-navy-600 text-white hover:bg-navy-700 transition-colors"

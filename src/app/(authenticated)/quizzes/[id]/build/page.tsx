@@ -260,6 +260,25 @@ export default function QuizBuilderPage() {
     );
   }
 
+  if (quiz?.is_published) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white border border-slate-200 rounded-xl p-6 max-w-md w-full text-center space-y-4">
+          <h1 className="text-lg font-semibold text-slate-900">Questions are locked</h1>
+          <p className="text-sm text-slate-600">
+            This quiz is already published. Unpublish it first to edit questions.
+          </p>
+          <button
+            onClick={() => router.push(`/quizzes/${quizId}`)}
+            className="w-full px-4 py-2 rounded-lg bg-navy-600 text-white hover:bg-navy-700 transition-colors"
+          >
+            Back to Quiz
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Sticky Header */}
