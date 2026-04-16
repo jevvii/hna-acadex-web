@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { StaticDateTimePicker } from '@mui/x-date-pickers/StaticDateTimePicker';
@@ -8,6 +8,7 @@ import { renderTimeViewClock } from '@mui/x-date-pickers/timeViewRenderers';
 import { DateOrTimeViewWithMeridiem } from '@mui/x-date-pickers/internals/models';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { CssBaseline } from '@mui/material';
+import { createPortal } from 'react-dom';
 import dayjs, { Dayjs } from 'dayjs';
 import { Calendar } from 'lucide-react';
 
@@ -67,12 +68,14 @@ function ClockDateTimeInlinePicker({
   value,
   onChange,
   minDate,
+  maxDate,
   view,
   onViewChange,
 }: {
   value: Dayjs;
   onChange: (date: Dayjs) => void;
   minDate?: Dayjs;
+  maxDate?: Dayjs;
   view: PickerView;
   onViewChange: (view: PickerView) => void;
 }) {
@@ -84,6 +87,9 @@ function ClockDateTimeInlinePicker({
           if (newValue) onChange(newValue);
         }}
         minDate={minDate}
+        maxDate={maxDate}
+        minDateTime={minDate}
+        maxDateTime={maxDate}
         ampm
         view={view}
         onViewChange={(newView) => onViewChange(newView)}
@@ -130,6 +136,7 @@ function ClockDateTimeModal({
   onCancel,
   onConfirm,
   minDate,
+  maxDate,
 }: {
   isOpen: boolean;
   pendingDate: Dayjs;
@@ -137,6 +144,7 @@ function ClockDateTimeModal({
   onCancel: () => void;
   onConfirm: () => void;
   minDate?: Dayjs;
+  maxDate?: Dayjs;
 }) {
   const [pickerView, setPickerView] = useState<PickerView>('day');
 
@@ -156,7 +164,7 @@ function ClockDateTimeModal({
   };
 
   if (!isOpen) return null;
-  return (
+  const modalContent = (
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60"
       onClick={(e) => {
@@ -171,6 +179,7 @@ function ClockDateTimeModal({
           value={pendingDate}
           onChange={onPendingDateChange}
           minDate={minDate}
+          maxDate={maxDate}
           view={pickerView}
           onViewChange={setPickerView}
         />
@@ -232,6 +241,8 @@ function ClockDateTimeModal({
       </div>
     </div>
   );
+  if (typeof document === 'undefined') return null;
+  return createPortal(modalContent, document.body);
 }
 
 export interface DeadlinePickerProps {
@@ -435,6 +446,8 @@ export interface DateTimePickerTriggerProps {
   onChange: (value: Dayjs) => void;
   disabled?: boolean;
   minDate?: Dayjs;
+  maxDate?: Dayjs;
+  autoOpen?: boolean;
 }
 
 export function DateTimePickerTrigger({
@@ -443,9 +456,19 @@ export function DateTimePickerTrigger({
   onChange,
   disabled = false,
   minDate,
+  maxDate,
+  autoOpen = false,
 }: DateTimePickerTriggerProps) {
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [pendingDate, setPendingDate] = useState<Dayjs>(value);
+  const didAutoOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (!autoOpen || disabled || didAutoOpenRef.current) return;
+    setPendingDate(value);
+    setIsPickerOpen(true);
+    didAutoOpenRef.current = true;
+  }, [autoOpen, disabled, value]);
 
   return (
     <PickerShell>
@@ -479,6 +502,7 @@ export function DateTimePickerTrigger({
             setIsPickerOpen(false);
           }}
           minDate={minDate}
+          maxDate={maxDate}
         />
       )}
     </PickerShell>

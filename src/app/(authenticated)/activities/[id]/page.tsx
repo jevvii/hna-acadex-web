@@ -17,7 +17,7 @@ import { cn, resolveFileUrl } from '@/lib/utils';
 import { activitiesApi, reminderApi } from '@/lib/api';
 import { Activity, Submission, SubmissionStatus } from '@/lib/types';
 import { CircularScore } from '@/components/CircularScore';
-import { DeadlinePickerTrigger } from '@/components/DeadlinePicker';
+import { DateTimePickerTrigger, DeadlinePickerTrigger } from '@/components/DeadlinePicker';
 import { logger } from '@/lib/logger';
 import { formatDateTime } from '@/lib/dateUtils';
 import {
@@ -377,8 +377,16 @@ function SubmissionModal({
 
 // Reminder picker component
 function ReminderPicker({ deadline, onSelect, onClose }: { deadline?: string; onSelect: (reminderDate: Date, offsetMinutes: number) => void; onClose: () => void }) {
+  const deadlineDate = deadline ? new Date(deadline) : new Date();
+  const now = new Date();
+  const isReminderAvailable = deadlineDate.getTime() > now.getTime();
+  const minReminderDate = dayjs(now);
+  const maxReminderDate = dayjs(deadlineDate);
+  const [showCustomPicker, setShowCustomPicker] = useState(false);
+  const [customReminderDate, setCustomReminderDate] = useState<Dayjs>(minReminderDate);
+  const [customPickerNonce, setCustomPickerNonce] = useState(0);
+
   if (!deadline) return null;
-  const deadlineDate = new Date(deadline);
   return (
     <div className="bg-white rounded-xl shadow-lg p-4 w-72">
       <h4 className="font-bold text-navy-800 mb-3">Set Reminder</h4>
@@ -398,6 +406,50 @@ function ReminderPicker({ deadline, onSelect, onClose }: { deadline?: string; on
             </button>
           );
         })}
+        <button
+          type="button"
+          disabled={!isReminderAvailable}
+          onClick={() => {
+            const nextCustomDate = dayjs().isAfter(maxReminderDate) ? maxReminderDate : dayjs();
+            setCustomReminderDate(nextCustomDate);
+            setShowCustomPicker(true);
+            setCustomPickerNonce((prev) => prev + 1);
+          }}
+          className={cn(
+            'w-full text-left px-4 py-3 rounded-lg transition-colors border',
+            isReminderAvailable
+              ? 'hover:bg-navy-50 border-navy-200 text-navy-800'
+              : 'opacity-50 cursor-not-allowed bg-gray-100 border-gray-200 text-gray-500'
+          )}
+        >
+          <p className="font-medium">Custom</p>
+          <p className="text-sm text-gray-500">Choose your own reminder time</p>
+        </button>
+        {showCustomPicker && isReminderAvailable ? (
+          <div className="pt-2">
+            <DateTimePickerTrigger
+              key={customPickerNonce}
+              label="Custom reminder time"
+              value={customReminderDate}
+              minDate={minReminderDate}
+              maxDate={maxReminderDate}
+              autoOpen
+              onChange={(selectedDate) => {
+                const boundedDate = selectedDate.isAfter(maxReminderDate)
+                  ? maxReminderDate
+                  : selectedDate.isBefore(minReminderDate)
+                    ? minReminderDate
+                    : selectedDate;
+                setCustomReminderDate(boundedDate);
+                const reminderDate = boundedDate.toDate();
+                const offsetMinutes = Math.max(0, Math.round((deadlineDate.getTime() - reminderDate.getTime()) / 60000));
+                onSelect(reminderDate, offsetMinutes);
+                setShowCustomPicker(false);
+                onClose();
+              }}
+            />
+          </div>
+        ) : null}
       </div>
       <button onClick={onClose} className="btn btn-outline w-full mt-4">Cancel</button>
     </div>
@@ -408,9 +460,17 @@ function ReminderPicker({ deadline, onSelect, onClose }: { deadline?: string; on
 function RemindersSection({ activityId, deadline }: { activityId: string; deadline?: string }) {
   const queryClient = useQueryClient();
   const [isPickerOpen, setIsPickerOpen] = useState(false);
-  const { data: remindersData, isLoading, error } = useQuery({ queryKey: ['reminders', 'activity', activityId], queryFn: () => reminderApi.getByActivity(activityId), enabled: !!activityId });
-  // Ensure reminders is always an array, even if API returns error object
-  const reminders = Array.isArray(remindersData) ? remindersData : [];
+  const isReminderAvailable = Boolean(deadline && new Date(deadline).getTime() > Date.now());
+  const { data: remindersData, isLoading, error } = useQuery({
+    queryKey: ['reminders', 'activity', activityId],
+    queryFn: () => reminderApi.getByActivity(activityId) as Promise<{ id: string; reminder_datetime: string }[] | { results: { id: string; reminder_datetime: string }[] }>,
+    enabled: !!activityId,
+    refetchInterval: 30000,
+  });
+  const reminders: { id: string; reminder_datetime: string }[] = Array.isArray(remindersData)
+    ? remindersData
+    : (remindersData?.results ?? []);
+  const upcomingReminders = reminders.filter((reminder) => new Date(reminder.reminder_datetime).getTime() > Date.now());
   const createMutation = useMutation({
     mutationFn: (data: { reminder_datetime: string; offset_minutes: number }) => reminderApi.create({ reminder_type: 'activity', activity_id: activityId, ...data }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['reminders', 'activity', activityId] }),
@@ -433,7 +493,13 @@ function RemindersSection({ activityId, deadline }: { activityId: string; deadli
         {deadline && (
           <Popover.Root open={isPickerOpen} onOpenChange={setIsPickerOpen}>
             <Popover.Trigger asChild>
-              <button className="btn btn-outline text-sm py-2 px-3"><Plus className="w-4 h-4 mr-1" />Add</button>
+              <button
+                className="btn btn-outline text-sm py-2 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!isReminderAvailable}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add
+              </button>
             </Popover.Trigger>
             <Popover.Portal>
               <Popover.Content className="z-50" side="bottom" align="end">
@@ -445,11 +511,17 @@ function RemindersSection({ activityId, deadline }: { activityId: string; deadli
       </div>
       {isLoading ? (
         <div className="py-4 text-center text-gray-500">Loading reminders...</div>
-      ) : reminders.length === 0 ? (
-        <p className="text-gray-500 text-sm">{deadline ? 'No reminders set. Add one to get notified before the deadline.' : 'No deadline set for this activity.'}</p>
+      ) : upcomingReminders.length === 0 ? (
+        <p className="text-gray-500 text-sm">
+          {deadline
+            ? isReminderAvailable
+              ? 'No reminders set. Add one to get notified before the deadline.'
+              : 'Deadline has passed. Reminders are no longer available.'
+            : 'No deadline set for this activity.'}
+        </p>
       ) : (
         <div className="space-y-2">
-          {reminders.map((reminder) => (
+          {upcomingReminders.map((reminder) => (
             <div key={reminder.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-gray-400" />
