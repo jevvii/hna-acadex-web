@@ -13,8 +13,8 @@ import { differenceInDays, differenceInHours } from 'date-fns';
 import dayjs, { Dayjs } from 'dayjs';
 import { useIsStudent, useIsTeacher } from '@/store/auth';
 import { cn, resolveFileUrl } from '@/lib/utils';
-import { activitiesApi, reminderApi } from '@/lib/api';
-import { Activity, Submission, SubmissionStatus } from '@/lib/types';
+import { activitiesApi, activityCommentsApi, reminderApi } from '@/lib/api';
+import { Activity, ActivityComment, Submission, SubmissionStatus } from '@/lib/types';
 import { CircularScore } from '@/components/CircularScore';
 import { DateTimePickerTrigger, DeadlinePickerTrigger } from '@/components/DeadlinePicker';
 import { logger } from '@/lib/logger';
@@ -41,6 +41,7 @@ import {
   MessageSquare,
   Upload,
   FileUp,
+  Send,
   X,
   Paperclip,
   Eye,
@@ -560,6 +561,163 @@ function StudentStatusBadge({ status, score, maxPoints = 100 }: { status: Submis
   return <span className={cn('px-3 py-1 rounded-full text-xs font-medium', config.className)}>{config.label}</span>;
 }
 
+function SubmissionCommentsPanel({
+  activityId,
+  submissionId,
+  studentId,
+  title = 'Private comments',
+  allowActivityThread = false,
+}: {
+  activityId: string;
+  submissionId?: string;
+  studentId?: string;
+  title?: string;
+  allowActivityThread?: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [draft, setDraft] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const hasScope = allowActivityThread || Boolean(submissionId || studentId);
+  const queryKey = ['activity-comments-thread', activityId, submissionId || `student:${studentId || 'activity'}`];
+  const canSend = allowActivityThread || Boolean(submissionId);
+
+  const { data: comments = [], isLoading } = useQuery({
+    queryKey,
+    queryFn: () => activityCommentsApi.getByActivity(
+      activityId,
+      submissionId || studentId ? { submissionId, studentId } : undefined
+    ),
+    enabled: !!activityId && hasScope,
+  });
+
+  const createCommentMutation = useMutation({
+    mutationFn: async ({ content, attachments }: { content?: string; attachments: File[] }) => {
+      const payload = {
+        activity_id: activityId,
+        submission_id: submissionId,
+        content,
+      };
+      if (attachments.length > 0) {
+        return activityCommentsApi.createWithFiles(payload, attachments);
+      }
+      return activityCommentsApi.create(payload);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = event.target.files ? Array.from(event.target.files) : [];
+    if (!selected.length) return;
+    setFiles((prev) => [...prev, ...selected]);
+    event.target.value = '';
+  };
+
+  const removeFile = (index: number) => setFiles((prev) => prev.filter((_, i) => i !== index));
+
+  const handleSubmit = () => {
+    const content = draft.trim();
+    if (!canSend || (!content && files.length === 0)) return;
+    const attachments = files;
+    setDraft('');
+    setFiles([]);
+    createCommentMutation.mutate({ content: content || undefined, attachments });
+  };
+
+  return (
+    <div className="mt-4 rounded-xl border border-gray-200 bg-slate-50 p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <MessageSquare className="h-4 w-4 text-navy-600" />
+        <h4 className="text-sm font-semibold text-navy-800">{title}</h4>
+      </div>
+
+      {!hasScope ? (
+        <p className="text-sm text-gray-500">Comments are not available for this context yet.</p>
+      ) : isLoading ? (
+        <div className="flex items-center gap-2 py-4 text-sm text-gray-500">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading comments...
+        </div>
+      ) : (
+        <>
+          <div className="max-h-64 space-y-3 overflow-y-auto pr-1">
+            {comments.length === 0 ? (
+              <p className="text-sm text-gray-500">No comments yet.</p>
+            ) : (
+              comments.map((comment: ActivityComment) => (
+                <div key={comment.id} className="rounded-lg border border-gray-200 bg-white p-3">
+                  <div className="mb-1 flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold text-navy-700">{comment.author_name}</p>
+                    <p className="text-[11px] text-gray-400">{formatDate(comment.created_at)}</p>
+                  </div>
+                  {comment.content ? <p className="text-sm text-gray-700 whitespace-pre-wrap">{comment.content}</p> : null}
+                  {comment.file_urls?.length ? (
+                    <div className="mt-2 space-y-1">
+                      {comment.file_urls.map((url, idx) => (
+                        <a
+                          key={`${comment.id}-file-${idx}`}
+                          href={resolveFileUrl(url)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-navy-600 hover:underline"
+                        >
+                          <Paperclip className="h-3 w-3" />
+                          {decodeURIComponent(url.split('/').pop()?.split('?')[0] || 'Attachment')}
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ))
+            )}
+          </div>
+
+          {canSend && (
+            <div className="mt-4 space-y-2">
+              {files.length > 0 && (
+                <div className="space-y-1">
+                  {files.map((file, index) => (
+                    <div key={`${file.name}-${index}`} className="flex items-center justify-between rounded bg-white px-2 py-1 text-xs text-gray-600">
+                      <span className="truncate pr-2">{file.name}</span>
+                      <button type="button" onClick={() => removeFile(index)} className="text-red-500 hover:text-red-600">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                rows={3}
+                placeholder="Write a private comment..."
+                className="w-full resize-none rounded-lg border border-gray-200 bg-white p-2 text-sm text-slate-900 outline-none focus:border-navy-500 focus:ring-1 focus:ring-navy-500"
+              />
+              <div className="flex items-center justify-between gap-2">
+                <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-600 hover:bg-gray-50">
+                  <Paperclip className="h-3.5 w-3.5" />
+                  Attach
+                  <input type="file" multiple className="hidden" onChange={handleFileSelect} />
+                </label>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={createCommentMutation.isPending || (!draft.trim() && files.length === 0)}
+                  className="inline-flex items-center gap-1 rounded bg-navy-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-navy-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {createCommentMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                  Send
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // Main page component
 export default function ActivityDetailsPage() {
   const params = useParams();
@@ -574,6 +732,7 @@ export default function ActivityDetailsPage() {
   const [inlineExamScores, setInlineExamScores] = useState<Record<string, string>>({});
   const [inlineExamErrors, setInlineExamErrors] = useState<Record<string, string>>({});
   const [inlineExamSavingStudentId, setInlineExamSavingStudentId] = useState<string | null>(null);
+  const [showActivityComments, setShowActivityComments] = useState(false);
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
@@ -1456,6 +1615,7 @@ export default function ActivityDetailsPage() {
                       </div>
                     </div>
                   )}
+
                 </motion.div>
               );
             })()}
@@ -1563,6 +1723,14 @@ export default function ActivityDetailsPage() {
                                     <p className="text-sm text-gray-600">{submission.feedback}</p>
                                   </div>
                                 )}
+
+                                <SubmissionCommentsPanel
+                                  activityId={activityId}
+                                  submissionId={submission.id || undefined}
+                                  studentId={submission.student_id}
+                                  title="Private student-teacher thread"
+                                />
+
                                 <div className="mt-4 flex gap-2">
                                   {activity.is_exam ? (
                                     <div className="w-full rounded-lg border border-purple-200 bg-purple-50 p-3">
@@ -1762,10 +1930,32 @@ export default function ActivityDetailsPage() {
                         );
                       })()
                     )}
+
+                    <button
+                      onClick={() => setShowActivityComments((prev) => !prev)}
+                      className="w-full btn btn-outline flex items-center justify-center gap-2"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      {showActivityComments ? 'Hide Comments' : 'Add Comment'}
+                    </button>
                   </>
                 )}
               </div>
             </motion.div>
+
+            {isStudent && showActivityComments && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+              >
+                <SubmissionCommentsPanel
+                  activityId={activityId}
+                  title="Private student-teacher thread"
+                  allowActivityThread
+                />
+              </motion.div>
+            )}
 
             {/* Submission Summary (Teacher) */}
             {isTeacher && submissions.length > 0 && (

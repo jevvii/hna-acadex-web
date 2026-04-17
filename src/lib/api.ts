@@ -547,6 +547,25 @@ export const activityCommentsApi = {
   }): Promise<ActivityComment> => {
     return api.post('/activity-comments/', data);
   },
+  createWithFiles: async (
+    data: {
+      activity_id: string;
+      content?: string;
+      submission_id?: string;
+      parent_id?: string;
+      file_urls?: string[];
+    },
+    files: File[]
+  ): Promise<ActivityComment> => {
+    const formData = new FormData();
+    formData.append('activity_id', data.activity_id);
+    if (data.content) formData.append('content', data.content);
+    if (data.submission_id) formData.append('submission_id', data.submission_id);
+    if (data.parent_id) formData.append('parent_id', data.parent_id);
+    if (data.file_urls?.length) formData.append('file_urls', JSON.stringify(data.file_urls));
+    files.forEach((file) => formData.append('files', file));
+    return api.postForm('/activity-comments/', formData);
+  },
   update: async (commentId: string, data: Partial<ActivityComment>): Promise<ActivityComment> => {
     return api.patch(`/activity-comments/${commentId}/`, data);
   },
