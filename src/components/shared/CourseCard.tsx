@@ -18,7 +18,7 @@ interface TeacherCourseCardProps {
   index: number;
 }
 
-type CardBadgeVariant = 'excellent' | 'good' | 'average' | 'pending';
+type CardBadgeVariant = 'excellent' | 'good' | 'average' | 'low' | 'pending';
 
 const CARD_OVERLAY = 'linear-gradient(to top, rgba(15, 33, 71, 0.95) 0%, rgba(15, 33, 71, 0.7) 50%, rgba(26, 58, 107, 0.3) 100%)';
 
@@ -84,29 +84,38 @@ function getBadgeStyles(variant: CardBadgeVariant): string {
   if (variant === 'average') {
     return 'bg-[rgba(245,158,11,0.2)] text-[#fcd34d] border border-[rgba(245,158,11,0.3)]';
   }
+  if (variant === 'low') {
+    return 'bg-[rgba(239,68,68,0.2)] text-[#fca5a5] border border-[rgba(239,68,68,0.35)]';
+  }
   return 'bg-[rgba(255,255,255,0.15)] text-white/80 border border-[rgba(255,255,255,0.2)]';
 }
 
 function getStudentBadge(course: StudentCourse): { text: string; variant: CardBadgeVariant } {
-  if (typeof course.final_grade === 'number') {
-    const rounded = Math.round(course.final_grade);
-    const letter = course.final_grade_letter ? ` ${course.final_grade_letter}` : '';
-    if (rounded >= 90) return { text: `${rounded}%${letter}`, variant: 'excellent' };
-    if (rounded >= 85) return { text: `${rounded}%${letter}`, variant: 'good' };
-    if (rounded >= 75) return { text: `${rounded}%${letter}`, variant: 'average' };
-    return { text: `${rounded}%${letter}`, variant: 'pending' };
-  }
-
   const summary = course.grade_summary;
-  if (!summary || summary.total_items_count === 0) {
+  const hasNoGradeableItems = summary?.has_no_gradeable_items ?? false;
+  const hasReleasedGrades = summary?.has_released_grades ?? false;
+  const hasPending = summary?.has_pending ?? false;
+
+  if (hasNoGradeableItems) {
+    return { text: 'No Grades', variant: 'pending' };
+  }
+  if (!hasReleasedGrades && !hasPending) {
+    return { text: 'No Grades Yet', variant: 'pending' };
+  }
+  if (!hasReleasedGrades && hasPending) {
     return { text: 'Pending', variant: 'pending' };
   }
 
-  const progress = Math.round((summary.graded_items_count / Math.max(summary.total_items_count, 1)) * 100);
-  if (progress >= 90) return { text: `${progress}% Ready`, variant: 'excellent' };
-  if (progress >= 75) return { text: `${progress}% Ready`, variant: 'good' };
-  if (progress > 0) return { text: `${progress}% Ready`, variant: 'average' };
-  return { text: 'Pending', variant: 'pending' };
+  if (typeof course.final_grade !== 'number') {
+    return { text: 'Released', variant: 'good' };
+  }
+
+  const displayGrade = Math.round(Math.min(Math.max(course.final_grade, 0), 100));
+  const letter = course.final_grade_letter ? ` ${course.final_grade_letter}` : '';
+  if (displayGrade >= 90) return { text: `${displayGrade}%${letter}`, variant: 'excellent' };
+  if (displayGrade >= 75) return { text: `${displayGrade}%${letter}`, variant: 'good' };
+  if (displayGrade >= 50) return { text: `${displayGrade}%${letter}`, variant: 'average' };
+  return { text: `${displayGrade}%${letter}`, variant: 'low' };
 }
 
 function getStudentSecondaryMeta(course: StudentCourse): string {

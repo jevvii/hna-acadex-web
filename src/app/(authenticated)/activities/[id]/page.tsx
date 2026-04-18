@@ -90,6 +90,23 @@ function getTimeStatus(dueDate?: string): { text: string; color: string; urgent:
   return { text: `Due in ${daysLeft} days`, color: 'text-emerald-600', urgent: false };
 }
 
+function hasMeaningfulContent(value?: string | null): boolean {
+  if (!value) return false;
+  return value
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim().length > 0;
+}
+
+function resolveInstructionPrefill(...values: Array<string | null | undefined>): string {
+  for (const value of values) {
+    if (hasMeaningfulContent(value)) return value || '';
+  }
+  const fallback = values.find((value): value is string => typeof value === 'string');
+  return fallback || '';
+}
+
 // PDF Preview Component - Fetches PDF with auth and displays via blob URL
 function PdfPreview({ url, fileName }: { url: string; fileName: string }) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
@@ -879,11 +896,12 @@ export default function ActivityDetailsPage() {
   // Initialize edit form when entering edit mode
   const enterEditMode = useCallback(() => {
     if (!activity) return;
+    const instructionPrefill = resolveInstructionPrefill(activity.instructions, activity.description);
 
     // Initialize form state with activity data
     setEditForm({
       title: activity.title || '',
-      instructions: activity.instructions || '',
+      instructions: instructionPrefill,
       points: activity.points ?? 100,
       attempt_limit: activity.attempt_limit ?? 1,
       deadline: activity.deadline ? dayjs(activity.deadline) : null,
@@ -899,7 +917,7 @@ export default function ActivityDetailsPage() {
 
     // Initialize Tiptap editor content
     if (editor) {
-      editor.commands.setContent(activity.instructions || '');
+      editor.commands.setContent(instructionPrefill);
     }
 
     setEditError('');

@@ -106,6 +106,23 @@ function ErrorState({ message, onRetry }: { message: string; onRetry?: () => voi
   );
 }
 
+function hasMeaningfulContent(value?: string | null): boolean {
+  if (!value) return false;
+  return value
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim().length > 0;
+}
+
+function resolveInstructionPrefill(...values: Array<string | null | undefined>): string {
+  for (const value of values) {
+    if (hasMeaningfulContent(value)) return value || '';
+  }
+  const fallback = values.find((value): value is string => typeof value === 'string');
+  return fallback || '';
+}
+
 // Reminder presets
 const REMINDER_PRESETS = [
   { label: '5 minutes before', offsetMinutes: 5 },
@@ -532,10 +549,11 @@ export default function QuizDetailsPage() {
   // Initialize edit form when entering edit mode
   const enterEditMode = useCallback(() => {
     if (!quiz) return;
+    const instructionPrefill = resolveInstructionPrefill(quiz.instructions, (quiz as { description?: string | null }).description);
 
     setEditForm({
       title: quiz.title || '',
-      instructions: quiz.instructions || '',
+      instructions: instructionPrefill,
       time_limit_minutes: quiz.time_limit_minutes ?? null,
       attempt_limit: quiz.attempt_limit ?? 1,
       score_selection_policy: (quiz.score_selection_policy as 'highest' | 'latest') || 'highest',
@@ -545,7 +563,7 @@ export default function QuizDetailsPage() {
 
     // Initialize Tiptap editor content
     if (editor) {
-      editor.commands.setContent(quiz.instructions || '');
+      editor.commands.setContent(instructionPrefill);
     }
 
     setEditError('');
@@ -603,7 +621,7 @@ export default function QuizDetailsPage() {
   // Sync editor content when entering edit mode
   useEffect(() => {
     if (isEditing && quiz && editor) {
-      editor.commands.setContent(quiz.instructions || '');
+      editor.commands.setContent(resolveInstructionPrefill(quiz.instructions, (quiz as { description?: string | null }).description));
     }
   }, [isEditing, quiz, editor]);
 
