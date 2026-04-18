@@ -160,6 +160,9 @@ export interface StudentCourse {
   grade_level: GradeLevel;
   final_grade?: number;
   final_grade_letter?: string;
+  current_computed_grade?: number;
+  computed_final_grade?: number;
+  current_grade?: number;
   grade_overridden?: boolean;
   teacher_name?: string;
   course_tag: string;

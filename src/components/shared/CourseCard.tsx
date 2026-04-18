@@ -91,6 +91,23 @@ function getBadgeStyles(variant: CardBadgeVariant): string {
 }
 
 function getStudentBadge(course: StudentCourse): { text: string; variant: CardBadgeVariant } {
+  const numericCandidates = [
+    course.final_grade,
+    course.current_computed_grade,
+    course.computed_final_grade,
+    course.current_grade,
+  ];
+  const currentNumericGrade =
+    numericCandidates.find((value): value is number => typeof value === 'number' && Number.isFinite(value)) ?? null;
+  if (currentNumericGrade !== null) {
+    const displayGrade = Math.round(Math.min(Math.max(currentNumericGrade, 0), 100));
+    const letter = course.final_grade_letter ? ` ${course.final_grade_letter}` : '';
+    if (displayGrade >= 90) return { text: `${displayGrade}%${letter}`, variant: 'excellent' };
+    if (displayGrade >= 75) return { text: `${displayGrade}%${letter}`, variant: 'good' };
+    if (displayGrade >= 50) return { text: `${displayGrade}%${letter}`, variant: 'average' };
+    return { text: `${displayGrade}%${letter}`, variant: 'low' };
+  }
+
   const summary = course.grade_summary;
   const hasNoGradeableItems = summary?.has_no_gradeable_items ?? false;
   const hasReleasedGrades = summary?.has_released_grades ?? false;
@@ -106,16 +123,7 @@ function getStudentBadge(course: StudentCourse): { text: string; variant: CardBa
     return { text: 'Pending', variant: 'pending' };
   }
 
-  if (typeof course.final_grade !== 'number') {
-    return { text: 'Released', variant: 'good' };
-  }
-
-  const displayGrade = Math.round(Math.min(Math.max(course.final_grade, 0), 100));
-  const letter = course.final_grade_letter ? ` ${course.final_grade_letter}` : '';
-  if (displayGrade >= 90) return { text: `${displayGrade}%${letter}`, variant: 'excellent' };
-  if (displayGrade >= 75) return { text: `${displayGrade}%${letter}`, variant: 'good' };
-  if (displayGrade >= 50) return { text: `${displayGrade}%${letter}`, variant: 'average' };
-  return { text: `${displayGrade}%${letter}`, variant: 'low' };
+  return { text: 'Released', variant: 'good' };
 }
 
 function getStudentSecondaryMeta(course: StudentCourse): string {
