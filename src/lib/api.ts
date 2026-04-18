@@ -65,6 +65,32 @@ type RequestOptions = {
   isFormData?: boolean;
 };
 
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function refreshSession(): Promise<boolean> {
+  if (refreshInFlight) {
+    return refreshInFlight;
+  }
+
+  refreshInFlight = (async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({}),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
 async function request(path: string, options: RequestOptions = {}, retry = true) {
   const { method = 'GET', body, auth = true, isFormData = false } = options;
   const headers: Record<string, string> = {};
@@ -87,14 +113,16 @@ async function request(path: string, options: RequestOptions = {}, retry = true)
   });
 
   if (res.status === 401 && auth) {
-    // Check if user had a session before (via persisted auth state or cookies)
-    // If not authenticated, this is just "not logged in" not "session expired"
+    // Check if user had a session before.
+    // HttpOnly cookies are not readable from JS, so use persisted auth state as the signal.
     const hadSession = typeof window !== 'undefined' &&
-      (document.cookie.includes('access_token') ||
-       localStorage.getItem('auth-storage'));
+      (sessionStorage.getItem('auth-storage') || localStorage.getItem('auth-storage'));
 
     if (hadSession && retry) {
-      // User WAS logged in but session expired
+      const refreshed = await refreshSession();
+      if (refreshed) {
+        return request(path, options, false);
+      }
       throw new ApiError('Session expired. Please sign in again.', 401, null);
     }
     // User was never logged in - return null silently (caller should handle)

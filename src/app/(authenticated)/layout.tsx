@@ -30,7 +30,7 @@ export default function AuthenticatedLayout({
       // Check if there's evidence of a previous session before calling fetchProfile
       // This prevents unnecessary API calls and console errors for users who were never logged in
       const hasSessionCookie = document.cookie.includes('access_token');
-      const hasPersistedAuth = localStorage.getItem('auth-storage');
+      const hasPersistedAuth = sessionStorage.getItem('auth-storage') || localStorage.getItem('auth-storage');
       const hadSession = hasSessionCookie || hasPersistedAuth;
 
       if (hadSession) {
