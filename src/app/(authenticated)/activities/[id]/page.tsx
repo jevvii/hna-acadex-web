@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -579,7 +579,7 @@ function SubmissionCommentsPanel({
   const [files, setFiles] = useState<File[]>([]);
   const hasScope = allowActivityThread || Boolean(submissionId || studentId);
   const queryKey = ['activity-comments-thread', activityId, submissionId || `student:${studentId || 'activity'}`];
-  const canSend = allowActivityThread || Boolean(submissionId);
+  const canSend = allowActivityThread || Boolean(submissionId || studentId);
 
   const { data: comments = [], isLoading } = useQuery({
     queryKey,
@@ -595,6 +595,7 @@ function SubmissionCommentsPanel({
       const payload = {
         activity_id: activityId,
         submission_id: submissionId,
+        student_id: !submissionId && studentId ? studentId : undefined,
         content,
       };
       if (attachments.length > 0) {
@@ -722,17 +723,22 @@ function SubmissionCommentsPanel({
 export default function ActivityDetailsPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const activityId = params.id as string;
   const queryClient = useQueryClient();
   const isStudent = useIsStudent();
   const isTeacher = useIsTeacher();
+  const openCommentThread = searchParams.get('open_comment_thread') === '1';
+  const threadStudentId = searchParams.get('thread_student_id');
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
-  const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
+  const [expandedStudentId, setExpandedStudentId] = useState<string | null>(() => (
+    openCommentThread && threadStudentId ? threadStudentId : null
+  ));
   const [selectedAttemptIndex, setSelectedAttemptIndex] = useState<number>(0);
   const [inlineExamScores, setInlineExamScores] = useState<Record<string, string>>({});
   const [inlineExamErrors, setInlineExamErrors] = useState<Record<string, string>>({});
   const [inlineExamSavingStudentId, setInlineExamSavingStudentId] = useState<string | null>(null);
-  const [showActivityComments, setShowActivityComments] = useState(false);
+  const [showActivityComments, setShowActivityComments] = useState<boolean>(() => openCommentThread && isStudent);
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
@@ -1634,6 +1640,7 @@ export default function ActivityDetailsPage() {
                 <div className="divide-y divide-gray-100">
                   {(submissions as SubmissionWithStudent[]).map((submission, index) => {
                     const isExpanded = expandedStudentId === submission.student_id;
+                    const canOpenGradePage = Boolean(submission.id && submission.student_id);
                     // Use fallback key if id is null/undefined - prefer student_id as secondary key
                     const itemKey = submission.id ?? submission.student_id ?? `submission-${index}`;
                     return (
@@ -1782,8 +1789,21 @@ export default function ActivityDetailsPage() {
                                       )}
                                     </div>
                                   ) : (
-                                    <button onClick={() => router.push(`/activities/${activityId}/grade/${submission.student_id}`)} className="btn btn-primary text-sm flex-1">
-                                      <Edit3 className="w-4 h-4 mr-1" /> {submission.graded_at ? 'Update Grade' : 'Grade Submission'}
+                                    <button
+                                      onClick={() => {
+                                        if (!canOpenGradePage) return;
+                                        router.push(`/activities/${activityId}/grade/${submission.student_id}`);
+                                      }}
+                                      disabled={!canOpenGradePage}
+                                      className={cn(
+                                        'btn text-sm flex-1',
+                                        canOpenGradePage ? 'btn-primary' : 'btn-outline cursor-not-allowed opacity-70'
+                                      )}
+                                    >
+                                      <Edit3 className="w-4 h-4 mr-1" />
+                                      {canOpenGradePage
+                                        ? (submission.graded_at ? 'Update Grade' : 'Grade Submission')
+                                        : 'No Submission Yet'}
                                     </button>
                                   )}
                                 </div>

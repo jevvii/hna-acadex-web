@@ -542,6 +542,7 @@ export const activityCommentsApi = {
     activity_id: string;
     content?: string;
     submission_id?: string;
+    student_id?: string;
     parent_id?: string;
     file_urls?: string[];
   }): Promise<ActivityComment> => {
@@ -552,6 +553,7 @@ export const activityCommentsApi = {
       activity_id: string;
       content?: string;
       submission_id?: string;
+      student_id?: string;
       parent_id?: string;
       file_urls?: string[];
     },
@@ -561,6 +563,7 @@ export const activityCommentsApi = {
     formData.append('activity_id', data.activity_id);
     if (data.content) formData.append('content', data.content);
     if (data.submission_id) formData.append('submission_id', data.submission_id);
+    if (data.student_id) formData.append('student_id', data.student_id);
     if (data.parent_id) formData.append('parent_id', data.parent_id);
     if (data.file_urls?.length) formData.append('file_urls', JSON.stringify(data.file_urls));
     files.forEach((file) => formData.append('files', file));

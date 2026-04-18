@@ -38,6 +38,27 @@ const notificationColors: Record<NotificationType, string> = {
   system: 'bg-gray-100 text-gray-700',
 };
 
+const THREAD_META_REGEX = /\[thread_meta\]([\s\S]*?)\[\/thread_meta\]/;
+
+type ThreadMeta = {
+  kind?: string;
+  thread_student_id?: string;
+};
+
+function parseThreadMeta(body?: string): { cleanBody: string; meta: ThreadMeta | null } {
+  if (!body) return { cleanBody: '', meta: null };
+  const match = body.match(THREAD_META_REGEX);
+  if (!match) return { cleanBody: body, meta: null };
+  let meta: ThreadMeta | null = null;
+  try {
+    meta = JSON.parse(match[1]) as ThreadMeta;
+  } catch {
+    meta = null;
+  }
+  const cleanBody = body.replace(THREAD_META_REGEX, '').trim();
+  return { cleanBody, meta };
+}
+
 function formatNotificationTime(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
@@ -117,6 +138,14 @@ export default function NotificationsPage() {
   };
 
   const getNotificationDestination = (notification: UserNotification): string | null => {
+    const { meta } = parseThreadMeta(notification.body);
+    if (notification.activity_id && meta?.kind === 'activity_comment') {
+      const params = new URLSearchParams({ open_comment_thread: '1' });
+      if (meta.thread_student_id) {
+        params.set('thread_student_id', meta.thread_student_id);
+      }
+      return `/activities/${notification.activity_id}?${params.toString()}`;
+    }
     if (notification.type === 'new_activity' && notification.activity_id) {
       return `/activities/${notification.activity_id}`;
     }
@@ -264,93 +293,96 @@ export default function NotificationsPage() {
         className="space-y-3"
       >
         <AnimatePresence initial={false} mode="sync">
-          {filteredNotifications?.map((notification) => (
-            <motion.div
-              key={notification.id}
-              layout="position"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-              className={cn(
-                'bg-white rounded-xl shadow-card p-4 flex items-start gap-4 group',
-                'transition-colors',
-                'cursor-pointer hover:bg-slate-50',
-                !notification.is_read && 'border-l-4 border-l-navy-500'
-              )}
-              onClick={() => handleNotificationClick(notification)}
-            >
-              <div
+          {filteredNotifications?.map((notification) => {
+            const { cleanBody } = parseThreadMeta(notification.body);
+            return (
+              <motion.div
+                key={notification.id}
+                layout="position"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
                 className={cn(
-                  'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
-                  notificationColors[notification.type]
+                  'bg-white rounded-xl shadow-card p-4 flex items-start gap-4 group',
+                  'transition-colors',
+                  'cursor-pointer hover:bg-slate-50',
+                  !notification.is_read && 'border-l-4 border-l-navy-500'
                 )}
+                onClick={() => handleNotificationClick(notification)}
               >
-                {notificationIcons[notification.type]}
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <h3
-                    className={cn(
-                      'font-medium text-navy-800',
-                      !notification.is_read && 'font-semibold'
-                    )}
-                  >
-                    {notification.title}
-                  </h3>
-                  <span className="text-xs text-gray-400 flex-shrink-0">
-                    {formatNotificationTime(notification.created_at)}
-                  </span>
+                <div
+                  className={cn(
+                    'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
+                    notificationColors[notification.type]
+                  )}
+                >
+                  {notificationIcons[notification.type]}
                 </div>
-                {notification.body && (
-                  <p className={cn(
-                    'text-sm mt-1',
-                    notification.is_read ? 'text-gray-500' : 'text-gray-600'
-                  )}>
-                    {isExpandableNotification(notification)
-                      && !expandedAnnouncementIds.has(notification.id)
-                      && notification.body.length > 200
-                      ? `${notification.body.slice(0, 200)}...`
-                      : notification.body}
-                  </p>
-                )}
-                {isExpandableNotification(notification)
-                  && notification.body && (
-                    <p className="text-xs text-navy-600 mt-2">
-                      {expandedAnnouncementIds.has(notification.id) ? 'Click to collapse' : 'Click to expand'}
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3
+                      className={cn(
+                        'font-medium text-navy-800',
+                        !notification.is_read && 'font-semibold'
+                      )}
+                    >
+                      {notification.title}
+                    </h3>
+                    <span className="text-xs text-gray-400 flex-shrink-0">
+                      {formatNotificationTime(notification.created_at)}
+                    </span>
+                  </div>
+                  {cleanBody && (
+                    <p className={cn(
+                      'text-sm mt-1',
+                      notification.is_read ? 'text-gray-500' : 'text-gray-600'
+                    )}>
+                      {isExpandableNotification(notification)
+                        && !expandedAnnouncementIds.has(notification.id)
+                        && cleanBody.length > 200
+                        ? `${cleanBody.slice(0, 200)}...`
+                        : cleanBody}
                     </p>
                   )}
-              </div>
+                  {isExpandableNotification(notification)
+                    && cleanBody && (
+                      <p className="text-xs text-navy-600 mt-2">
+                        {expandedAnnouncementIds.has(notification.id) ? 'Click to collapse' : 'Click to expand'}
+                      </p>
+                    )}
+                </div>
 
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                {!notification.is_read && (
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {!notification.is_read && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMarkAsRead(notification.id);
+                      }}
+                      disabled={markAsReadMutation.isPending}
+                      className="p-2 text-gray-400 hover:text-green-500 transition-colors"
+                      title="Mark as read"
+                    >
+                      <CheckCircle2 className="w-5 h-5" />
+                    </button>
+                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleMarkAsRead(notification.id);
+                      handleDelete(notification.id);
                     }}
-                    disabled={markAsReadMutation.isPending}
-                    className="p-2 text-gray-400 hover:text-green-500 transition-colors"
-                    title="Mark as read"
+                    disabled={deleteMutation.isPending}
+                    className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                    title="Delete"
                   >
-                    <CheckCircle2 className="w-5 h-5" />
+                    <Trash2 className="w-5 h-5" />
                   </button>
-                )}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(notification.id);
-                  }}
-                  disabled={deleteMutation.isPending}
-                  className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                  title="Delete"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </div>
-            </motion.div>
-          ))}
+                </div>
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
 
         {filteredNotifications?.length === 0 && (
