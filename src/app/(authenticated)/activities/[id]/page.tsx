@@ -12,6 +12,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { differenceInDays, differenceInHours } from 'date-fns';
 import dayjs, { Dayjs } from 'dayjs';
 import { useIsStudent, useIsTeacher } from '@/store/auth';
+import { useAuthStore } from '@/store/auth';
 import { cn, resolveFileUrl } from '@/lib/utils';
 import { activitiesApi, activityCommentsApi, reminderApi } from '@/lib/api';
 import { Activity, ActivityComment, Submission, SubmissionStatus } from '@/lib/types';
@@ -575,6 +576,7 @@ function SubmissionCommentsPanel({
   allowActivityThread?: boolean;
 }) {
   const queryClient = useQueryClient();
+  const currentUserId = useAuthStore((state) => state.user?.id);
   const [draft, setDraft] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const hasScope = allowActivityThread || Boolean(submissionId || studentId);
@@ -646,13 +648,31 @@ function SubmissionCommentsPanel({
             {comments.length === 0 ? (
               <p className="text-sm text-gray-500">No comments yet.</p>
             ) : (
-              comments.map((comment: ActivityComment) => (
-                <div key={comment.id} className="rounded-lg border border-gray-200 bg-white p-3">
+              comments.map((comment: ActivityComment) => {
+                const isOwnMessage = Boolean(currentUserId && comment.author_id === currentUserId);
+                return (
+                <div key={comment.id} className={cn('flex', isOwnMessage ? 'justify-end' : 'justify-start')}>
+                  <div
+                    className={cn(
+                      'max-w-[88%] rounded-lg border p-3',
+                      isOwnMessage
+                        ? 'border-navy-200 bg-navy-600 text-white'
+                        : 'border-gray-200 bg-white text-gray-900'
+                    )}
+                  >
                   <div className="mb-1 flex items-center justify-between gap-3">
-                    <p className="text-xs font-semibold text-navy-700">{comment.author_name}</p>
-                    <p className="text-[11px] text-gray-400">{formatDate(comment.created_at)}</p>
+                    <p className={cn('text-xs font-semibold', isOwnMessage ? 'text-white/90' : 'text-navy-700')}>
+                      {isOwnMessage ? 'You' : comment.author_name}
+                    </p>
+                    <p className={cn('text-[11px]', isOwnMessage ? 'text-white/70' : 'text-gray-400')}>
+                      {formatDate(comment.created_at)}
+                    </p>
                   </div>
-                  {comment.content ? <p className="text-sm text-gray-700 whitespace-pre-wrap">{comment.content}</p> : null}
+                  {comment.content ? (
+                    <p className={cn('text-sm whitespace-pre-wrap', isOwnMessage ? 'text-white' : 'text-gray-700')}>
+                      {comment.content}
+                    </p>
+                  ) : null}
                   {comment.file_urls?.length ? (
                     <div className="mt-2 space-y-1">
                       {comment.file_urls.map((url, idx) => (
@@ -661,7 +681,10 @@ function SubmissionCommentsPanel({
                           href={resolveFileUrl(url)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-xs text-navy-600 hover:underline"
+                          className={cn(
+                            'flex items-center gap-1 text-xs hover:underline',
+                            isOwnMessage ? 'text-white/90' : 'text-navy-600'
+                          )}
                         >
                           <Paperclip className="h-3 w-3" />
                           {decodeURIComponent(url.split('/').pop()?.split('?')[0] || 'Attachment')}
@@ -670,7 +693,9 @@ function SubmissionCommentsPanel({
                     </div>
                   ) : null}
                 </div>
-              ))
+                </div>
+                );
+              })
             )}
           </div>
 
