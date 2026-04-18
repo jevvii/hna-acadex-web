@@ -43,21 +43,6 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * Get CSRF token from meta tag for state-changing requests
- */
-function getCsrfToken(): string | null {
-  if (typeof document === 'undefined') return null;
-  return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || null;
-}
-
-/**
- * Check if the request is a state-changing method
- */
-function isStateChangingMethod(method: string): boolean {
-  return ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase());
-}
-
 type RequestOptions = {
   method?: string;
   body?: unknown;
@@ -94,14 +79,6 @@ async function refreshSession(): Promise<boolean> {
 async function request(path: string, options: RequestOptions = {}, retry = true) {
   const { method = 'GET', body, auth = true, isFormData = false } = options;
   const headers: Record<string, string> = {};
-
-  // Add CSRF token for state-changing requests
-  if (isStateChangingMethod(method)) {
-    const csrfToken = getCsrfToken();
-    if (csrfToken) {
-      headers['X-CSRF-Token'] = csrfToken;
-    }
-  }
 
   if (!isFormData) headers['Content-Type'] = 'application/json';
 

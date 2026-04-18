@@ -7,7 +7,7 @@ export function middleware(request: NextRequest) {
   const isAuthenticated = !!accessToken
 
   // Protected routes that require authentication
-  const protectedPaths = ['/courses', '/activities', '/quizzes', '/calendar', '/todos', '/notifications', '/settings']
+  const protectedPaths = ['/courses', '/activities', '/quizzes', '/calendar', '/todos', '/notifications', '/settings', '/report-card', '/advisory']
   const isProtectedPath = protectedPaths.some(path =>
     request.nextUrl.pathname.startsWith(path)
   )

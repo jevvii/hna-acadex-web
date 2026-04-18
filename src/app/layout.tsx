@@ -28,8 +28,6 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <meta httpEquiv="Content-Security-Policy" content={cspContent} />
-        {/* CSRF token meta tag for API requests */}
-        <meta name="csrf-token" content="" />
       </head>
       <body className="antialiased">
         <Providers>

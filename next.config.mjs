@@ -12,6 +12,7 @@ const nextConfig = {
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'api.hna-acadex.com' },
+      { protocol: 'https', hostname: 'res.cloudinary.com' },
     ],
   },
   // Silence turbopack workspace root warning
@@ -140,6 +141,10 @@ const nextConfig = {
           {
             key: 'Content-Security-Policy',
             value: "frame-ancestors 'none';",
+          },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
           },
         ],
       },
