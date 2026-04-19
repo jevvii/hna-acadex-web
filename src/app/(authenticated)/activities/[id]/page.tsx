@@ -121,8 +121,12 @@ function PdfPreview({ url, fileName }: { url: string; fileName: string }) {
         setIsLoading(true);
         setHasError(false);
 
+        // Pre-signed URLs (like Storj) shouldn't use credentials: 'include' 
+        // as it causes CORS errors when the server doesn't echo the Origin header.
+        const isExternalUrl = url.startsWith('http') && !url.includes(window.location.host);
+        
         const response = await fetch(url, {
-          credentials: 'include',
+          credentials: isExternalUrl ? 'omit' : 'include',
           headers: {
             'Accept': 'application/pdf,*/*',
           },
@@ -1576,9 +1580,10 @@ export default function ActivityDetailsPage() {
                         const resolvedUrl = resolveFileUrl(url);
                         const fileName = url.split('/').pop()?.split('?')[0] || `File ${index + 1}`;
                         const decodedName = decodeURIComponent(fileName);
-                        const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url);
-                        const isPdf = /\.pdf$/i.test(url);
-                        const isDocx = /\.docx?$/i.test(url);
+                        const urlWithoutQuery = url.split('?')[0];
+                        const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(urlWithoutQuery);
+                        const isPdf = /\.pdf$/i.test(urlWithoutQuery);
+                        const isDocx = /\.docx?$/i.test(urlWithoutQuery);
 
                         return (
                           <div key={index} className="border border-gray-200 rounded-xl overflow-hidden bg-gray-50/50">
