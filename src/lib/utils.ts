@@ -28,6 +28,9 @@ export function resolveFileUrl(rawUrl: string | undefined | null): string {
  * Convert an absolute media URL to a relative path for the Next.js proxy
  * This allows media files to be fetched through the proxy, avoiding CSP issues
  * when the backend is accessed via different IPs (localhost vs LAN IP)
+ *
+ * Cloudinary URLs are returned as-is — upload-type resources are publicly
+ * accessible and don't need proxying.
  */
 export function toMediaProxyUrl(fileUrl: string | undefined | null): string {
   if (!fileUrl) return '';
@@ -38,14 +41,14 @@ export function toMediaProxyUrl(fileUrl: string | undefined | null): string {
 
   // Absolute URL - extract the path portion for /media/ files
   if (/^https?:\/\//i.test(fileUrl)) {
-    // Match /media/ or /course_files/ or similar media paths
+    // Direct backend URL: extract /media/ or /course_files/ path
     const mediaMatch = fileUrl.match(/^https?:\/\/[^/]+(\/(?:media|course_files)\/.*)$/i);
     if (mediaMatch) {
       return mediaMatch[1];
     }
   }
 
-  // Fallback - return as-is
+  // Fallback - return as-is (includes Cloudinary URLs which are publicly accessible)
   return fileUrl;
 }
 
