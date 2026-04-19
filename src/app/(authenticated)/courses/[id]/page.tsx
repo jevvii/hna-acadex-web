@@ -10,7 +10,7 @@ import { useCoursesStore } from '@/store/courses';
 import { useIsStudent, useIsTeacher, useAuthStore } from '@/store/auth';
 import { CreateActivityModal } from '@/components/modals/CreateActivityModal';
 import { CreateQuizModal } from '@/components/modals/CreateQuizModal';
-import { cn, getInitials, toMediaProxyUrl } from '@/lib/utils';
+import { cn, getInitials, resolveFileUrl, toMediaProxyUrl } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import {
   coursesApi,
@@ -2677,7 +2677,7 @@ function AttendanceTab({ courseId }: { courseId: string }) {
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-navy-500 to-green-600 flex items-center justify-center text-white font-semibold shrink-0">
                     {student.avatar_url ? (
                       <img
-                        src={student.avatar_url}
+                        src={resolveFileUrl(student.avatar_url)}
                         alt={student.student_name}
                         className="w-10 h-10 rounded-full object-cover"
                       />

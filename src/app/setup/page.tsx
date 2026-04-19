@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { useAuthStore } from '@/store/auth';
 import { authApi } from '@/lib/api';
 import { Camera, Upload, CheckCircle, Eye, EyeOff, ArrowRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, resolveFileUrl } from '@/lib/utils';
 
 export default function AccountSetupPage() {
   const router = useRouter();
@@ -14,7 +14,7 @@ export default function AccountSetupPage() {
   const setUser = useAuthStore((state) => state.setUser);
 
   const [step, setStep] = useState<'photo' | 'password'>(user?.avatar_url ? 'password' : 'photo');
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.avatar_url || null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(resolveFileUrl(user?.avatar_url) || null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
 
   const [newPassword, setNewPassword] = useState('');

@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { Layers, User, Users } from 'lucide-react';
 import { COURSE_FALLBACK_BACKGROUNDS, COURSE_OVERLAY_PRESETS } from '@/lib/constants';
 import { StudentCourse, TeacherCourse } from '@/lib/types';
+import { resolveFileUrl } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
 
 interface StudentCourseCardProps {
@@ -52,11 +53,12 @@ function getCardBackgroundLayers(coverImageUrl: string | undefined, gradient: st
   baseStyle: CSSProperties;
   tintStyle: CSSProperties | null;
 } {
-  const hasCoverImage = Boolean(coverImageUrl?.trim());
+  const resolvedCoverImageUrl = resolveFileUrl(coverImageUrl);
+  const hasCoverImage = Boolean(resolvedCoverImageUrl.trim());
   return {
     baseStyle: hasCoverImage
       ? {
-          backgroundImage: `url("${coverImageUrl}")`,
+          backgroundImage: `url("${resolvedCoverImageUrl}")`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',

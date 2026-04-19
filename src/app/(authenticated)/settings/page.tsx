@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Camera, Loader2, Lock, Mail, User, BadgeCheck } from 'lucide-react';
 import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
-import { cn, getInitials } from '@/lib/utils';
+import { cn, getInitials, resolveFileUrl } from '@/lib/utils';
 
 export default function SettingsPage() {
   const user = useAuthStore((state) => state.user);
@@ -77,7 +77,7 @@ export default function SettingsPage() {
               <div className="w-28 h-28 rounded-full overflow-hidden bg-navy-50 border-4 border-navy-100">
                 {user?.avatar_url ? (
                   <img
-                    src={user.avatar_url}
+                    src={resolveFileUrl(user.avatar_url)}
                     alt={user.full_name || 'Profile'}
                     className="w-full h-full object-cover"
                   />
