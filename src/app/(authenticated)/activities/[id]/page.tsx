@@ -1722,8 +1722,9 @@ export default function ActivityDetailsPage() {
                                       const resolvedUrl = resolveFileUrl(url);
                                       const fileName = url.split('/').pop()?.split('?')[0] || `File ${index + 1}`;
                                       const decodedName = decodeURIComponent(fileName);
-                                      const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
-                                      const isPdf = /\.pdf$/i.test(url);
+                                      const urlWithoutQuery = url.split('?')[0];
+                                      const isImage = /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(urlWithoutQuery);
+                                      const isPdf = /\.pdf$/i.test(urlWithoutQuery);
 
                                       return (
                                         <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
