@@ -33,13 +33,13 @@ export default function RootLayout({
   const connectSrc = [
     "'self'",
     'https://api.hna-acadex.com',
-    'https://res.cloudinary.com',
+    'https://gateway.storjshare.io',
     ...(isDev ? ['http://localhost:8000', 'ws:'] : []),
     ...(apiOrigin ? [apiOrigin] : []),
   ]
     .filter((value, index, array) => array.indexOf(value) === index)
     .join(' ');
-  const frameSrc = ["'self'", 'blob:', 'https://res.cloudinary.com'].join(' ');
+  const frameSrc = ["'self'", 'blob:', 'https://gateway.storjshare.io'].join(' ');
 
   const cspContent = isDev
     // Development: Allow unsafe-eval for React Refresh/HMR

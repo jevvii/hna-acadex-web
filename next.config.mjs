@@ -37,7 +37,7 @@ const nextConfig = {
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'api.hna-acadex.com' },
-      { protocol: 'https', hostname: 'res.cloudinary.com' },
+      { protocol: 'https', hostname: 'gateway.storjshare.io' },
     ],
   },
   // Silence turbopack workspace root warning

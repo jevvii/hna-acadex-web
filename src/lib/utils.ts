@@ -29,8 +29,8 @@ export function resolveFileUrl(rawUrl: string | undefined | null): string {
  * This allows media files to be fetched through the proxy, avoiding CSP issues
  * when the backend is accessed via different IPs (localhost vs LAN IP)
  *
- * Cloudinary URLs are returned as-is — upload-type resources are publicly
- * accessible and don't need proxying.
+ * S3 pre-signed URLs (Storj) and other external URLs are returned as-is —
+ * they are publicly accessible and don't need proxying.
  */
 export function toMediaProxyUrl(fileUrl: string | undefined | null): string {
   if (!fileUrl) return '';
@@ -48,7 +48,7 @@ export function toMediaProxyUrl(fileUrl: string | undefined | null): string {
     }
   }
 
-  // Fallback - return as-is (includes Cloudinary URLs which are publicly accessible)
+  // Fallback - return as-is (includes S3 pre-signed URLs which are publicly accessible)
   return fileUrl;
 }
 

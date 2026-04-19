@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HNA Acadex Web
 
-## Getting Started
+Next.js frontend for HNA Acadex, designed to run on Vercel and proxy API requests to the Django backend.
 
-First, run the development server:
+## Local development
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+1. Copy envs:
+   ```bash
+   cp .env.example .env.local
+   ```
+2. Start app:
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+## Production deployment (Vercel)
+
+Set these environment variables in Vercel Project Settings:
+
+```env
+NEXT_PUBLIC_API_URL=https://hna-acadex-backend-production-df16.up.railway.app
+NEXT_PUBLIC_SITE_URL=https://<your-vercel-domain>
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Notes
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `NEXT_PUBLIC_API_URL` must be the backend origin only (no `/api` suffix).
+- API calls go to `/api/*` on the frontend and are rewritten server-side to the backend origin.
+- Non-localhost `http://` backend URLs are auto-normalized to `https://` in build config to avoid mixed-content and secure-cookie issues.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Backend settings required for web auth/cookies
 
-## Learn More
+On your backend environment, ensure:
 
-To learn more about Next.js, take a look at the following resources:
+```env
+CORS_ALLOW_ALL_ORIGINS=0
+CORS_ALLOWED_ORIGINS=https://<your-vercel-domain>
+CSRF_TRUSTED_ORIGINS=https://<your-vercel-domain>,https://hna-acadex-backend-production-df16.up.railway.app
+FRONTEND_URL=https://<your-vercel-domain>
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Build commands
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run build
+npm run start
+```
