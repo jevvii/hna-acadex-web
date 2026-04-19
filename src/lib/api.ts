@@ -107,10 +107,22 @@ async function request(path: string, options: RequestOptions = {}, retry = true)
   }
 
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  let data: any = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
+    }
+  }
 
   if (!res.ok) {
-    const detail = data?.detail || data?.message || JSON.stringify(data) || 'Request failed';
+    const detail = typeof data === 'string'
+      ? data.trim() || 'Request failed'
+      : data?.detail
+        || data?.message
+        || JSON.stringify(data)
+        || 'Request failed';
     throw new ApiError(detail, res.status, data);
   }
 
