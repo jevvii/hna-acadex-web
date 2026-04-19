@@ -725,7 +725,7 @@ export default function QuizDetailsPage() {
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <h1 className="font-display text-2xl lg:text-3xl font-bold">{quiz.title}</h1>
+                  <h1 className="font-display text-2xl lg:text-3xl font-bold text-white">{quiz.title}</h1>
                   <span className={cn(
                     'px-3 py-1 rounded-full text-sm font-medium border',
                     quizStatus === 'available' ? 'bg-white/20 border-white/30 text-white' :

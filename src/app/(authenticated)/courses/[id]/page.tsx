@@ -1416,9 +1416,14 @@ function FilePreviewModal({
         setIsLoading(true);
         setHasError(false);
 
-        // Convert absolute URL to relative for Next.js proxy (avoids CSP issues with different IPs)
-        const proxyUrl = toMediaProxyUrl(file.file_url);
-        const response = await fetch(proxyUrl, {
+        // Route backend media through Next.js proxy; use direct URL for external/public files.
+        const resolvedUrl = toMediaProxyUrl(file.file_url);
+        if (!resolvedUrl.startsWith('/')) {
+          setBlobUrl(resolvedUrl);
+          return;
+        }
+
+        const response = await fetch(resolvedUrl, {
           credentials: 'include',
           signal: controller.signal,
         });
