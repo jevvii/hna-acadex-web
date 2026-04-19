@@ -372,8 +372,9 @@ export const filesApi = {
   downloadFile: async (fileUrl: string, fileName: string) => {
     // Convert absolute URL to relative for Next.js proxy (avoids CSP issues with different IPs)
     const proxyUrl = toMediaProxyUrl(fileUrl);
+    const useProxyAuth = proxyUrl.startsWith('/');
     const response = await fetch(proxyUrl, {
-      credentials: 'include',
+      credentials: useProxyAuth ? 'include' : 'omit',
     });
     if (!response.ok) throw new Error('Download failed');
     const blob = await response.blob();
