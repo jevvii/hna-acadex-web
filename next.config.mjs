@@ -47,89 +47,11 @@ const nextConfig = {
   async rewrites() {
     const apiUrl = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL);
     return [
-      // Proxy all /api/* requests to Django backend
-      // Using explicit path patterns that include trailing slash support
-      // Django requires trailing slashes on all URL patterns
-      {
-        source: '/api/auth/:path*',
-        destination: `${apiUrl}/api/auth/:path*`,
-      },
-      {
-        source: '/api/courses/:path*',
-        destination: `${apiUrl}/api/courses/:path*`,
-      },
-      {
-        source: '/api/course-sections/:path*',
-        destination: `${apiUrl}/api/course-sections/:path*`,
-      },
-      {
-        source: '/api/profiles/:path*',
-        destination: `${apiUrl}/api/profiles/:path*`,
-      },
-      {
-        source: '/api/dashboard/:path*',
-        destination: `${apiUrl}/api/dashboard/:path*`,
-      },
-      {
-        source: '/api/activities/:path*',
-        destination: `${apiUrl}/api/activities/:path*`,
-      },
-      {
-        source: '/api/quizzes/:path*',
-        destination: `${apiUrl}/api/quizzes/:path*`,
-      },
-      {
-        source: '/api/course-files/:path*',
-        destination: `${apiUrl}/api/course-files/:path*`,
-      },
-      {
-        source: '/api/announcements/:path*',
-        destination: `${apiUrl}/api/announcements/:path*`,
-      },
-      {
-        source: '/api/attendance/:path*',
-        destination: `${apiUrl}/api/attendance/:path*`,
-      },
-      {
-        source: '/api/calendar-events/:path*',
-        destination: `${apiUrl}/api/calendar-events/:path*`,
-      },
-      {
-        source: '/api/notifications/:path*',
-        destination: `${apiUrl}/api/notifications/:path*`,
-      },
-      {
-        source: '/api/todos/:path*',
-        destination: `${apiUrl}/api/todos/:path*`,
-      },
-      {
-        source: '/api/reminders/:path*',
-        destination: `${apiUrl}/api/reminders/:path*`,
-      },
-      {
-        source: '/api/activity-comments/:path*',
-        destination: `${apiUrl}/api/activity-comments/:path*`,
-      },
-      {
-        source: '/api/enrollments/:path*',
-        destination: `${apiUrl}/api/enrollments/:path*`,
-      },
-      {
-        source: '/api/activity-submissions/:path*',
-        destination: `${apiUrl}/api/activity-submissions/:path*`,
-      },
-      {
-        source: '/api/quiz-answers/:path*',
-        destination: `${apiUrl}/api/quiz-answers/:path*`,
-      },
-      {
-        source: '/api/quiz-questions/:path*',
-        destination: `${apiUrl}/api/quiz-questions/:path*`,
-      },
-      // Catch-all for other API routes (with trailing slash)
+      // Single catch-all keeps Django's trailing slash paths intact
+      // without creating double slashes for collection endpoints.
       {
         source: '/api/:path*',
-        destination: `${apiUrl}/api/:path*`,
+        destination: `${apiUrl}/api/:path*/`,
       },
       // Proxy media files to Django backend for PDF/image serving
       {
